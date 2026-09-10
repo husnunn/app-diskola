@@ -67,13 +67,18 @@ private fun readHomeUser(context: Context): HomeUser {
 
 private data class MenuTileData(val icon: String, val label: String, val locked: Boolean, val implemented: Boolean)
 
-private val menuTiles = listOf(
+/** Asesmen is a student-only module; teachers get Agenda Mingguan in that slot instead. */
+private fun menuTilesFor(isTeacher: Boolean) = listOf(
     MenuTileData("auto_stories", "Materi", locked = false, implemented = true),
     MenuTileData("assignment", "Tugas", locked = false, implemented = false),
     MenuTileData("how_to_reg", "Presensi", locked = false, implemented = true),
     MenuTileData("edit_note", "Jurnal", locked = false, implemented = false),
     MenuTileData("event_note", "Agenda", locked = false, implemented = false),
-    MenuTileData("quiz", "Asesmen", locked = false, implemented = false),
+    if (isTeacher) {
+        MenuTileData("event_available", "Agenda Mingguan", locked = false, implemented = false)
+    } else {
+        MenuTileData("quiz", "Asesmen", locked = false, implemented = true)
+    },
     MenuTileData("workspace_premium", "Poin", locked = false, implemented = false),
     MenuTileData("business_center", "Magang", locked = true, implemented = false),
     MenuTileData("menu_book", "Perpus", locked = true, implemented = false),
@@ -83,9 +88,12 @@ private val menuTiles = listOf(
 fun HomeScreen(
     onNavigateToMateri: () -> Unit,
     onNavigateToAbsensi: () -> Unit,
+    onNavigateToAsesmen: () -> Unit,
     onNavigateToNotifikasi: () -> Unit,
     modifier: Modifier = Modifier,
+    isTeacher: Boolean = false,
 ) {
+    val menuTiles = remember(isTeacher) { menuTilesFor(isTeacher) }
     val context = LocalContext.current
     var user by remember { mutableStateOf(readHomeUser(context)) }
     var comingSoonDialog by remember { mutableStateOf(false) }
@@ -96,6 +104,7 @@ fun HomeScreen(
         when {
             tile.label == "Materi" -> onNavigateToMateri()
             tile.label == "Presensi" -> onNavigateToAbsensi()
+            tile.label == "Asesmen" -> onNavigateToAsesmen()
             tile.locked -> lockedDialog = true
             else -> comingSoonDialog = true
         }

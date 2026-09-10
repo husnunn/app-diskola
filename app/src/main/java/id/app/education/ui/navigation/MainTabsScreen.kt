@@ -42,9 +42,21 @@ import id.app.education.ui.screens.akun.AkunScreen
 import id.app.education.ui.screens.akun.AkunSettingScreen
 import id.app.education.ui.screens.akun.readAkunSession
 import id.app.education.ui.screens.home.HomeScreen
+import id.app.education.ui.screens.akm.AkmDetailScreen
+import id.app.education.ui.screens.akm.AkmExplainScreen
+import id.app.education.ui.screens.akm.AkmQuestionScreen
+import id.app.education.ui.screens.akm.AkmResumeScreen
+import id.app.education.ui.screens.akm.AkmScoreScreen
+import id.app.education.ui.screens.akm.AkmScreen
+import id.app.education.ui.screens.materi.MapelGuruScreen
+import id.app.education.ui.screens.materi.MapelScreen
 import id.app.education.ui.screens.materi.MateriDetailScreen
-import id.app.education.ui.screens.materi.MateriScreen
+import id.app.education.ui.screens.materi.MateriGuruScreen
+import id.app.education.ui.screens.materi.MateriListScreen
 import id.app.education.ui.screens.materi.UploadMateriScreen
+import id.app.education.ui.screens.materi.initialsOf
+import id.app.education.ui.screens.materi.rememberIsTeacher
+import id.app.education.ui.screens.materi.targetLabel
 import id.app.education.ui.screens.notifikasi.NotifikasiDetailScreen
 import id.app.education.ui.screens.notifikasi.NotifikasiScreen
 import id.app.education.ui.screens.pembayaran.CheckoutScreen
@@ -60,6 +72,7 @@ import id.app.education.ui.screens.pembayaran.TransferScreen
 import id.app.education.ui.theme.LocalWindowWidth
 import id.app.education.ui.theme.WindowWidth
 import id.app.education.ui.theme.contentContainer
+import id.app.education.viewmodel.AkmViewModel
 import id.app.education.viewmodel.AkunViewModel
 import id.app.education.viewmodel.NotifikasiViewModel
 import id.app.education.viewmodel.PembayaranViewModel
@@ -138,9 +151,14 @@ fun MainTabsScreen(onLoggedOut: () -> Unit, modifier: Modifier = Modifier) {
                 modifier = Modifier.weight(1f).contentContainer(),
             ) {
                 composable<Route.MainTab.Pembelajaran> {
+                    val isTeacher = rememberIsTeacher()
                     HomeScreen(
-                        onNavigateToMateri = { navController.navigate(Route.Materi) },
+                        isTeacher = isTeacher,
+                        onNavigateToMateri = {
+                            navController.navigate(if (isTeacher) Route.MateriGuru else Route.Mapel)
+                        },
                         onNavigateToAbsensi = { navController.navigate(Route.Absensi) },
+                        onNavigateToAsesmen = { navController.navigate(Route.Akm.List) },
                         onNavigateToNotifikasi = { navController.navigate(Route.Notifikasi) },
                     )
                 }
@@ -162,12 +180,34 @@ fun MainTabsScreen(onLoggedOut: () -> Unit, modifier: Modifier = Modifier) {
                     )
                 }
     
-                composable<Route.Materi> {
-                    MateriScreen(
+                composable<Route.Mapel> {
+                    MapelScreen(
                         onBack = { navController.popBackStack() },
-                        onOpenDetail = { item -> navController.navigate(item.toDetailRoute()) },
-                        onAddMateri = { navController.navigate(Route.UploadMateri()) },
-                        onEditMateri = { item -> navController.navigate(item.toEditRoute()) },
+                        onOpenSubject = { navController.navigate(Route.MateriList(it.id, it.name)) },
+                    )
+                }
+                composable<Route.MateriGuru> {
+                    MateriGuruScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenSubjects = { navController.navigate(Route.MapelGuru) },
+                        onOpenMateri = { navController.navigate(it.toDetailRoute()) },
+                        onUpload = { navController.navigate(Route.UploadMateri()) },
+                        onEdit = { navController.navigate(it.toEditRoute()) },
+                    )
+                }
+                composable<Route.MapelGuru> {
+                    MapelGuruScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenSubject = { navController.navigate(Route.MateriList(it.id, it.name)) },
+                    )
+                }
+                composable<Route.MateriList> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.MateriList>()
+                    MateriListScreen(
+                        subjectId = route.subjectId,
+                        subjectName = route.subjectName,
+                        onBack = { navController.popBackStack() },
+                        onOpenMateri = { navController.navigate(it.toDetailRoute()) },
                     )
                 }
                 composable<Route.Absensi> {
@@ -175,13 +215,70 @@ fun MainTabsScreen(onLoggedOut: () -> Unit, modifier: Modifier = Modifier) {
                 }
                 composable<Route.MateriDetail> { backStackEntry ->
                     val route = backStackEntry.toRoute<Route.MateriDetail>()
-                    MateriDetailScreen(route = route, onBack = { navController.popBackStack() })
+                    MateriDetailScreen(
+                        route = route,
+                        onBack = { navController.popBackStack() },
+                        onOpenFile = {},
+                        onDownloadFile = {},
+                        onOpenLink = {},
+                    )
                 }
                 composable<Route.UploadMateri> { backStackEntry ->
                     val route = backStackEntry.toRoute<Route.UploadMateri>()
                     UploadMateriScreen(route = route, onDone = { navController.popBackStack() })
                 }
     
+                composable<Route.Akm.List> {
+                    val vm: AkmViewModel = hiltViewModel(navController.getBackStackEntry(Route.Akm.List))
+                    AkmScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenDetail = { navController.navigate(Route.Akm.Detail(it)) },
+                        onOpenScore = { navController.navigate(Route.Akm.Score(it)) },
+                        showTimeGate = true,
+                        viewModel = vm,
+                    )
+                }
+                composable<Route.Akm.Detail> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.Akm.Detail>()
+                    val vm: AkmViewModel = hiltViewModel(navController.getBackStackEntry(Route.Akm.List))
+                    AkmDetailScreen(
+                        akmId = route.id,
+                        onBack = { navController.popBackStack() },
+                        onStart = { navController.navigate(Route.Akm.Resume(route.id)) },
+                        onViewScore = { navController.navigate(Route.Akm.Score(route.id)) },
+                        viewModel = vm,
+                    )
+                }
+                composable<Route.Akm.Resume> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.Akm.Resume>()
+                    val vm: AkmViewModel = hiltViewModel(navController.getBackStackEntry(Route.Akm.List))
+                    AkmResumeScreen(
+                        akmId = route.id,
+                        onOpenQuestions = { navController.navigate(Route.Akm.Question(route.id)) },
+                        // Pop back to the existing list rather than navigating to a fresh one:
+                        // recreating it would drop the shared AkmViewModel and re-fire the clock gate.
+                        onSubmitted = { navController.popBackStack(Route.Akm.List, inclusive = false) },
+                        viewModel = vm,
+                    )
+                }
+                composable<Route.Akm.Question> {
+                    val vm: AkmViewModel = hiltViewModel(navController.getBackStackEntry(Route.Akm.List))
+                    AkmQuestionScreen(onBack = { navController.popBackStack() }, viewModel = vm)
+                }
+                composable<Route.Akm.Score> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.Akm.Score>()
+                    val vm: AkmViewModel = hiltViewModel(navController.getBackStackEntry(Route.Akm.List))
+                    AkmScoreScreen(
+                        scoreId = route.id,
+                        onBack = { navController.popBackStack() },
+                        onOpenExplanation = { navController.navigate(Route.Akm.Explain(route.id)) },
+                        viewModel = vm,
+                    )
+                }
+                composable<Route.Akm.Explain> {
+                    AkmExplainScreen(onBack = { navController.popBackStack() })
+                }
+
                 composable<Route.Notifikasi> {
                     val viewModel: NotifikasiViewModel = hiltViewModel(navController.getBackStackEntry(Route.Notifikasi))
                     NotifikasiScreen(
@@ -303,14 +400,12 @@ private fun MateriItem.toDetailRoute() = Route.MateriDetail(
     title = name,
     description = description,
     teacher = teacher?.name.orEmpty(),
+    teacherInitials = initialsOf(teacher?.name.orEmpty()),
     date = created_at_label,
-    subjectName = subject?.name.orEmpty(),
-    subjectIcon = subject?.icon_image.orEmpty(),
-    filePath = file_path.orEmpty(),
-    fileName = file_name.orEmpty(),
-    fileType = file_type.orEmpty(),
-    fileSize = file_size.orEmpty(),
-    links = uri?.link ?: emptyList(),
+    target = targetLabel().orEmpty(),
+    fileName = file_name,
+    fileSize = file_size,
+    link = uri?.link?.firstOrNull().orEmpty(),
 )
 
 private fun MateriItem.toEditRoute() = Route.UploadMateri(

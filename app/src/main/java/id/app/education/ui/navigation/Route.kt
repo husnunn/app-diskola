@@ -59,24 +59,35 @@ sealed interface Route {
 
     // Pushed from the Pembelajaran (Home) tab's "Menu Pembelajaran" grid.
     @Serializable
-    data object Materi : Route
-
-    @Serializable
     data object Absensi : Route
+
+    /** Materi entry point for students — the subject picker. */
+    @Serializable
+    data object Mapel : Route
+
+    /** Materi entry point for teachers — "Materi Saya", the list of what they uploaded. */
+    @Serializable
+    data object MateriGuru : Route
+
+    /** Subjects a teacher is assigned to, reached from [MateriGuru]. */
+    @Serializable
+    data object MapelGuru : Route
+
+    /** Materials within one subject — shared by both roles. */
+    @Serializable
+    data class MateriList(val subjectId: Int = 0, val subjectName: String = "") : Route
 
     @Serializable
     data class MateriDetail(
         val title: String = "",
         val description: String = "",
         val teacher: String = "",
+        val teacherInitials: String = "",
         val date: String = "",
-        val subjectName: String = "",
-        val subjectIcon: String = "",
-        val filePath: String = "",
+        val target: String = "",
         val fileName: String = "",
-        val fileType: String = "",
         val fileSize: String = "",
-        val links: List<String> = emptyList(),
+        val link: String = "",
     ) : Route
 
     @Serializable
@@ -89,6 +100,28 @@ sealed interface Route {
         val link: String = "",
         val classId: Int = -1,
     ) : Route
+
+    /** Asesmen/AKM, pushed from Home's "Asesmen" tile. Students only. UI-only — no backend yet. */
+    sealed interface Akm : Route {
+        @Serializable
+        data object List : Akm
+
+        @Serializable
+        data class Detail(val id: Int = 0) : Akm
+
+        /** Exam lobby — the instruction tree, shown in exam mode. */
+        @Serializable
+        data class Resume(val id: Int = 0) : Akm
+
+        @Serializable
+        data class Question(val id: Int = 0) : Akm
+
+        @Serializable
+        data class Score(val id: Int = 0) : Akm
+
+        @Serializable
+        data class Explain(val id: Int = 0) : Akm
+    }
 
     // Pushed from Home's notification bell.
     @Serializable

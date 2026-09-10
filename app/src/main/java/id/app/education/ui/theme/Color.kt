@@ -166,6 +166,16 @@ data class ExtendedColors(
     val brandGradientDark: Color,
     val brandGradientMid: Color,
     val brandGradientLight: Color,
+    /**
+     * Exam-mode header surface. Deliberately its own token rather than `tertiary`: the handoff
+     * paints this bar with hardcoded white text, and `tertiary` flips to a light mint in dark
+     * mode, where white would be unreadable.
+     */
+    val examSurface: Color,
+    val onExamSurface: Color,
+    /** Penalty countdown chip — always reads as an alert, in either theme. */
+    val penaltyContainer: Color,
+    val onPenaltyContainer: Color,
 )
 
 val LightExtendedColors = ExtendedColors(
@@ -177,6 +187,10 @@ val LightExtendedColors = ExtendedColors(
     brandGradientDark = Color(0xFF014D48),
     brandGradientMid = Color(0xFF0F7A6E),
     brandGradientLight = Color(0xFF12A78E),
+    examSurface = Color(0xFF2D4960),
+    onExamSurface = Color(0xFFFFFFFF),
+    penaltyContainer = Color(0xFFFFDAD6),
+    onPenaltyContainer = Color(0xFF93000A),
 )
 
 val DarkExtendedColors = ExtendedColors(
@@ -188,6 +202,10 @@ val DarkExtendedColors = ExtendedColors(
     brandGradientDark = Color(0xFF014D48),
     brandGradientMid = Color(0xFF0F7A6E),
     brandGradientLight = Color(0xFF12A78E),
+    examSurface = Color(0xFF1E3345),
+    onExamSurface = Color(0xFFFFFFFF),
+    penaltyContainer = Color(0xFF93000A),
+    onPenaltyContainer = Color(0xFFFFDAD6),
 )
 
 val LocalExtendedColors = staticCompositionLocalOf { LightExtendedColors }

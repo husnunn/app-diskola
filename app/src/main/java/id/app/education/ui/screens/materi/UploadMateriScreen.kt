@@ -48,6 +48,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Info
+import id.app.education.ui.components.DetailScaffold
+import id.app.education.ui.components.SectionLabel
+import id.app.education.ui.theme.DiskolaExtraShapes
+import id.app.education.ui.theme.ScreenHorizontalPadding
+import id.app.education.ui.theme.extendedColors
 import id.app.education.ui.components.AppButton
 import id.app.education.ui.components.AppTextField
 import id.app.education.ui.navigation.Route
@@ -107,20 +116,23 @@ fun UploadMateriScreen(
         selectedFileUri = uri
         selectedFileName = queryFileName(context, uri) ?: "upload.pdf"
     }
+    val canSubmit = judul.isNotBlank() &&
+        selectedSubjectId != null &&
+        (selectedFileUri != null || urlLink.isNotBlank())
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(if (route.isEdit) "Edit Materi" else "Upload Materi") },
-                navigationIcon = {
-                    IconButton(onClick = onDone) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null) }
-                },
-            )
-        },
+    DetailScaffold(
+        title = if (route.isEdit) "Edit Materi" else "Unggah Materi",
+        onBack = onDone,
+        useCloseIcon = true,
+        modifier = modifier,
         bottomBar = {
-            Box(modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerLowest).padding(Spacing.xl)) {
+            Box(
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                    .padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md),
+            ) {
                 AppButton(
-                    text = if (route.isEdit) "Simpan Perubahan" else "Posting Materi",
+                    text = if (route.isEdit) "Simpan Perubahan" else "Posting materi",
                     onClick = {
                         val data = buildRequestData(judul, deskripsi, urlLink, target, selectedGrade, selectedMajorId, selectedClassId, selectedSubjectId)
                         val filePart = selectedFileUri?.let { buildFilePart(context, it, selectedFileName ?: "upload.pdf") }
@@ -130,99 +142,217 @@ fun UploadMateriScreen(
                             viewModel.uploadMateri(data, filePart)
                         }
                     },
+                    enabled = canSubmit,
                     loading = loading,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
         },
-        modifier = modifier,
     ) { padding ->
         Column(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(Spacing.xl),
+                .padding(horizontal = ScreenHorizontalPadding)
+                .padding(bottom = Spacing.xl),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
-            AppTextField(value = judul, onValueChange = { if (it.length <= 500) judul = it }, label = "Judul Materi", placeholder = "Ketik judul di sini")
-            AppTextField(value = deskripsi, onValueChange = { if (it.length <= 5000) deskripsi = it }, label = "Deskripsi", placeholder = "Ketik deskripsi")
-
-            SimpleDropdown(
-                label = "Mata Pelajaran",
-                options = teacherSubjects.map { it.name },
-                selected = selectedSubjectName,
-                onSelected = { name ->
-                    selectedSubjectName = name
-                    selectedSubjectId = teacherSubjects.find { it.name == name }?.id
-                },
-            )
-
-            Text("Ditampilkan ke", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
-
-            TargetRow(
-                label = "Jenjang",
-                selected = target == UploadTarget.JENJANG,
-                onSelect = { target = UploadTarget.JENJANG },
-            ) {
-                SimpleDropdown(label = "", options = listOf("10", "11", "12"), selected = selectedGrade, onSelected = { selectedGrade = it }, enabled = target == UploadTarget.JENJANG)
-            }
-            TargetRow(
-                label = "Jurusan",
-                selected = target == UploadTarget.JURUSAN,
-                onSelect = { target = UploadTarget.JURUSAN },
-            ) {
-                SimpleDropdown(
-                    label = "",
-                    options = majors.map { it.name },
-                    selected = majors.find { it.id == selectedMajorId }?.name.orEmpty(),
-                    onSelected = { name -> selectedMajorId = majors.find { it.name == name }?.id },
-                    enabled = target == UploadTarget.JURUSAN,
+            FormCard {
+                FieldLabel(text = "Judul Materi", required = true, counter = "${judul.length}/500")
+                AppTextField(
+                    value = judul,
+                    onValueChange = { if (it.length <= 500) judul = it },
+                    placeholder = "mis. Struktur Data: Array dan ArrayList",
                 )
-            }
-            TargetRow(
-                label = "Kelas",
-                selected = target == UploadTarget.KELAS,
-                onSelect = { target = UploadTarget.KELAS },
-            ) {
+
+                FieldLabel(text = "Deskripsi", required = false, counter = "${deskripsi.length}/5000")
+                AppTextField(
+                    value = deskripsi,
+                    onValueChange = { if (it.length <= 5000) deskripsi = it },
+                    placeholder = "Ringkasan isi materi (opsional)",
+                )
+
+                FieldLabel(text = "Mata Pelajaran", required = true)
                 SimpleDropdown(
                     label = "",
-                    options = classes.map { it.name },
-                    selected = classes.find { it.id == selectedClassId }?.name.orEmpty(),
-                    onSelected = { name -> selectedClassId = classes.find { it.name == name }?.id },
-                    enabled = target == UploadTarget.KELAS,
+                    options = teacherSubjects.map { it.name },
+                    selected = selectedSubjectName.ifBlank { "Pilih mata pelajaran" },
+                    onSelected = { name ->
+                        selectedSubjectName = name
+                        selectedSubjectId = teacherSubjects.find { it.name == name }?.id
+                    },
                 )
             }
 
-            androidx.compose.material3.HorizontalDivider()
+            FormCard {
+                SectionLabel("DITAMPILKAN KE")
+                TargetRadio("Jenjang", target == UploadTarget.JENJANG) {
+                    target = UploadTarget.JENJANG
+                    selectedMajorId = null
+                    selectedClassId = null
+                }
+                TargetRadio("Jurusan", target == UploadTarget.JURUSAN) {
+                    target = UploadTarget.JURUSAN
+                    selectedGrade = ""
+                    selectedClassId = null
+                }
+                TargetRadio("Kelas", target == UploadTarget.KELAS) {
+                    target = UploadTarget.KELAS
+                    selectedGrade = ""
+                    selectedMajorId = null
+                }
 
-            Text("File Materi", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-            Text("Upload file · format PDF", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                when (target) {
+                    UploadTarget.JENJANG -> SimpleDropdown(
+                        label = "",
+                        options = listOf("10", "11", "12"),
+                        selected = selectedGrade.ifBlank { "Pilih jenjang" },
+                        onSelected = { selectedGrade = it },
+                    )
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(120.dp)
-                    .border(1.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Rounded.UploadFile, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
-                    Spacer(modifier = Modifier.size(Spacing.sm))
-                    AppButton(
-                        text = "Lampirkan File",
-                        onClick = { filePickerLauncher.launch("application/pdf") },
-                        variant = id.app.education.ui.components.ButtonVariant.Outlined,
-                        modifier = Modifier.width(180.dp),
+                    UploadTarget.JURUSAN -> SimpleDropdown(
+                        label = "",
+                        options = majors.map { it.name },
+                        selected = majors.find { it.id == selectedMajorId }?.name ?: "Pilih jurusan",
+                        onSelected = { name -> selectedMajorId = majors.find { it.name == name }?.id },
+                    )
+
+                    UploadTarget.KELAS -> SimpleDropdown(
+                        label = "",
+                        options = classes.map { it.name },
+                        selected = classes.find { it.id == selectedClassId }?.name ?: "Pilih kelas",
+                        onSelected = { name -> selectedClassId = classes.find { it.name == name }?.id },
+                    )
+                }
+
+                Text(
+                    "Hanya satu target yang dikirim — mengganti mode akan mengosongkan pilihan sebelumnya.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            FormCard {
+                FieldLabel(text = "File Materi", required = false)
+                FileDropZone(
+                    fileName = selectedFileName,
+                    onPick = { filePickerLauncher.launch("*/*") },
+                    onClear = {
+                        selectedFileUri = null
+                        selectedFileName = null
+                    },
+                )
+
+                FieldLabel(text = "Url Link", required = false)
+                AppTextField(
+                    value = urlLink,
+                    onValueChange = { urlLink = it },
+                    placeholder = "https://",
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow, DiskolaExtraShapes.card)
+                        .padding(Spacing.lg),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Icon(
+                        Icons.Rounded.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.extendedColors.warning,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Text(
+                        "Isi minimal satu: berkas materi atau tautan. Deskripsi tidak wajib.",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = Spacing.md),
                     )
                 }
             }
-            selectedFileName?.let {
-                Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-            }
+        }
+    }
+}
 
-            AppTextField(value = urlLink, onValueChange = { urlLink = it }, label = "Url Link", placeholder = "Ketik url")
-            Spacer(modifier = Modifier.size(Spacing.huge))
+/** One bordered block of the upload form. */
+@Composable
+private fun FormCard(content: @Composable () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest, DiskolaExtraShapes.card)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, DiskolaExtraShapes.card)
+            .padding(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun FieldLabel(text: String, required: Boolean, counter: String? = null) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        if (required) {
+            Text(" *", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.error)
+        }
+        Spacer(modifier = Modifier.weight(1f))
+        counter?.let {
+            Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun TargetRadio(label: String, selected: Boolean, onSelect: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clickable(onClick = onSelect),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = selected, onClick = onSelect)
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+@Composable
+private fun FileDropZone(fileName: String?, onPick: () -> Unit, onClear: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 52.dp)
+            .background(scheme.surfaceContainerLowest, DiskolaExtraShapes.card)
+            .border(1.5.dp, scheme.outlineVariant, DiskolaExtraShapes.card)
+            .clickable(onClick = onPick)
+            .padding(Spacing.lg),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Rounded.UploadFile, contentDescription = null, tint = scheme.primary)
+        Column(modifier = Modifier.weight(1f).padding(start = Spacing.md)) {
+            Text(
+                fileName ?: "Belum ada berkas dipilih",
+                style = MaterialTheme.typography.bodySmall,
+                color = scheme.onSurface,
+            )
+            Text(
+                "Format PDF atau gambar · maksimal 12 MB",
+                style = MaterialTheme.typography.labelSmall,
+                color = scheme.onSurfaceVariant,
+            )
+        }
+        if (fileName != null) {
+            IconButton(onClick = onClear) {
+                Icon(Icons.Rounded.Close, contentDescription = "Hapus berkas", tint = scheme.error)
+            }
         }
     }
 }
