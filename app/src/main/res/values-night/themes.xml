@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Night overrides for Theme.MVVM to improve contrast in dark mode -->
+    <style name="Theme.MVVM" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Brand (night palette comes from values-night/colors.xml) -->
+        <item name="colorPrimary">@color/ref_primary</item>
+        <item name="colorPrimaryVariant">@color/ref_primary_container</item>
+        <item name="colorSecondary">@color/ref_secondary</item>
+        <item name="colorSecondaryVariant">@color/ref_secondary_container</item>
+
+        <!-- Surfaces -->
+        <item name="colorSurface">@color/ref_surface</item>
+        <item name="colorOnSurface">@color/ref_on_surface</item>
+        <item name="android:colorBackground">@color/ref_background</item>
+        <item name="colorOnBackground">@color/ref_on_surface</item>
+
+        <!-- On colors tuned for night -->
+        <item name="colorOnPrimary">@color/black</item>
+        <item name="colorOnSecondary">@color/black</item>
+
+        <!-- System bars tuned for dark mode -->
+        <item name="android:statusBarColor">@color/ref_surface_container_highest</item>
+        <item name="android:navigationBarColor">@color/ref_surface_container_low</item>
+        <!-- dark background -> light icons -->
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+
+        <!-- Window -->
+        <item name="android:windowBackground">@color/ref_background</item>
+
+        <!-- Material widgets fallback -->
+        <item name="materialButtonStyle">@style/Widget.MaterialComponents.Button</item>
+        <item name="textInputStyle">@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox</item>
+    </style>
+
+</resources>

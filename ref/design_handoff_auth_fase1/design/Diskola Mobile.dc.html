@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=block" rel="stylesheet">
+<style>
+body{margin:0;background:#e6ede9;font-family:Lato,system-ui,sans-serif}
+a{color:#006A60;text-decoration:none}
+a:hover{color:#005048}
+@keyframes dskSpin{to{transform:rotate(360deg)}}
+@keyframes dskIn{from{opacity:0;transform:scale(.86)}to{opacity:1;transform:scale(1)}}
+@keyframes dskFade{from{opacity:0}to{opacity:1}}
+@keyframes dskUp{from{transform:translateY(28px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes dskPop{from{transform:scale(.94);opacity:0}to{transform:scale(1);opacity:1}}
+.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}
+.dv-tname{font:900 13px/1.2 Lato,sans-serif;color:#1a1a1a}
+.dv-opts{display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}
+.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 Lato,sans-serif;color:rgba(0,0,0,.55)}
+.dv-card{max-width:100%;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}
+.dv-opt:target .dv-oid{background:#2a78d6;color:#fff}
+.dv-next{margin:22px 0 0;font:12px/1.5 Lato,sans-serif;color:rgba(0,0,0,.5)}
+</style>
+</helmet>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Diskola Mobile — Fase 0 (design system) + Fase 1 (Auth)</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a">
+  <div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Prototipe Auth — bisa diklik, terang &amp; gelap</div>
+  <div style="display:flex;flex-direction:column;gap:12px;width:428px">
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:10px;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:8px">
+      <button onClick="{{ toggleTheme }}" style="height:30px;padding:0 12px;border-radius:15px;border:1px solid rgba(0,0,0,.14);background:#1a1a1a;color:#fff;font:700 11px Lato,sans-serif;cursor:pointer;display:flex;align-items:center;gap:6px"><span style="font-family:'Material Symbols Rounded';font-size:15px">{{ themeIcon }}</span>{{ themeLabel }}</button>
+      <button onClick="{{ toggleRole }}" style="height:30px;padding:0 12px;border-radius:15px;border:1px solid rgba(0,0,0,.14);background:#fff;color:#1a1a1a;font:700 11px Lato,sans-serif;cursor:pointer">Peran: {{ roleLabel }}</button>
+      <sc-for list="{{ jumps }}" as="j" hint-placeholder-count="6"><button onClick="{{ j.on }}" style="height:30px;padding:0 11px;border-radius:15px;border:1px solid rgba(0,0,0,.14);font:700 11px Lato,sans-serif;cursor:pointer;background:{{ j.bg }};color:{{ j.fg }}">{{ j.label }}</button></sc-for>
+    </div>
+
+    <div style="width:412px;height:892px;border-radius:26px;overflow:hidden;border:8px solid rgba(116,119,117,.5);box-shadow:0 30px 80px rgba(0,0,0,.25);box-sizing:border-box;display:flex;--p:#006A60;--op:#FFFFFF;--pc:#005048;--opc:#95E7DA;--sec:#007A6E;--secc:#CAE5E0;--osecc:#4E6763;--ter:#2D4960;--terc:#456179;--oterc:#BEDCF8;--err:#BA1A1A;--errc:#FFDAD6;--oerrc:#93000A;--bg:#F4FAF8;--on:#151D1C;--sv:#DBE4E2;--osv:#3E4947;--out:#6E7977;--outv:#BEC9C6;--c0:#FFFFFF;--c1:#EDF6F3;--c2:#E7F0ED;--c3:#E1EAE7;--c4:#DBE4E2;--ok:#008779;--warn:#FF891C;--g1:rgba(0,106,96,0.12);--g2:rgba(159,242,228,0.25);--g3:rgba(0,106,96,0.05);--arcA:rgba(0,106,96,0.16);--arcB:rgba(0,106,96,0.04);--arcO:rgba(0,106,96,0.12);--w1:#EDF6F3;--w2:#F4FAF8;{{ themeVars }}">
+      <div style="position:relative;flex:1;overflow:hidden;background:var(--bg);display:flex;flex-direction:column;font-family:Lato,system-ui,sans-serif;color:var(--on)">
+
+        <sc-if value="{{ showAmbient }}" hint-placeholder-val="{{ true }}">
+          <div style="position:absolute;inset:0;background:linear-gradient(180deg,var(--w1) 0%,var(--w2) 50%,var(--w1) 100%);pointer-events:none"></div>
+          <div style="position:absolute;top:0;left:0;right:0;height:34%;background:linear-gradient(180deg,var(--arcA),var(--arcB));border-bottom:1px solid var(--arcO);clip-path:polygon(0 0,100% 0,100% 64%,50% 100%,0 58%);pointer-events:none"></div>
+          <div style="position:absolute;top:-80px;right:-64px;width:288px;height:288px;border-radius:50%;filter:blur(40px);background:radial-gradient(circle,var(--g1),transparent 70%);pointer-events:none"></div>
+          <div style="position:absolute;top:112px;left:-80px;width:240px;height:240px;border-radius:50%;filter:blur(64px);background:radial-gradient(circle,var(--g2),transparent 70%);pointer-events:none"></div>
+          <div style="position:absolute;bottom:-64px;right:0;width:320px;height:240px;border-radius:50%;filter:blur(64px);background:radial-gradient(circle,var(--g3),transparent 70%);pointer-events:none"></div>
+        </sc-if>
+
+        <div style="position:relative;z-index:2;flex:none"><x-import component-from-global-scope="AndroidStatusBar" from="./android-frame.jsx" dark="{{ isDark }}" hint-size="100%,40px"></x-import></div>
+
+        <div style="position:relative;z-index:2;flex:1;min-height:0;display:flex;flex-direction:column">
+
+          <sc-if value="{{ isSplash }}" hint-placeholder-val="{{ true }}">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;animation:dskFade .4s ease-out">
+              <img src="logo-mark.png" alt="Diskola" style="width:108px;height:auto;animation:dskIn .4s cubic-bezier(.05,.7,.1,1)">
+              <div style="font:900 22px/1 Lato,sans-serif;letter-spacing:7px;color:var(--on)">DISKOLA</div>
+              <div style="display:flex;align-items:center;gap:10px;margin-top:12px">
+                <div style="width:18px;height:18px;border-radius:50%;border:2.5px solid var(--c4);border-top-color:var(--p);animation:dskSpin .9s linear infinite"></div>
+                <span style="font:400 14px Lato,sans-serif;color:var(--osv)">Memuat…</span>
+              </div>
+            </div>
+            <div style="text-align:center;padding-bottom:12px;font:400 10px Lato,sans-serif;letter-spacing:1px;color:var(--osv);opacity:.75">DISKOLA MOBILE V2.2.0</div>
+          </sc-if>
+
+          <sc-if value="{{ isOnboard }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;display:flex;flex-direction:column;padding:8px 20px 20px;animation:dskFade .25s ease-out">
+              <div style="display:flex;align-items:center;gap:8px">
+                <img src="logo-mark.png" alt="" style="width:30px;height:auto">
+                <span style="font:900 13px/1 Lato,sans-serif;letter-spacing:3px;color:var(--on)">DISKOLA</span>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;text-align:center">
+                <div style="width:252px;height:196px;border-radius:24px;border:1.5px dashed var(--outv);background:var(--c1);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px">
+                  <span style="font-family:'Material Symbols Rounded';font-size:52px;color:var(--p)">{{ obIcon }}</span>
+                  <span style="font:700 11px Lato,sans-serif;color:var(--osv);letter-spacing:.5px">Ilustrasi · {{ obTag }}</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:10px">
+                  <div style="font:900 25px/1.25 Lato,sans-serif;text-wrap:pretty">{{ obTitle }}</div>
+                  <div style="font:400 15px/1.6 Lato,sans-serif;color:var(--osv);text-wrap:pretty">{{ obDesc }}</div>
+                </div>
+              </div>
+              <div style="display:flex;gap:6px;justify-content:center;padding:20px 0 24px">
+                <sc-for list="{{ dots }}" as="d" hint-placeholder-count="3"><div style="height:6px;border-radius:3px;background:var(--p);transition:all .25s cubic-bezier(.05,.7,.1,1);width:{{ d.w }};opacity:{{ d.o }}"></div></sc-for>
+              </div>
+              <div style="display:flex;gap:12px;align-items:center">
+                <sc-if value="{{ obNotFirst }}" hint-placeholder-val="{{ false }}">
+                  <button onClick="{{ obBack }}" style="height:52px;padding:0 20px;border-radius:14px;border:none;background:transparent;color:var(--p);font:900 14px Lato,sans-serif;cursor:pointer">kembali</button>
+                </sc-if>
+                <button onClick="{{ obNext }}" style="flex:1;height:52px;border-radius:14px;border:none;background:var(--p);color:var(--op);font:900 15px Lato,sans-serif;cursor:pointer;transition:transform .15s cubic-bezier(.05,.7,.1,1)" style-active="transform:scale(.97)">{{ obCta }}</button>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isLogin }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;min-height:0;overflow:auto;padding:12px 20px 28px;display:flex;flex-direction:column;gap:18px;animation:dskFade .25s ease-out">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+                <img src="logo-mark.png" alt="Diskola" style="width:56px;height:auto">
+                <div style="font:900 20px/1 Lato,sans-serif;letter-spacing:6px;color:var(--on)">DISKOLA</div>
+                <div style="font:900 9px/1 Lato,sans-serif;letter-spacing:1.6px;color:var(--osv);text-align:center">SISTEM INFORMASI AKADEMIK TERPADU</div>
+                <div style="height:26px;padding:0 10px;border-radius:13px;background:var(--c1);display:flex;align-items:center;gap:6px;margin-top:2px"><span style="width:6px;height:6px;border-radius:50%;background:var(--ok)"></span><span style="font:900 10px Lato,sans-serif;letter-spacing:.6px;color:var(--ok)">Aktif</span></div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <div style="font:900 26px/1.2 Lato,sans-serif">Selamat Datang</div>
+                <div style="font:400 14px/1.5 Lato,sans-serif;color:var(--osv)">Masuk untuk melanjutkan ke portal sekolahmu.</div>
+              </div>
+
+              <div style="background:var(--c0);border:1px solid var(--outv);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:16px">
+                <div style="font:900 16px/1 Lato,sans-serif">Login Akun</div>
+
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  <div style="font:700 12px Lato,sans-serif;color:var(--osv)">NISN / NIS / NIK</div>
+                  <input value="{{ nisn }}" onChange="{{ onNisn }}" inputMode="numeric" placeholder="Contoh: 0051234567" style="height:52px;box-sizing:border-box;border-radius:14px;border:1.5px solid var(--outv);background:transparent;padding:0 16px;font:400 15px Lato,sans-serif;color:var(--on);width:100%;outline:none" style-focus="border-color:var(--p);border-width:2px">
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  <div style="font:700 12px Lato,sans-serif;color:var(--osv)">Sekolah</div>
+                  <button onClick="{{ openSheet }}" style="height:52px;box-sizing:border-box;border-radius:14px;border:1.5px solid var(--outv);background:transparent;padding:0 14px 0 16px;display:flex;align-items:center;gap:10px;width:100%;cursor:pointer;text-align:left" style-hover="border-color:var(--out)">
+                    <span style="flex:1;font:400 15px Lato,sans-serif;color:{{ schoolColor }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ schoolLabel }}</span>
+                    <span style="font-family:'Material Symbols Rounded';font-size:22px;color:var(--osv)">expand_more</span>
+                  </button>
+                </div>
+
+                <div onClick="{{ toggleTerms }}" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;min-height:48px;padding-top:2px">
+                  <span style="font-family:'Material Symbols Rounded';font-size:22px;color:{{ termsColor }};flex:none">{{ termsIcon }}</span>
+                  <span style="font:400 13px/1.5 Lato,sans-serif;color:var(--osv)">Saya menyetujui <a href="#1a" onClick="{{ openPolicy }}" style="color:var(--p);font-weight:700">Syarat &amp; Ketentuan</a> penggunaan Diskola.</span>
+                </div>
+
+                <button onClick="{{ submitLogin }}" disabled="{{ loginDisabled }}" style="height:52px;border-radius:14px;border:none;background:var(--p);color:var(--op);font:900 15px Lato,sans-serif;cursor:pointer;transition:transform .15s cubic-bezier(.05,.7,.1,1);opacity:{{ loginAlpha }}" style-active="transform:scale(.98)">Masuk</button>
+
+                <div style="display:flex;align-items:center;gap:12px"><div style="flex:1;height:1px;background:var(--outv)"></div><span style="font:400 12px Lato,sans-serif;color:var(--osv)">atau</span><div style="flex:1;height:1px;background:var(--outv)"></div></div>
+
+                <button onClick="{{ startSso }}" style="height:52px;border-radius:14px;border:1.5px solid var(--out);background:transparent;color:var(--on);font:900 14px Lato,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px" style-active="transform:scale(.98)">
+                  <span style="width:20px;height:20px;border-radius:5px;border:1px dashed var(--out);display:flex;align-items:center;justify-content:center;font:900 11px Lato,sans-serif;color:var(--osv)">G</span>
+                  Masuk dengan Akun Google
+                </button>
+              </div>
+
+              <div style="background:var(--c1);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px">
+                <div style="font:400 13px/1.5 Lato,sans-serif;color:var(--osv)"><strong style="color:var(--on)">NISN/NIK belum terdaftar?</strong> Hubungi operator sekolah Anda untuk pendaftaran akun.</div>
+                <button style="height:44px;align-self:flex-start;padding:0 20px;border-radius:14px;border:1.5px solid var(--out);background:transparent;color:var(--p);font:900 13px Lato,sans-serif;cursor:pointer">Bantuan</button>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isPass }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;min-height:0;overflow:auto;padding:4px 20px 28px;display:flex;flex-direction:column;gap:20px;animation:dskFade .25s ease-out">
+              <div style="display:flex;align-items:center;justify-content:space-between;min-height:48px">
+                <button onClick="{{ backToLogin }}" style="width:48px;height:48px;margin-left:-12px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;color:var(--on)">arrow_back</span></button>
+                <img src="logo-mark.png" alt="" style="width:30px;height:auto">
+              </div>
+
+              <div style="display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center">
+                <div style="font:900 10px/1 Lato,sans-serif;letter-spacing:2.2px;color:var(--osv)">MASUK SEBAGAI</div>
+                <div style="width:84px;height:84px;border-radius:50%;background:var(--c1);border:2px solid var(--outv);display:flex;align-items:center;justify-content:center;font:900 26px Lato,sans-serif;color:var(--p)">MD</div>
+                <div style="font:900 20px/1.3 Lato,sans-serif;max-width:280px;text-wrap:pretty">Muhammad Dliyaurrahman Muzakki</div>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <span style="height:24px;padding:0 10px;border-radius:12px;background:var(--secc);color:var(--osecc);font:900 10px Lato,sans-serif;letter-spacing:.6px;display:flex;align-items:center">{{ roleBadge }}</span>
+                  <span style="font:400 13px Lato,sans-serif;color:var(--osv)">{{ roleSub }}</span>
+                </div>
+                <div style="font:400 12px Lato,sans-serif;color:var(--osv)">{{ idLabel }}</div>
+              </div>
+
+              <div style="background:var(--c0);border:1px solid var(--outv);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:14px">
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  <div style="font:700 12px Lato,sans-serif;color:var(--osv)">Password</div>
+                  <div style="height:52px;box-sizing:border-box;border-radius:14px;border:1.5px solid var(--outv);display:flex;align-items:center;padding:0 8px 0 16px;gap:6px">
+                    <input value="{{ pass }}" onChange="{{ onPass }}" type="{{ passType }}" placeholder="Masukkan password" style="flex:1;border:none;background:transparent;font:400 15px Lato,sans-serif;color:var(--on);outline:none;min-width:0">
+                    <button onClick="{{ toggleShow }}" style="width:40px;height:40px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:20px;color:var(--osv)">{{ passIcon }}</span></button>
+                  </div>
+                </div>
+                <div style="font:400 13px Lato,sans-serif;color:var(--osv)">Lupa password? <a href="#1a" style="color:var(--p);font-weight:700">Reset</a></div>
+                <button onClick="{{ submitPass }}" disabled="{{ passDisabled }}" style="height:52px;border-radius:14px;border:none;background:var(--p);color:var(--op);font:900 15px Lato,sans-serif;cursor:pointer;transition:transform .15s cubic-bezier(.05,.7,.1,1);opacity:{{ passAlpha }}" style-active="transform:scale(.98)">Login</button>
+              </div>
+
+              <div style="background:var(--c1);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px">
+                <div style="font:900 13px Lato,sans-serif">Hubungi Kami</div>
+                <div style="display:flex;align-items:center;gap:10px"><span style="font-family:'Material Symbols Rounded';font-size:18px;color:var(--p)">chat</span><span style="font:400 13px Lato,sans-serif;color:var(--osv)">WhatsApp operator · 0812-3456-7890</span></div>
+                <div style="display:flex;align-items:center;gap:10px"><span style="font-family:'Material Symbols Rounded';font-size:18px;color:var(--p)">call</span><span style="font:400 13px Lato,sans-serif;color:var(--osv)">Telepon sekolah · (0321) 123456</span></div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isSso }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;min-height:0;overflow:auto;padding:4px 20px 28px;display:flex;flex-direction:column;gap:20px;animation:dskFade .25s ease-out">
+              <div style="display:flex;align-items:center;justify-content:space-between;min-height:48px">
+                <button onClick="{{ backToLogin }}" style="width:48px;height:48px;margin-left:-12px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:24px;color:var(--on)">arrow_back</span></button>
+                <img src="logo-mark.png" alt="" style="width:30px;height:auto">
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center">
+                <div style="font:900 10px/1 Lato,sans-serif;letter-spacing:2.2px;color:var(--osv)">MASUK SEBAGAI</div>
+                <div style="width:84px;height:84px;border-radius:50%;background:var(--c1);border:1.5px dashed var(--outv);display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:38px;color:var(--osv)">person</span></div>
+                <div style="font:900 18px/1.3 Lato,sans-serif">Muhammad D. Muzakki</div>
+                <div style="font:400 13px Lato,sans-serif;color:var(--osv)">muzakki@gmail.com</div>
+              </div>
+              <div style="background:var(--c0);border:1px solid var(--outv);border-radius:14px;padding:4px 16px;display:flex;flex-direction:column">
+                <div style="display:flex;align-items:center;justify-content:space-between;min-height:48px;gap:16px"><span style="font:400 13px Lato,sans-serif;color:var(--osv)">Peran</span><span style="font:700 13px Lato,sans-serif">{{ roleBadge }}</span></div>
+                <div style="height:1px;background:var(--outv)"></div>
+                <div style="display:flex;align-items:center;justify-content:space-between;min-height:48px;gap:16px"><span style="font:400 13px Lato,sans-serif;color:var(--osv)">NISN</span><span style="font:700 13px Lato,sans-serif">0051234567</span></div>
+                <div style="height:1px;background:var(--outv)"></div>
+                <div style="display:flex;align-items:center;justify-content:space-between;min-height:48px;gap:16px"><span style="font:400 13px Lato,sans-serif;color:var(--osv)">Kelas</span><span style="font:700 13px Lato,sans-serif">{{ roleSub }}</span></div>
+                <div style="height:1px;background:var(--outv)"></div>
+                <div style="display:flex;align-items:center;justify-content:space-between;min-height:48px;gap:16px"><span style="font:400 13px Lato,sans-serif;color:var(--osv)">Sekolah</span><span style="font:700 13px Lato,sans-serif">SMK DEMO</span></div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <button onClick="{{ ssoYes }}" style="height:52px;border-radius:14px;border:none;background:var(--p);color:var(--op);font:900 15px Lato,sans-serif;cursor:pointer" style-active="transform:scale(.98)">Iya, itu saya</button>
+                <button onClick="{{ backToLogin }}" style="height:48px;border-radius:14px;border:none;background:transparent;color:var(--p);font:900 14px Lato,sans-serif;cursor:pointer">Tidak, bukan saya</button>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isHome }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;min-height:0;display:flex;flex-direction:column;animation:dskFade .25s ease-out">
+              <div style="flex:1;min-height:0;overflow:auto">
+                <div style="position:relative">
+                  <div style="height:196px;background:linear-gradient(180deg,#014D48 0%,#0F7A6E 60%,#12A78E 100%);border-radius:0 0 28px 28px"></div>
+                  <div style="position:absolute;top:0;left:0;right:0;padding:12px 20px 0;display:flex;flex-direction:column;gap:16px">
+                    <div style="display:flex;align-items:center;gap:12px">
+                      <div style="width:38px;height:38px;border-radius:50%;background:#FFFFFF;display:flex;align-items:center;justify-content:center;font:900 13px Lato,sans-serif;color:#014D48;flex:none">SD</div>
+                      <div style="flex:1;min-width:0"><div style="font:900 15px/1.2 Lato,sans-serif;color:#FFFFFF">SMK DEMO</div><div style="font:400 11px Lato,sans-serif;color:rgba(255,255,255,.82)">Jombang, Jawa Timur</div></div>
+                      <button style="width:44px;height:44px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:22px;color:#FFFFFF">refresh</span></button>
+                      <button style="width:44px;height:44px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative"><span style="font-family:'Material Symbols Rounded';font-size:22px;color:#FFFFFF">notifications</span><span style="position:absolute;top:8px;right:8px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#BA1A1A;color:#FFFFFF;font:900 10px Lato,sans-serif;display:flex;align-items:center;justify-content:center">3</span></button>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px">
+                      <div style="width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.22);border:1.5px solid rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font:900 16px Lato,sans-serif;color:#FFFFFF;flex:none">MD</div>
+                      <div style="min-width:0"><div style="font:400 11px Lato,sans-serif;color:rgba(255,255,255,.82)">Assalamualaikum,</div><div style="font:900 16px/1.25 Lato,sans-serif;color:#FFFFFF;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Muhammad D. Muzakki</div></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="position:relative;z-index:1;padding:0 20px 24px;display:flex;flex-direction:column;gap:16px;margin-top:-56px">
+                  <div style="background:var(--c0);border-radius:14px;padding:16px;box-shadow:0 4px 16px rgba(0,0,0,.10);display:flex;flex-direction:column;gap:12px">
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <span style="width:8px;height:8px;border-radius:50%;background:var(--ok)"></span>
+                      <span style="font:900 11px Lato,sans-serif;letter-spacing:1px;color:var(--ok)">KELAS BERLANGSUNG</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px">
+                      <div style="width:46px;height:46px;border-radius:12px;background:var(--c1);display:flex;align-items:center;justify-content:center;flex:none"><span style="font-family:'Material Symbols Rounded';font-size:24px;color:var(--p)">code</span></div>
+                      <div style="flex:1;min-width:0"><div style="font:900 15px Lato,sans-serif">Informatika</div><div style="font:400 12px Lato,sans-serif;color:var(--osv)">07.30 – 09.00 · Ruang Lab 2</div></div>
+                    </div>
+                    <div style="display:flex;gap:8px">
+                      <button style="flex:1;height:48px;border-radius:14px;border:none;background:var(--p);color:var(--op);font:900 13px Lato,sans-serif;cursor:pointer">Hadiri</button>
+                      <button style="flex:1;height:48px;border-radius:14px;border:none;background:var(--secc);color:var(--osecc);font:900 13px Lato,sans-serif;cursor:pointer">Isi Jurnal</button>
+                    </div>
+                  </div>
+
+                  <div style="display:flex;flex-direction:column;gap:12px">
+                    <div style="font:900 14px Lato,sans-serif">Menu Pembelajaran</div>
+                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+                      <sc-for list="{{ menu }}" as="m" hint-placeholder-count="9">
+                        <div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 4px;background:var(--c0);border:1px solid var(--outv);border-radius:14px;cursor:pointer;min-height:48px" style-hover="background:var(--c1)">
+                          <span style="font-family:'Material Symbols Rounded';font-size:26px;color:var(--p)">{{ m.icon }}</span>
+                          <span style="font:700 11px/1.2 Lato,sans-serif;text-align:center;color:var(--on)">{{ m.label }}</span>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </div>
+
+                  <div style="height:112px;border-radius:14px;border:1.5px dashed var(--outv);background:var(--c1);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px">
+                    <span style="font-family:'Material Symbols Rounded';font-size:26px;color:var(--osv)">image</span>
+                    <span style="font:700 11px Lato,sans-serif;color:var(--osv)">Carousel banner · 3 slide</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style="flex:none;background:var(--c2);border-top:1px solid var(--outv);display:flex;padding:8px 8px 4px">
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;cursor:pointer">
+                  <div style="height:32px;padding:0 20px;border-radius:16px;background:var(--secc);display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:22px;color:var(--osecc)">school</span></div>
+                  <span style="font:900 11px Lato,sans-serif;color:var(--on)">Pembelajaran</span>
+                </div>
+                <div onClick="{{ openScope }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;cursor:pointer">
+                  <div style="height:32px;padding:0 20px;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:22px;color:var(--osv)">account_balance_wallet</span></div>
+                  <span style="font:400 11px Lato,sans-serif;color:var(--osv)">Pembayaran</span>
+                </div>
+                <div onClick="{{ openScope }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;cursor:pointer">
+                  <div style="height:32px;padding:0 20px;display:flex;align-items:center;justify-content:center"><div style="width:24px;height:24px;border-radius:50%;background:var(--c4);display:flex;align-items:center;justify-content:center;font:900 9px Lato,sans-serif;color:var(--osv)">MD</div></div>
+                  <span style="font:400 11px Lato,sans-serif;color:var(--osv)">Akun</span>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+        </div>
+
+        <div style="position:relative;z-index:2;flex:none"><x-import component-from-global-scope="AndroidNavBar" from="./android-frame.jsx" dark="{{ isDark }}" hint-size="100%,24px"></x-import></div>
+
+        <sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+          <div onClick="{{ closeSheet }}" style="position:absolute;inset:0;z-index:5;background:rgba(0,0,0,.42);animation:dskFade .2s ease-out"></div>
+          <div style="position:absolute;left:0;right:0;bottom:0;z-index:6;max-height:76%;background:var(--c2);border-radius:28px 28px 0 0;display:flex;flex-direction:column;animation:dskUp .25s cubic-bezier(.05,.7,.1,1)">
+            <div style="padding:12px 20px 0;display:flex;flex-direction:column;gap:12px;flex:none">
+              <div style="width:32px;height:4px;border-radius:2px;background:var(--outv);align-self:center"></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                <div style="font:900 17px Lato,sans-serif">Pilih Lembaga Sekolah</div>
+                <button onClick="{{ closeSheet }}" style="width:44px;height:44px;margin-right:-10px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:22px;color:var(--osv)">close</span></button>
+              </div>
+              <div style="height:48px;box-sizing:border-box;border-radius:24px;background:var(--c0);display:flex;align-items:center;gap:10px;padding:0 16px">
+                <span style="font-family:'Material Symbols Rounded';font-size:20px;color:var(--osv)">search</span>
+                <input value="{{ q }}" onChange="{{ onQ }}" placeholder="Cari nama sekolah" style="flex:1;border:none;background:transparent;font:400 14px Lato,sans-serif;color:var(--on);outline:none;min-width:0">
+              </div>
+            </div>
+            <div style="flex:1;min-height:0;overflow:auto;padding:8px 12px 20px">
+              <sc-for list="{{ schoolList }}" as="s" hint-placeholder-count="4">
+                <div onClick="{{ s.pick }}" style="display:flex;align-items:center;gap:14px;padding:12px 8px;min-height:48px;border-radius:14px;cursor:pointer" style-hover="background:var(--c1)">
+                  <div style="width:44px;height:44px;border-radius:12px;background:var(--c1);display:flex;align-items:center;justify-content:center;font:900 13px Lato,sans-serif;color:var(--p);flex:none">{{ s.ini }}</div>
+                  <div style="flex:1;min-width:0"><div style="font:700 14px Lato,sans-serif">{{ s.name }}</div><div style="font:400 12px Lato,sans-serif;color:var(--osv)">{{ s.city }}</div></div>
+                  <span style="font-family:'Material Symbols Rounded';font-size:22px;color:var(--p);opacity:{{ s.o }}">check_circle</span>
+                </div>
+              </sc-for>
+              <div style="display:flex;align-items:center;gap:10px;padding:14px 8px">
+                <div style="width:16px;height:16px;border-radius:50%;border:2.5px solid var(--c4);border-top-color:var(--p);animation:dskSpin .9s linear infinite"></div>
+                <span style="font:400 12px Lato,sans-serif;color:var(--osv)">Memuat daftar sekolah…</span>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ dlgPolicy }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;z-index:7;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;padding:24px;animation:dskFade .2s ease-out">
+            <div style="width:100%;max-height:100%;background:var(--c2);border-radius:24px;display:flex;flex-direction:column;overflow:hidden;animation:dskPop .25s cubic-bezier(.05,.7,.1,1)">
+              <div style="padding:20px 20px 12px;font:900 17px Lato,sans-serif;flex:none">Syarat &amp; Ketentuan</div>
+              <div style="flex:1;min-height:0;overflow:auto;padding:0 20px;font:400 13px/1.65 Lato,sans-serif;color:var(--osv);display:flex;flex-direction:column;gap:10px">
+                <div style="font:900 13px Lato,sans-serif;color:var(--on)">1. Penggunaan Akun</div>
+                <div>Akun Diskola bersifat pribadi dan terikat pada data pokok pendidikan sekolah Anda. Pengguna wajib menjaga kerahasiaan password dan PIN dompet digital.</div>
+                <div style="font:900 13px Lato,sans-serif;color:var(--on)">2. Data Akademik</div>
+                <div>Data presensi, nilai, dan jurnal kelas dikelola oleh sekolah. Diskola bertindak sebagai penyedia layanan portal dan tidak mengubah data akademik tanpa instruksi sekolah.</div>
+                <div style="font:900 13px Lato,sans-serif;color:var(--on)">3. Transaksi Pembayaran</div>
+                <div>Setiap transaksi SPP, tagihan, dan top up saldo tercatat dan dapat diperiksa pada Riwayat Pembayaran. Pembatalan mengikuti kebijakan sekolah dan mitra pembayaran.</div>
+                <div style="font:900 13px Lato,sans-serif;color:var(--on)">4. Kebijakan Privasi</div>
+                <div>Data pribadi digunakan sebatas keperluan layanan akademik dan pembayaran sekolah.</div>
+              </div>
+              <div style="padding:16px 20px 20px;flex:none"><button onClick="{{ acceptPolicy }}" style="width:100%;height:52px;border-radius:14px;border:none;background:var(--p);color:var(--op);font:900 14px Lato,sans-serif;letter-spacing:.6px;cursor:pointer">SAYA PAHAM</button></div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ dlgGuest }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;z-index:7;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;padding:24px;animation:dskFade .2s ease-out">
+            <div style="width:100%;background:var(--c2);border-radius:24px;padding:24px;display:flex;flex-direction:column;gap:14px;animation:dskPop .25s cubic-bezier(.05,.7,.1,1)">
+              <div style="font:900 17px Lato,sans-serif">Konfirmasi</div>
+              <div style="font:400 13px/1.6 Lato,sans-serif;color:var(--osv)">Akun Google ini belum terhubung ke sekolah manapun. Anda akan melanjutkan sebagai <strong style="color:var(--on)">tamu</strong> dengan akses terbatas. Ketik frasa berikut untuk melanjutkan:</div>
+              <div style="padding:12px 14px;border-radius:8px;background:var(--c4);font:900 14px Lato,sans-serif;letter-spacing:1px;text-align:center;color:var(--on)">SAYA MENGERTI</div>
+              <input value="{{ phrase }}" onChange="{{ onPhrase }}" placeholder="Ketik frasa di atas" style="height:52px;box-sizing:border-box;border-radius:14px;border:1.5px solid var(--outv);background:transparent;padding:0 16px;font:400 15px Lato,sans-serif;color:var(--on);outline:none;width:100%" style-focus="border-color:var(--p);border-width:2px">
+              <div style="display:flex;gap:8px">
+                <button onClick="{{ closeDialog }}" style="flex:1;height:52px;border-radius:14px;border:1.5px solid var(--out);background:transparent;color:var(--p);font:900 14px Lato,sans-serif;cursor:pointer">Batal</button>
+                <button onClick="{{ guestNext }}" disabled="{{ guestDisabled }}" style="flex:1;height:52px;border-radius:14px;border:none;background:var(--p);color:var(--op);font:900 14px Lato,sans-serif;cursor:pointer;opacity:{{ guestAlpha }}">Lanjut</button>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ dlgUpdate }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;z-index:8;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:24px;animation:dskFade .2s ease-out">
+            <div style="width:100%;background:var(--c2);border-radius:24px;padding:26px 24px;display:flex;flex-direction:column;gap:14px;align-items:center;text-align:center;animation:dskPop .25s cubic-bezier(.05,.7,.1,1)">
+              <div style="width:76px;height:76px;border-radius:50%;background:var(--c1);display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:38px;color:var(--p)">system_update</span></div>
+              <div style="font:900 18px Lato,sans-serif">Update Tersedia</div>
+              <div style="font:400 13px/1.6 Lato,sans-serif;color:var(--osv)">Versi baru Diskola sudah tersedia di Play Store. Perbarui aplikasi untuk melanjutkan.</div>
+              <button onClick="{{ closeDialog }}" style="width:100%;height:52px;border-radius:14px;border:none;background:var(--p);color:var(--op);font:900 14px Lato,sans-serif;cursor:pointer">Update</button>
+              <div style="font:400 11px Lato,sans-serif;color:var(--osv);opacity:.8">Dialog tidak dapat ditutup</div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ dlgScope }}" hint-placeholder-val="{{ false }}">
+          <div onClick="{{ closeDialog }}" style="position:absolute;inset:0;z-index:7;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;padding:24px;animation:dskFade .2s ease-out">
+            <div style="width:100%;background:var(--c2);border-radius:24px;padding:24px;display:flex;flex-direction:column;gap:14px;align-items:center;text-align:center;animation:dskPop .25s cubic-bezier(.05,.7,.1,1)">
+              <div style="width:72px;height:72px;border-radius:50%;background:var(--c1);display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:34px;color:var(--osv)">construction</span></div>
+              <div style="font:900 17px Lato,sans-serif">Belum di cakupan Fase 1</div>
+              <div style="font:400 13px/1.6 Lato,sans-serif;color:var(--osv)">Tab ini masuk Fase 2 (Pembayaran) dan Fase 3 (Akun). Mockup ini fokus pada Fase 0 + Fase 1.</div>
+              <button onClick="{{ closeDialog }}" style="width:100%;height:52px;border-radius:14px;border:none;background:var(--p);color:var(--op);font:900 14px Lato,sans-serif;cursor:pointer">Mengerti</button>
+            </div>
+          </div>
+        </sc-if>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="dv-opt" id="1b">
+  <div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Fase 0 — token &amp; komponen, terang vs gelap</div>
+  <div style="display:flex;gap:20px;align-items:flex-start">
+    <div class="dv-card" style="width:480px;--p:#006A60;--op:#FFFFFF;--pc:#005048;--opc:#95E7DA;--sec:#007A6E;--secc:#CAE5E0;--osecc:#4E6763;--ter:#2D4960;--err:#BA1A1A;--errc:#FFDAD6;--oerrc:#93000A;--bg:#F4FAF8;--on:#151D1C;--sv:#DBE4E2;--osv:#3E4947;--out:#6E7977;--outv:#BEC9C6;--c0:#FFFFFF;--c1:#EDF6F3;--c2:#E7F0ED;--c3:#E1EAE7;--c4:#DBE4E2;--ok:#008779;--warn:#FF891C">
+      <dc-import name="DiskolaKit" hint-size="480px,2600px"></dc-import>
+    </div>
+    <div class="dv-card" style="width:480px;border-color:rgba(255,255,255,.12);--p:#92D3C7;--op:#003731;--pc:#005047;--opc:#74C3B5;--sec:#43DDBD;--secc:#00BE9F;--osecc:#00463A;--ter:#86D5C7;--err:#FFB4AB;--errc:#93000A;--oerrc:#FFDAD6;--bg:#0A1513;--on:#D9E5E1;--sv:#2C3735;--osv:#BFC9C5;--out:#899390;--outv:#3F4946;--c0:#06100E;--c1:#131E1C;--c2:#172220;--c3:#212C2A;--c4:#2C3735;--ok:#43DDBD;--warn:#FFB86A">
+      <dc-import name="DiskolaKit" hint-size="480px,2600px"></dc-import>
+    </div>
+  </div>
+</div>
+
+<div class="dv-opt" id="1c">
+  <div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Varian tata letak Login — langkah &amp; label identik, susunan berbeda</div>
+  <div style="display:flex;gap:20px;align-items:flex-start">
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="font:700 11px Lato,sans-serif;color:rgba(0,0,0,.5)">i · Panel form menempel bawah</div>
+      <div style="width:412px;height:892px;border-radius:26px;overflow:hidden;border:8px solid rgba(116,119,117,.5);box-shadow:0 30px 80px rgba(0,0,0,.25);box-sizing:border-box;display:flex;--p:#006A60;--op:#FFFFFF;--secc:#CAE5E0;--osecc:#4E6763;--bg:#F4FAF8;--on:#151D1C;--osv:#3E4947;--out:#6E7977;--outv:#BEC9C6;--c0:#FFFFFF;--c1:#EDF6F3;--c4:#DBE4E2;--ok:#008779">
+        <div style="position:relative;flex:1;overflow:hidden;background:var(--bg);display:flex;flex-direction:column;font-family:Lato,sans-serif;color:var(--on)">
+          <div style="position:absolute;inset:0;background:linear-gradient(180deg,#EDF6F3 0%,#F4FAF8 50%,#EDF6F3 100%)"></div>
+          <div style="position:absolute;top:0;left:0;right:0;height:34%;background:linear-gradient(180deg,rgba(0,106,96,.16),rgba(0,106,96,.04));clip-path:polygon(0 0,100% 0,100% 64%,50% 100%,0 58%)"></div>
+          <div style="position:absolute;top:-80px;right:-64px;width:288px;height:288px;border-radius:50%;filter:blur(40px);background:radial-gradient(circle,rgba(0,106,96,.12),transparent 70%)"></div>
+          <div style="position:absolute;top:112px;left:-80px;width:240px;height:240px;border-radius:50%;filter:blur(64px);background:radial-gradient(circle,rgba(159,242,228,.25),transparent 70%)"></div>
+          <div style="position:relative;z-index:2;flex:none"><x-import component-from-global-scope="AndroidStatusBar" from="./android-frame.jsx" hint-size="100%,40px"></x-import></div>
+          <div style="position:relative;z-index:2;padding:20px 20px 28px;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;align-items:center;gap:10px"><img src="logo-mark.png" alt="" style="width:34px;height:auto"><div><div style="font:900 14px/1 Lato,sans-serif;letter-spacing:3px">DISKOLA</div><div style="font:900 8px/1.4 Lato,sans-serif;letter-spacing:1.2px;color:var(--osv)">SISTEM INFORMASI AKADEMIK TERPADU</div></div></div>
+            <div style="font:900 30px/1.15 Lato,sans-serif;text-wrap:pretty">Selamat<br>Datang</div>
+            <div style="height:26px;padding:0 10px;border-radius:13px;background:var(--c1);display:flex;align-items:center;gap:6px;align-self:flex-start"><span style="width:6px;height:6px;border-radius:50%;background:var(--ok)"></span><span style="font:900 10px Lato,sans-serif;color:var(--ok)">Aktif</span></div>
+          </div>
+          <div style="position:relative;z-index:2;flex:1;background:var(--c0);border-radius:28px 28px 0 0;box-shadow:0 -8px 28px rgba(0,0,0,.08);padding:24px 20px;display:flex;flex-direction:column;gap:16px">
+            <div style="font:900 17px Lato,sans-serif">Login Akun</div>
+            <div style="display:flex;flex-direction:column;gap:6px"><div style="font:700 12px Lato,sans-serif;color:var(--osv)">NISN / NIS / NIK</div><div style="height:52px;border-radius:14px;border:1.5px solid var(--outv);display:flex;align-items:center;padding:0 16px;font:400 15px Lato,sans-serif;color:var(--out)">Contoh: 0051234567</div></div>
+            <div style="display:flex;flex-direction:column;gap:6px"><div style="font:700 12px Lato,sans-serif;color:var(--osv)">Sekolah</div><div style="height:52px;border-radius:14px;border:1.5px solid var(--outv);display:flex;align-items:center;padding:0 14px 0 16px;gap:10px"><span style="flex:1;font:400 15px Lato,sans-serif;color:var(--out)">Pilih sekolah</span><span style="font-family:'Material Symbols Rounded';font-size:22px;color:var(--osv)">expand_more</span></div></div>
+            <div style="display:flex;align-items:flex-start;gap:10px;min-height:48px"><span style="font-family:'Material Symbols Rounded';font-size:22px;color:var(--out)">check_box_outline_blank</span><span style="font:400 13px/1.5 Lato,sans-serif;color:var(--osv)">Saya menyetujui <strong style="color:var(--p)">Syarat &amp; Ketentuan</strong> penggunaan Diskola.</span></div>
+            <button style="height:52px;border-radius:14px;border:none;background:var(--p);color:var(--op);font:900 15px Lato,sans-serif;opacity:.45">Masuk</button>
+            <div style="display:flex;align-items:center;gap:12px"><div style="flex:1;height:1px;background:var(--outv)"></div><span style="font:400 12px Lato,sans-serif;color:var(--osv)">atau</span><div style="flex:1;height:1px;background:var(--outv)"></div></div>
+            <button style="height:52px;border-radius:14px;border:1.5px solid var(--out);background:transparent;color:var(--on);font:900 14px Lato,sans-serif;display:flex;align-items:center;justify-content:center;gap:10px"><span style="width:20px;height:20px;border-radius:5px;border:1px dashed var(--out);display:flex;align-items:center;justify-content:center;font:900 11px Lato,sans-serif;color:var(--osv)">G</span>Masuk dengan Akun Google</button>
+            <div style="margin-top:auto;font:400 12px/1.5 Lato,sans-serif;color:var(--osv);text-align:center">NISN/NIK belum terdaftar? <strong style="color:var(--p)">Bantuan</strong></div>
+          </div>
+          <div style="position:relative;z-index:2;flex:none;background:var(--c0)"><x-import component-from-global-scope="AndroidNavBar" from="./android-frame.jsx" hint-size="100%,24px"></x-import></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="font:700 11px Lato,sans-serif;color:rgba(0,0,0,.5)">ii · Tanpa kartu, field underline, CTA sticky</div>
+      <div style="width:412px;height:892px;border-radius:26px;overflow:hidden;border:8px solid rgba(116,119,117,.5);box-shadow:0 30px 80px rgba(0,0,0,.25);box-sizing:border-box;display:flex;--p:#006A60;--op:#FFFFFF;--bg:#F4FAF8;--on:#151D1C;--osv:#3E4947;--out:#6E7977;--outv:#BEC9C6;--c0:#FFFFFF;--c1:#EDF6F3;--ok:#008779">
+        <div style="position:relative;flex:1;overflow:hidden;background:var(--bg);display:flex;flex-direction:column;font-family:Lato,sans-serif;color:var(--on)">
+          <div style="position:absolute;inset:0;background:linear-gradient(180deg,#EDF6F3 0%,#F4FAF8 50%,#EDF6F3 100%)"></div>
+          <div style="position:absolute;top:0;left:0;right:0;height:34%;background:linear-gradient(180deg,rgba(0,106,96,.16),rgba(0,106,96,.04));clip-path:polygon(0 0,100% 0,100% 64%,50% 100%,0 58%)"></div>
+          <div style="position:absolute;bottom:-64px;right:0;width:320px;height:240px;border-radius:50%;filter:blur(64px);background:radial-gradient(circle,rgba(0,106,96,.08),transparent 70%)"></div>
+          <div style="position:relative;z-index:2;flex:none"><x-import component-from-global-scope="AndroidStatusBar" from="./android-frame.jsx" hint-size="100%,40px"></x-import></div>
+          <div style="position:relative;z-index:2;flex:1;padding:16px 20px 0;display:flex;flex-direction:column;gap:28px">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><img src="logo-mark.png" alt="" style="width:64px;height:auto"><div style="font:900 20px/1 Lato,sans-serif;letter-spacing:6px">DISKOLA</div><div style="font:900 9px/1 Lato,sans-serif;letter-spacing:1.6px;color:var(--osv)">SISTEM INFORMASI AKADEMIK TERPADU</div></div>
+            <div style="display:flex;flex-direction:column;gap:24px">
+              <div style="display:flex;flex-direction:column;gap:4px"><div style="font:900 24px/1.2 Lato,sans-serif">Masuk ke akun kamu</div><div style="font:400 14px/1.5 Lato,sans-serif;color:var(--osv)">Gunakan NISN, NIS, atau NIK yang terdaftar di sekolah.</div></div>
+              <div style="display:flex;flex-direction:column;gap:22px">
+                <div style="display:flex;flex-direction:column;gap:8px"><div style="font:900 11px Lato,sans-serif;letter-spacing:1.2px;color:var(--osv)">NISN / NIS / NIK</div><div style="min-height:40px;border-bottom:1.5px solid var(--outv);display:flex;align-items:center;font:400 17px Lato,sans-serif;color:var(--out)">0051234567</div></div>
+                <div style="display:flex;flex-direction:column;gap:8px"><div style="font:900 11px Lato,sans-serif;letter-spacing:1.2px;color:var(--p)">SEKOLAH</div><div style="min-height:40px;border-bottom:2px solid var(--p);display:flex;align-items:center;gap:10px"><span style="flex:1;font:700 17px Lato,sans-serif;color:var(--on)">SMK DEMO</span><span style="font-family:'Material Symbols Rounded';font-size:22px;color:var(--p)">expand_more</span></div><div style="font:400 12px Lato,sans-serif;color:var(--osv)">Jombang, Jawa Timur</div></div>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:10px;min-height:48px"><span style="font-family:'Material Symbols Rounded';font-size:22px;color:var(--p)">check_box</span><span style="font:400 13px/1.5 Lato,sans-serif;color:var(--osv)">Saya menyetujui <strong style="color:var(--p)">Syarat &amp; Ketentuan</strong> penggunaan Diskola.</span></div>
+            </div>
+            <div style="margin-top:auto;padding-bottom:16px;display:flex;flex-direction:column;gap:10px;align-items:center"><div style="font:400 12px/1.5 Lato,sans-serif;color:var(--osv);text-align:center">NISN/NIK belum terdaftar? Hubungi operator sekolah Anda.</div></div>
+          </div>
+          <div style="position:relative;z-index:3;flex:none;padding:12px 20px 8px;background:rgba(244,250,248,.86);backdrop-filter:blur(12px);border-top:1px solid var(--outv);display:flex;flex-direction:column;gap:8px">
+            <button style="height:52px;border-radius:14px;border:none;background:var(--p);color:var(--op);font:900 15px Lato,sans-serif">Masuk</button>
+            <button style="height:48px;border-radius:14px;border:none;background:transparent;color:var(--p);font:900 14px Lato,sans-serif;display:flex;align-items:center;justify-content:center;gap:10px"><span style="width:20px;height:20px;border-radius:5px;border:1px dashed var(--out);display:flex;align-items:center;justify-content:center;font:900 11px Lato,sans-serif;color:var(--osv)">G</span>Masuk dengan Akun Google</button>
+            <x-import component-from-global-scope="AndroidNavBar" from="./android-frame.jsx" hint-size="100%,24px"></x-import>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="font:700 11px Lato,sans-serif;color:rgba(0,0,0,.5)">iii · Hero staircase (Pola B) + sheet login</div>
+      <div style="width:412px;height:892px;border-radius:26px;overflow:hidden;border:8px solid rgba(116,119,117,.5);box-shadow:0 30px 80px rgba(0,0,0,.25);box-sizing:border-box;display:flex;--p:#006A60;--op:#FFFFFF;--bg:#F4FAF8;--on:#151D1C;--osv:#3E4947;--out:#6E7977;--outv:#BEC9C6;--c0:#FFFFFF;--c1:#EDF6F3;--ok:#008779">
+        <div style="position:relative;flex:1;overflow:hidden;background:var(--bg);display:flex;flex-direction:column;font-family:Lato,sans-serif;color:var(--on)">
+          <div style="position:absolute;top:0;left:0;right:0;height:340px;background:linear-gradient(180deg,#014D48 0%,#0F7A6E 60%,#12A78E 100%);clip-path:polygon(0 0,100% 0,100% 100%,80% 100%,80% 86%,60% 86%,60% 72%,40% 72%,40% 58%,20% 58%,20% 44%,0 44%)"></div>
+          <div style="position:relative;z-index:2;flex:none"><x-import component-from-global-scope="AndroidStatusBar" from="./android-frame.jsx" dark="{{ true }}" hint-size="100%,40px"></x-import></div>
+          <div style="position:relative;z-index:2;padding:24px 20px 0;display:flex;flex-direction:column;gap:10px">
+            <div style="width:60px;height:60px;border-radius:18px;background:rgba(255,255,255,.94);display:flex;align-items:center;justify-content:center"><img src="logo-mark.png" alt="" style="width:40px;height:auto"></div>
+            <div style="font:900 22px/1 Lato,sans-serif;letter-spacing:6px;color:#FFFFFF">DISKOLA</div>
+            <div style="font:900 9px/1 Lato,sans-serif;letter-spacing:1.6px;color:rgba(255,255,255,.8)">SISTEM INFORMASI AKADEMIK TERPADU</div>
+            <div style="height:26px;padding:0 10px;border-radius:13px;background:rgba(255,255,255,.2);display:flex;align-items:center;gap:6px;align-self:flex-start;margin-top:4px"><span style="width:6px;height:6px;border-radius:50%;background:#43DDBD"></span><span style="font:900 10px Lato,sans-serif;color:#FFFFFF">Aktif</span></div>
+          </div>
+          <div style="position:relative;z-index:2;flex:1;margin-top:52px;background:var(--c0);border-radius:28px 28px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.14);padding:22px 20px;display:flex;flex-direction:column;gap:14px">
+            <div style="width:32px;height:4px;border-radius:2px;background:var(--outv);align-self:center"></div>
+            <div style="display:flex;flex-direction:column;gap:2px"><div style="font:900 22px Lato,sans-serif">Selamat Datang</div><div style="font:400 13px Lato,sans-serif;color:var(--osv)">Masuk untuk melanjutkan ke portal sekolahmu.</div></div>
+            <div style="display:flex;flex-direction:column;gap:6px"><div style="font:700 12px Lato,sans-serif;color:var(--osv)">NISN / NIS / NIK</div><div style="height:52px;border-radius:14px;background:var(--c1);display:flex;align-items:center;padding:0 16px;font:400 15px Lato,sans-serif;color:var(--out)">Contoh: 0051234567</div></div>
+            <div style="display:flex;flex-direction:column;gap:6px"><div style="font:700 12px Lato,sans-serif;color:var(--osv)">Sekolah</div><div style="height:52px;border-radius:14px;background:var(--c1);display:flex;align-items:center;padding:0 14px 0 16px;gap:10px"><span style="flex:1;font:400 15px Lato,sans-serif;color:var(--out)">Pilih sekolah</span><span style="font-family:'Material Symbols Rounded';font-size:22px;color:var(--osv)">expand_more</span></div></div>
+            <div style="display:flex;align-items:flex-start;gap:10px;min-height:48px"><span style="font-family:'Material Symbols Rounded';font-size:22px;color:var(--out)">check_box_outline_blank</span><span style="font:400 13px/1.5 Lato,sans-serif;color:var(--osv)">Saya menyetujui <strong style="color:var(--p)">Syarat &amp; Ketentuan</strong> penggunaan Diskola.</span></div>
+            <button style="height:52px;border-radius:14px;border:none;background:var(--p);color:var(--op);font:900 15px Lato,sans-serif;opacity:.45">Masuk</button>
+            <button style="height:48px;border-radius:14px;border:none;background:transparent;color:var(--p);font:900 14px Lato,sans-serif;display:flex;align-items:center;justify-content:center;gap:10px"><span style="width:20px;height:20px;border-radius:5px;border:1px dashed var(--out);display:flex;align-items:center;justify-content:center;font:900 11px Lato,sans-serif;color:var(--osv)">G</span>Masuk dengan Akun Google</button>
+            <div style="margin-top:auto"><x-import component-from-global-scope="AndroidNavBar" from="./android-frame.jsx" hint-size="100%,24px"></x-import></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="dv-opt" id="1d">
+  <div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>Varian motif background — Pola A / B / C divektorkan</div>
+  <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="font:700 11px Lato,sans-serif;color:rgba(0,0,0,.5)">Pola A · terang (rujukan AuthScaffold)</div>
+      <div style="position:relative;width:340px;height:600px;border-radius:20px;overflow:hidden;border:1px solid rgba(0,0,0,.1);font-family:Lato,sans-serif">
+        <div style="position:absolute;inset:0;background:linear-gradient(180deg,#EDF6F3 0%,#F4FAF8 50%,#EDF6F3 100%)"></div>
+        <div style="position:absolute;top:0;left:0;right:0;height:34%;background:linear-gradient(180deg,rgba(0,106,96,.16),rgba(0,106,96,.04));border-bottom:1px solid rgba(0,106,96,.12);clip-path:polygon(0 0,100% 0,100% 64%,50% 100%,0 58%)"></div>
+        <div style="position:absolute;top:-66px;right:-53px;width:238px;height:238px;border-radius:50%;filter:blur(33px);background:radial-gradient(circle,rgba(0,106,96,.12),transparent 70%)"></div>
+        <div style="position:absolute;top:92px;left:-66px;width:198px;height:198px;border-radius:50%;filter:blur(53px);background:radial-gradient(circle,rgba(159,242,228,.25),transparent 70%)"></div>
+        <div style="position:absolute;bottom:-53px;right:0;width:264px;height:198px;border-radius:50%;filter:blur(53px);background:radial-gradient(circle,rgba(0,106,96,.05),transparent 70%)"></div>
+        <div style="position:absolute;left:20px;right:20px;bottom:20px;display:flex;flex-direction:column;gap:6px">
+          <div style="font:900 9px Lato,sans-serif;letter-spacing:1.4px;color:#3E4947">3 LAPIS</div>
+          <div style="font:400 11px/1.5 Lato,sans-serif;color:#3E4947">tonal wash 3-stop · brand arc primary .16→.04 · 3 glow blob 40–64px blur di sudut</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="font:700 11px Lato,sans-serif;color:rgba(0,0,0,.5)">Pola A · gelap (tanpa arc, blob lebih besar)</div>
+      <div style="position:relative;width:340px;height:600px;border-radius:20px;overflow:hidden;border:1px solid rgba(255,255,255,.12);background:#0A1513;font-family:Lato,sans-serif">
+        <div style="position:absolute;top:-79px;left:-66px;width:264px;height:264px;border-radius:50%;filter:blur(74px);background:radial-gradient(circle,rgba(0,80,71,.9),transparent 70%)"></div>
+        <div style="position:absolute;top:50%;right:-79px;width:231px;height:231px;border-radius:50%;filter:blur(74px);background:radial-gradient(circle,rgba(0,190,159,.45),transparent 70%);transform:translateY(-50%)"></div>
+        <div style="position:absolute;bottom:-66px;left:50%;width:314px;height:215px;border-radius:50%;filter:blur(82px);background:radial-gradient(circle,rgba(0,80,71,.75),transparent 70%);transform:translateX(-50%)"></div>
+        <div style="position:absolute;left:20px;right:20px;bottom:20px;display:flex;flex-direction:column;gap:6px">
+          <div style="font:900 9px Lato,sans-serif;letter-spacing:1.4px;color:#BFC9C5">3 BLOB, TANPA ARC</div>
+          <div style="font:400 11px/1.5 Lato,sans-serif;color:#BFC9C5">#005047 .4 top-start · #00BE9F .25 center-end · #005047 .3 bottom-center</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="font:700 11px Lato,sans-serif;color:rgba(0,0,0,.5)">Pola B · staircase divektorkan (6 langkah)</div>
+      <div style="position:relative;width:340px;height:600px;border-radius:20px;overflow:hidden;border:1px solid rgba(0,0,0,.1);background:#F4FAF8;font-family:Lato,sans-serif">
+        <div style="position:absolute;top:0;left:0;right:0;height:200px;background:linear-gradient(180deg,#014D48 0%,#0F7A6E 60%,#12A78E 100%);clip-path:polygon(0 0,100% 0,100% 100%,84% 100%,84% 88%,67% 88%,67% 76%,50% 76%,50% 64%,33% 64%,33% 52%,16% 52%,16% 40%,0 40%)"></div>
+        <div style="position:absolute;top:0;left:0;right:0;height:200px;background:repeating-linear-gradient(135deg,rgba(255,255,255,.05) 0 2px,transparent 2px 12px);clip-path:polygon(0 0,100% 0,100% 100%,84% 100%,84% 88%,67% 88%,67% 76%,50% 76%,50% 64%,33% 64%,33% 52%,16% 52%,16% 40%,0 40%)"></div>
+        <div style="position:absolute;top:16px;left:20px;right:20px;display:flex;align-items:center;gap:10px">
+          <div style="width:34px;height:34px;border-radius:50%;background:#FFFFFF;display:flex;align-items:center;justify-content:center;font:900 12px Lato,sans-serif;color:#014D48">SD</div>
+          <div style="flex:1"><div style="font:900 14px/1.2 Lato,sans-serif;color:#FFF">SMK DEMO</div><div style="font:400 10px Lato,sans-serif;color:rgba(255,255,255,.8)">Jombang, Jawa Timur</div></div>
+          <span style="font-family:'Material Symbols Rounded';font-size:20px;color:#FFF">notifications</span>
+        </div>
+        <div style="position:absolute;top:104px;left:20px;right:20px;padding:14px;border-radius:14px;background:#FFFFFF;box-shadow:0 4px 16px rgba(0,0,0,.1)"><div style="font:900 12px Lato,sans-serif;color:#008779">KELAS BERLANGSUNG</div><div style="font:900 15px Lato,sans-serif;color:#151D1C">Informatika · 07.30–09.00</div></div>
+        <div style="position:absolute;left:20px;right:20px;bottom:20px;display:flex;flex-direction:column;gap:6px">
+          <div style="font:900 9px Lato,sans-serif;letter-spacing:1.4px;color:#3E4947">PENGGANTI img_bg_bayar.png</div>
+          <div style="font:400 11px/1.5 Lato,sans-serif;color:#3E4947">Langkah lebih rapat, tepi bawah bertingkat naik ke kanan, tekstur garis 5% — theme-aware, tanpa bitmap 8,8 MB.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="font:700 11px Lato,sans-serif;color:rgba(0,0,0,.5)">Pola C · selebrasi (layar sukses)</div>
+      <div style="position:relative;width:340px;height:600px;border-radius:20px;overflow:hidden;border:1px solid rgba(0,0,0,.1);background:linear-gradient(135deg,#014D48 0%,#0E8377 55%,#12A78E 100%);font-family:Lato,sans-serif">
+        <div style="position:absolute;top:0;right:0;width:70%;height:36%;background:repeating-linear-gradient(90deg,rgba(159,242,228,.18) 0 1px,transparent 1px 26px),repeating-linear-gradient(0deg,rgba(159,242,228,.18) 0 1px,transparent 1px 26px)"></div>
+        <img src="logo-mark.png" alt="" style="position:absolute;top:6%;right:-14%;width:62%;height:auto;opacity:.16">
+        <div style="position:absolute;right:-20%;bottom:14%;width:70%;height:34%;border-radius:50%;border:26px solid rgba(255,255,255,.07)"></div>
+        <div style="position:absolute;left:-10%;right:-10%;bottom:-6%;height:26%;background:linear-gradient(180deg,rgba(2,60,55,.35),rgba(2,60,55,.6));border-radius:50% 50% 0 0/100% 100% 0 0;filter:blur(2px)"></div>
+        <div style="position:absolute;left:0;right:0;top:44%;padding:0 24px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center">
+          <div style="width:76px;height:76px;border-radius:50%;background:rgba(255,255,255,.16);border:1.5px solid rgba(255,255,255,.4);display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:40px;color:#FFFFFF">check</span></div>
+          <div style="font:900 22px Lato,sans-serif;color:#FFFFFF">Transaksi Berhasil</div>
+          <div style="font:400 13px/1.5 Lato,sans-serif;color:rgba(255,255,255,.86)">SPP Oktober 2026 · Rp 500.000<br>Saldo Klaspay terpotong Rp 500.000</div>
+        </div>
+        <div style="position:absolute;left:20px;right:20px;bottom:20px;font:400 10px/1.5 Lato,sans-serif;color:rgba(255,255,255,.7);text-align:center">Khusus momen selebrasi — jangan dipakai di layar form/list.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="dv-opt" id="1e">
+  <div class="dv-olabel"><a class="dv-oid" href="#1e">1e</a>Varian komponen dasar — tiga tafsir shape &amp; bobot</div>
+  <div style="display:flex;gap:16px;align-items:flex-start;--p:#006A60;--op:#FFFFFF;--secc:#CAE5E0;--osecc:#4E6763;--on:#151D1C;--osv:#3E4947;--out:#6E7977;--outv:#BEC9C6;--c0:#FFFFFF;--c1:#EDF6F3;--c3:#E1EAE7;--ok:#008779">
+
+    <div class="dv-card" style="width:300px;padding:20px;background:#F4FAF8;display:flex;flex-direction:column;gap:14px;font-family:Lato,sans-serif;color:var(--on)">
+      <div style="font:900 12px Lato,sans-serif;letter-spacing:1.2px;color:var(--osv)">i · M3 MURNI (8/14)</div>
+      <button style="height:52px;border-radius:14px;border:none;background:var(--p);color:var(--op);font:900 14px Lato,sans-serif;cursor:pointer">Masuk</button>
+      <button style="height:52px;border-radius:14px;border:1.5px solid var(--out);background:transparent;color:var(--p);font:900 14px Lato,sans-serif;cursor:pointer">Bantuan</button>
+      <div style="display:flex;flex-direction:column;gap:6px"><div style="font:700 12px Lato,sans-serif;color:var(--osv)">NISN</div><div style="height:52px;border-radius:14px;border:1.5px solid var(--outv);display:flex;align-items:center;padding:0 16px;font:400 15px Lato,sans-serif;color:var(--out)">0051234567</div></div>
+      <div style="background:var(--c0);border:1px solid var(--outv);border-radius:14px;padding:16px"><div style="font:900 14px Lato,sans-serif">Kelas berlangsung</div><div style="font:400 12px Lato,sans-serif;color:var(--osv)">Informatika · 07.30–09.00</div></div>
+      <div style="display:flex;align-items:center;gap:12px;background:var(--c0);border:1px solid var(--outv);border-radius:14px;padding:12px 14px"><div style="width:40px;height:40px;border-radius:12px;background:var(--c1);display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:20px;color:var(--p)">how_to_reg</span></div><div style="flex:1"><div style="font:700 14px Lato,sans-serif">Presensi</div><div style="font:400 11px Lato,sans-serif;color:var(--osv)">Hari ini · belum absen</div></div><span style="font-family:'Material Symbols Rounded';font-size:20px;color:var(--osv)">chevron_right</span></div>
+    </div>
+
+    <div class="dv-card" style="width:300px;padding:20px;background:#F4FAF8;display:flex;flex-direction:column;gap:14px;font-family:Lato,sans-serif;color:var(--on)">
+      <div style="font:900 12px Lato,sans-serif;letter-spacing:1.2px;color:var(--osv)">ii · LEMBUT (24/28, terisi)</div>
+      <button style="height:56px;border-radius:28px;border:none;background:var(--p);color:var(--op);font:900 15px Lato,sans-serif;cursor:pointer;box-shadow:0 6px 18px rgba(0,106,96,.28)">Masuk</button>
+      <button style="height:56px;border-radius:28px;border:none;background:var(--secc);color:var(--osecc);font:900 15px Lato,sans-serif;cursor:pointer">Bantuan</button>
+      <div style="display:flex;flex-direction:column;gap:6px"><div style="font:700 12px Lato,sans-serif;color:var(--osv)">NISN</div><div style="height:56px;border-radius:24px;background:var(--c1);display:flex;align-items:center;padding:0 20px;font:400 15px Lato,sans-serif;color:var(--out)">0051234567</div></div>
+      <div style="background:var(--c0);border-radius:24px;padding:18px;box-shadow:0 6px 20px rgba(0,0,0,.08)"><div style="font:900 14px Lato,sans-serif">Kelas berlangsung</div><div style="font:400 12px Lato,sans-serif;color:var(--osv)">Informatika · 07.30–09.00</div></div>
+      <div style="display:flex;align-items:center;gap:12px;background:var(--c0);border-radius:24px;padding:12px 16px;box-shadow:0 4px 14px rgba(0,0,0,.06)"><div style="width:42px;height:42px;border-radius:50%;background:var(--c1);display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:20px;color:var(--p)">how_to_reg</span></div><div style="flex:1"><div style="font:700 14px Lato,sans-serif">Presensi</div><div style="font:400 11px Lato,sans-serif;color:var(--osv)">Hari ini · belum absen</div></div><span style="font-family:'Material Symbols Rounded';font-size:20px;color:var(--osv)">chevron_right</span></div>
+    </div>
+
+    <div class="dv-card" style="width:300px;padding:20px;background:#F4FAF8;display:flex;flex-direction:column;gap:14px;font-family:Lato,sans-serif;color:var(--on)">
+      <div style="font:900 12px Lato,sans-serif;letter-spacing:1.2px;color:var(--osv)">iii · TEGAS (8, outline 2px)</div>
+      <button style="height:52px;border-radius:8px;border:none;background:var(--p);color:var(--op);font:900 13px Lato,sans-serif;letter-spacing:1.4px;cursor:pointer">MASUK</button>
+      <button style="height:52px;border-radius:8px;border:2px solid var(--p);background:transparent;color:var(--p);font:900 13px Lato,sans-serif;letter-spacing:1.4px;cursor:pointer">BANTUAN</button>
+      <div style="display:flex;flex-direction:column;gap:6px"><div style="font:900 10px Lato,sans-serif;letter-spacing:1.4px;color:var(--osv)">NISN</div><div style="height:52px;border-radius:8px;border:2px solid var(--outv);display:flex;align-items:center;padding:0 14px;font:400 15px Lato,sans-serif;color:var(--out)">0051234567</div></div>
+      <div style="background:var(--c0);border:2px solid var(--on);border-radius:8px;padding:16px"><div style="font:900 10px Lato,sans-serif;letter-spacing:1.4px;color:var(--ok)">KELAS BERLANGSUNG</div><div style="font:900 15px Lato,sans-serif;padding-top:4px">Informatika · 07.30–09.00</div></div>
+      <div style="display:flex;align-items:center;gap:12px;background:var(--c0);border:2px solid var(--outv);border-radius:8px;padding:12px 14px"><div style="width:40px;height:40px;border-radius:8px;background:var(--p);display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:20px;color:var(--op)">how_to_reg</span></div><div style="flex:1"><div style="font:900 13px Lato,sans-serif;letter-spacing:.6px">PRESENSI</div><div style="font:400 11px Lato,sans-serif;color:var(--osv)">Hari ini · belum absen</div></div><span style="font-family:'Material Symbols Rounded';font-size:20px;color:var(--osv)">chevron_right</span></div>
+    </div>
+
+  </div>
+</div>
+
+</div>
+<p class="dv-next">Coba selanjutnya: “varian tata letak Login” · “varian motif background (Pola A/B/C)” · “varian komponen dasar” · “lanjut Fase 2 Pembayaran”</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}">
+class Component extends DCLogic {
+  state = { screen: 'splash', dark: false, role: 'siswa', page: 0, nisn: '', school: null, terms: false, pass: '', show: false, sheet: false, dialog: null, phrase: '', q: '' };
+
+  DARK = "--p:#92D3C7;--op:#003731;--pc:#005047;--opc:#74C3B5;--sec:#43DDBD;--secc:#00BE9F;--osecc:#00463A;--ter:#86D5C7;--terc:#005047;--oterc:#74C3B5;--err:#FFB4AB;--errc:#93000A;--oerrc:#FFDAD6;--bg:#0A1513;--on:#D9E5E1;--sv:#2C3735;--osv:#BFC9C5;--out:#899390;--outv:#3F4946;--c0:#06100E;--c1:#131E1C;--c2:#172220;--c3:#212C2A;--c4:#2C3735;--ok:#43DDBD;--warn:#FFB86A;--g1:rgba(0,80,71,0.40);--g2:rgba(0,190,159,0.25);--g3:rgba(0,80,71,0.30);--arcA:transparent;--arcB:transparent;--arcO:transparent;--w1:#0A1513;--w2:#0A1513;";
+
+  schools = [
+    { id: 1, name: 'SMK DEMO', city: 'Jombang, Jawa Timur', ini: 'SD' },
+    { id: 2, name: 'SMA Demo Nusantara 1', city: 'Surabaya, Jawa Timur', ini: 'SA' },
+    { id: 3, name: 'MTs Mambaul Maarif', city: 'Jombang, Jawa Timur', ini: 'MM' },
+    { id: 4, name: 'SMK Robithotul Hikmah', city: 'Kediri, Jawa Timur', ini: 'RH' },
+    { id: 5, name: 'SMP Demo Harapan', city: 'Malang, Jawa Timur', ini: 'DH' }
+  ];
+
+  ob = [
+    { tag: 'Pembelajaran', icon: 'auto_stories', title: 'Belajar tanpa batas ruang kelas', desc: 'Materi, tugas, dan jurnal kelas dalam satu tempat — semua yang kamu butuhkan untuk mengikuti pelajaran.' },
+    { tag: 'Kewirausahaan', icon: 'storefront', title: 'Toko sekolah di saku kamu', desc: 'Kelola produk, pesanan, dan pemasukan unit usaha sekolah langsung dari ponsel.' },
+    { tag: 'Dompet digital', icon: 'account_balance_wallet', title: 'Bayar sekolah tanpa antre', desc: 'SPP, tagihan, dan top up saldo Klaspay cukup dari satu dompet digital.' }
+  ];
+
+  menu = [
+    { icon: 'auto_stories', label: 'Materi' }, { icon: 'assignment', label: 'Tugas' }, { icon: 'how_to_reg', label: 'Presensi' },
+    { icon: 'edit_note', label: 'Jurnal' }, { icon: 'event_note', label: 'Agenda' }, { icon: 'quiz', label: 'Asesmen' },
+    { icon: 'workspace_premium', label: 'Poin' }, { icon: 'business_center', label: 'Magang' }, { icon: 'menu_book', label: 'Perpus' }
+  ];
+
+  go = (s) => this.setState({ screen: s, sheet: false, dialog: null });
+
+  renderVals() {
+    const s = this.state;
+    const dark = s.dark;
+    const ob = this.ob[s.page];
+    const school = s.school ? this.schools.find(x => x.id === s.school) : null;
+    const canLogin = s.nisn.length >= 4 && !!school && s.terms;
+    const canPass = s.pass.length >= 4;
+    const q = s.q.trim().toLowerCase();
+    const list = this.schools.filter(x => !q || x.name.toLowerCase().includes(q));
+
+    const jumpDefs = [
+      ['Splash', 'splash'], ['Onboarding', 'onboard'], ['Login', 'login'], ['Password', 'password'], ['SSO', 'sso'], ['Home', 'home']
+    ];
+    const dlgDefs = [['Dialog tamu', 'guest'], ['Update wajib', 'update']];
+
+    return {
+      themeVars: dark ? this.DARK : '',
+      isDark: dark,
+      themeLabel: dark ? 'Gelap' : 'Terang',
+      themeIcon: dark ? 'dark_mode' : 'light_mode',
+      toggleTheme: () => this.setState({ dark: !s.dark }),
+      roleLabel: s.role === 'siswa' ? 'Siswa' : 'Guru',
+      roleBadge: s.role === 'siswa' ? 'SISWA' : 'GURU',
+      roleSub: s.role === 'siswa' ? 'Kelas 10 · Informatika' : 'Guru Mapel · Informatika',
+      idLabel: s.role === 'siswa' ? 'NISN 0051234567' : 'NIK 3517041505900001',
+      toggleRole: () => this.setState({ role: s.role === 'siswa' ? 'guru' : 'siswa' }),
+
+      jumps: jumpDefs.map(([label, key]) => ({
+        label, on: () => this.go(key),
+        bg: s.screen === key ? '#006A60' : '#fff',
+        fg: s.screen === key ? '#fff' : '#1a1a1a'
+      })).concat(dlgDefs.map(([label, key]) => ({
+        label, on: () => this.setState({ dialog: key }),
+        bg: s.dialog === key ? '#2D4960' : '#fff',
+        fg: s.dialog === key ? '#fff' : '#1a1a1a'
+      }))),
+
+      showAmbient: s.screen !== 'home',
+      isSplash: s.screen === 'splash',
+      isOnboard: s.screen === 'onboard',
+      isLogin: s.screen === 'login',
+      isPass: s.screen === 'password',
+      isSso: s.screen === 'sso',
+      isHome: s.screen === 'home',
+
+      obTag: ob.tag, obIcon: ob.icon, obTitle: ob.title, obDesc: ob.desc,
+      obNotFirst: s.page > 0,
+      obCta: s.page === 2 ? 'selesai' : 'berikutnya',
+      obBack: () => this.setState({ page: Math.max(0, s.page - 1) }),
+      obNext: () => s.page === 2 ? this.go('login') : this.setState({ page: s.page + 1 }),
+      dots: [0, 1, 2].map(i => ({ w: i === s.page ? '22px' : '6px', o: i === s.page ? 1 : 0.28 })),
+
+      nisn: s.nisn,
+      onNisn: (e) => this.setState({ nisn: e.target.value.replace(/[^0-9]/g, '') }),
+      schoolLabel: school ? school.name : 'Pilih sekolah',
+      schoolColor: school ? 'var(--on)' : 'var(--out)',
+      terms: s.terms,
+      toggleTerms: () => this.setState({ terms: !s.terms }),
+      termsIcon: s.terms ? 'check_box' : 'check_box_outline_blank',
+      termsColor: s.terms ? 'var(--p)' : 'var(--out)',
+      loginDisabled: !canLogin,
+      loginAlpha: canLogin ? 1 : 0.45,
+      submitLogin: () => canLogin && this.go('password'),
+      startSso: () => this.go('sso'),
+
+      pass: s.pass,
+      onPass: (e) => this.setState({ pass: e.target.value }),
+      passType: s.show ? 'text' : 'password',
+      passIcon: s.show ? 'visibility_off' : 'visibility',
+      toggleShow: () => this.setState({ show: !s.show }),
+      passDisabled: !canPass,
+      passAlpha: canPass ? 1 : 0.45,
+      submitPass: () => canPass && this.go('home'),
+      backToLogin: () => this.go('login'),
+      ssoYes: () => this.go('home'),
+
+      sheetOpen: s.sheet,
+      openSheet: () => this.setState({ sheet: true }),
+      closeSheet: () => this.setState({ sheet: false, q: '' }),
+      q: s.q,
+      onQ: (e) => this.setState({ q: e.target.value }),
+      schoolList: list.map(x => ({
+        ini: x.ini, name: x.name, city: x.city,
+        o: s.school === x.id ? 1 : 0,
+        pick: () => this.setState({ school: x.id, sheet: false, q: '' })
+      })),
+
+      dlgPolicy: s.dialog === 'policy',
+      dlgGuest: s.dialog === 'guest',
+      dlgUpdate: s.dialog === 'update',
+      dlgScope: s.dialog === 'scope',
+      openPolicy: (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState({ dialog: 'policy' }); },
+      openGuest: () => this.setState({ dialog: 'guest' }),
+      openScope: () => this.setState({ dialog: 'scope' }),
+      closeDialog: () => this.setState({ dialog: null }),
+      acceptPolicy: () => this.setState({ dialog: null, terms: true }),
+      phrase: s.phrase,
+      onPhrase: (e) => this.setState({ phrase: e.target.value }),
+      guestDisabled: s.phrase.trim().toUpperCase() !== 'SAYA MENGERTI',
+      guestAlpha: s.phrase.trim().toUpperCase() === 'SAYA MENGERTI' ? 1 : 0.45,
+      guestNext: () => this.setState({ dialog: null, screen: 'home' }),
+
+      menu: this.menu
+    };
+  }
+}
+</script>
+</body>
+</html>

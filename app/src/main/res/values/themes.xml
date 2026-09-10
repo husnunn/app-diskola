@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.MVVM" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Brand (use reference palette) -->
+        <item name="colorPrimary">@color/ref_primary</item>
+        <item name="colorPrimaryVariant">@color/ref_primary_container</item>
+        <item name="colorSecondary">@color/ref_secondary</item>
+        <item name="colorSecondaryVariant">@color/ref_secondary_container</item>
+
+        <!-- Surfaces -->
+        <item name="colorSurface">@color/ref_surface</item>
+        <item name="colorOnSurface">@color/ref_on_surface</item>
+        <item name="android:colorBackground">@color/ref_background</item>
+        <item name="colorOnBackground">@color/ref_on_surface</item>
+
+        <!-- On colors (ensure contrast) -->
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorOnSecondary">@color/white</item>
+
+        <!-- System bars -->
+        <item name="android:statusBarColor">@color/ref_primary</item>
+        <item name="android:navigationBarColor">@color/ref_surface</item>
+        <!-- status bar dark (primary), use light icons -->
+        <item name="android:windowLightStatusBar">false</item>
+        <!-- navigation bar light icons when surface is light -->
+        <item name="android:windowLightNavigationBar">true</item>
+
+        <!-- Window -->
+        <item name="android:windowBackground">@color/ref_background</item>
+
+        <!-- Material widgets -->
+        <item name="materialButtonStyle">@style/Widget.MaterialComponents.Button</item>
+        <item name="textInputStyle">@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox</item>
+    </style>
+
+</resources>

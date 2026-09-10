@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark Mode Palette — kept in sync with ui/theme/Color.kt's DiskolaDarkColorScheme -->
+    <color name="ref_primary">#92D3C7</color>
+    <color name="ref_primary_container">#005047</color>
+    <color name="ref_secondary">#43DDBD</color>
+    <color name="ref_secondary_container">#00BE9F</color>
+    <color name="ref_background">#0A1513</color>
+    <color name="ref_surface">#0A1513</color>
+    <color name="ref_on_surface">#D9E5E1</color>
+    <color name="ref_on_surface_variant">#BFC9C5</color>
+    <color name="ref_outline">#899390</color>
+    <color name="ref_outline_variant">#3F4946</color>
+    <color name="ref_surface_container_lowest">#06100E</color>
+    <color name="ref_surface_container_low">#131E1C</color>
+    <color name="ref_surface_container">#172220</color>
+    <color name="ref_surface_container_highest">#2C3735</color>
+</resources>

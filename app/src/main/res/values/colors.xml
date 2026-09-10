@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#396EB0</color>
+    <color name="purple_700">#396EB0</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="blue_bg">#396EB0</color>
+    <color name="primary_blue">#C2D2E7</color>
+    <color name="gray">#666666</color>
+    <color name="gray_100">#c5c5c5</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="white2">#FAFAFA</color>
+    <color name="black_900">#121212</color>
+    <color name="black_800">#1E1E1E</color> <!-- sedikit lebih terang -->
+    <color name="red_outline">#E2A1A1</color>
+    <color name="green_500">#4CAF50</color>
+    <color name="blue_link">#1E88E5</color>
+    <color name="blue_accent">#0066FF</color>
+    <color name="orange">#f2aa58</color>
+    <color name="oldorange">#b76303</color>
+
+    <!-- Brand colors — kept in sync with ui/theme/Color.kt's DiskolaLightColorScheme.
+         Only the app's pre-Compose window chrome (status/nav bar, window background flash
+         before DiskolaTheme paints) still reads these; everything else uses MaterialTheme. -->
+    <color name="error">#ba1a1a</color>
+    <color name="ref_primary">#006A60</color>
+    <color name="ref_primary_container">#005048</color>
+    <color name="ref_secondary">#007A6E</color>
+    <color name="ref_secondary_container">#CAE5E0</color>
+    <color name="ref_background">#F4FAF8</color>
+    <color name="ref_surface">#F4FAF8</color>
+    <color name="ref_on_surface">#151D1C</color>
+    <color name="ref_on_surface_variant">#3E4947</color>
+    <color name="ref_outline">#6E7977</color>
+    <color name="ref_outline_variant">#BEC9C6</color>
+    <color name="ref_surface_container_lowest">#FFFFFF</color>
+    <color name="ref_surface_container_low">#EDF6F3</color>
+    <color name="ref_surface_container">#E7F0ED</color>
+    <color name="ref_surface_container_highest">#DBE4E2</color>
+    <color name="ref_primary_fixed_dim">#84D5C8</color>
+    <color name="ref_secondary_fixed">#CAE5E0</color>
+
+</resources>
