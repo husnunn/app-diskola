@@ -23,7 +23,7 @@
 # --- Room (keep generated implementations and annotated elements) ---
 # Keep Room-generated database implementations and their inner classes
 -keep class **_Impl { *; }
--keep class id.app.education.database.LocalDatabase_Impl { *; }
+-keep class id.diskola.app.database.LocalDatabase_Impl { *; }
 
 # Keep classes extending RoomDatabase (prevents stripping abstract DB)
 -keep class * extends androidx.room.RoomDatabase { *; }

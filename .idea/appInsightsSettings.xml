@@ -8,10 +8,10 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="id.app.education.debug" />
-                  <option name="mobileSdkAppId" value="1:1047003221816:android:99a14ef49def5732543bcd" />
-                  <option name="projectId" value="mvvmmoduleapp" />
-                  <option name="projectNumber" value="1047003221816" />
+                  <option name="appId" value="id.diskola.app.debug" />
+                  <option name="mobileSdkAppId" value="1:176339532902:android:876455c4c9e2c29462c1a7" />
+                  <option name="projectId" value="diskola-8ef52" />
+                  <option name="projectNumber" value="176339532902" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />

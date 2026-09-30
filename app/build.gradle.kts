@@ -13,7 +13,7 @@ plugins {
 }
 
 android {
-    namespace = "id.app.education"
+    namespace = "id.diskola.app"
     compileSdk = 36
 
     val properties = Properties()
@@ -24,7 +24,7 @@ android {
     val webClientId = properties.getProperty("WEB_CLIENT_ID") ?: ""
 
     defaultConfig {
-        applicationId = "id.app.education"
+        applicationId = "id.diskola.app"
         minSdk = 27
         targetSdk = 36
         versionCode = 1
@@ -44,12 +44,14 @@ android {
                 "proguard-rules.pro"
             )
             buildConfigField("String", "API_URL", properties.getProperty("API_URL_PROD", ""))
+            buildConfigField("String", "ASSETS_URL", properties.getProperty("ASSETS_URL_PROD", "\"\""))
         }
         debug {
             applicationIdSuffix = ".debug"
             isMinifyEnabled = false
             isDebuggable = true
             buildConfigField("String", "API_URL", properties.getProperty("API_URL_DEV", ""))
+            buildConfigField("String", "ASSETS_URL", properties.getProperty("ASSETS_URL_DEV", "\"\""))
         }
     }
     compileOptions {
@@ -106,6 +108,10 @@ dependencies {
     implementation(libs.hilt.android)
     kapt(libs.hilt.android.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
+
+    // Hilt + WorkManager (AKM question/media background sync)
+    implementation(libs.androidx.hilt.work)
+    kapt(libs.androidx.hilt.compiler)
 
     // Sign-in with Google (Credential Manager)
     implementation(libs.androidx.credentials)
@@ -169,5 +175,8 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
 
     implementation(libs.lottie)
+
+    // Native LaTeX/MathJax formula rendering for AKM question text (no WebView)
+    implementation(libs.jlatexmath.android)
 
 }
