@@ -95,7 +95,8 @@ data class AkmSettingResponse(val data: AkmSettingData? = null)
 data class AkmSettingData(
     val penalty_times: Int = 0,
     val penalty_applied: Boolean = false,
-    val absence_setting: Boolean = false,
+    /** Null = key missing; Presensi treats that as "radius restricted" (the safe default). */
+    val absence_setting: Boolean? = null,
     val exam_lock_mode: Boolean? = true,
 )
 

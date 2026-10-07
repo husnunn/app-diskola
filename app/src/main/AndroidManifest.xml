@@ -4,6 +4,12 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Presensi Dinas Luar selfie (CameraX). Deliberately no RECORD_AUDIO / ACCESS_BACKGROUND_LOCATION. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.front" android:required="false" />
 
     <application
         android:name=".App"
@@ -16,6 +22,13 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.MVVM"
         tools:targetApi="31">
+
+        <!-- Agenda Mingguan's check-in map. The value comes from local.properties via the
+             `MAPS_API_KEY` manifest placeholder in app/build.gradle.kts. -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${MAPS_API_KEY}" />
+
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
@@ -49,6 +62,19 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <!-- Lets `FileOpenRepository` hand a downloaded Materi file to another app via
+             `ACTION_VIEW` (doc `05-pembelajaran-materi-tugas.md` §4.3) without exposing a raw
+             `file://` Uri. Was entirely absent before this pass. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

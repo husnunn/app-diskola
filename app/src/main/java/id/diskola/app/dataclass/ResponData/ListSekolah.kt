@@ -141,7 +141,9 @@ data class ClassRoomData(
 
 @JsonClass(generateAdapter = true)
 data class TeacherData(
-    val id: Int? = null
+    val id: Int? = null,
+    val name: String? = null,
+    val nip: String? = null,
 )
 
 

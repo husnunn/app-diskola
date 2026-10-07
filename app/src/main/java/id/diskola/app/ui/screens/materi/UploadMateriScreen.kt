@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,29 +14,21 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.UploadFile
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,20 +41,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Info
+import id.diskola.app.ui.components.AppButton
+import id.diskola.app.ui.components.BannerError
 import id.diskola.app.ui.components.DetailScaffold
+import id.diskola.app.ui.components.LinkPreviewCard
 import id.diskola.app.ui.components.SectionLabel
+import id.diskola.app.ui.components.SimpleDropdown
+import id.diskola.app.ui.navigation.Route
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.extendedColors
-import id.diskola.app.ui.components.AppButton
-import id.diskola.app.ui.components.AppTextField
-import id.diskola.app.ui.navigation.Route
 import id.diskola.app.ui.theme.Spacing
-import id.diskola.app.viewmodel.MateriViewModel
+import id.diskola.app.viewmodel.UploadMateriViewModel
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
@@ -72,53 +63,104 @@ import java.io.FileOutputStream
 
 private enum class UploadTarget { JENJANG, JURUSAN, KELAS }
 
+private val ALLOWED_MIME_TYPES = arrayOf(
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "image/*",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+)
+
+private const val MAX_FILE_BYTES = 12 * 1024 * 1024L
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UploadMateriScreen(
     route: Route.UploadMateri,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: MateriViewModel = hiltViewModel(),
+    viewModel: UploadMateriViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
 
-    var judul by remember { mutableStateOf(route.materiName) }
-    var deskripsi by remember { mutableStateOf(route.materiDesc) }
-    var urlLink by remember { mutableStateOf(route.link) }
+    var judul by remember { mutableStateOf("") }
+    var deskripsi by remember { mutableStateOf("") }
+    var urlLink by remember { mutableStateOf("") }
     var selectedSubjectId by remember { mutableStateOf(if (route.subjectId >= 0) route.subjectId else null) }
-    var selectedSubjectName by remember { mutableStateOf("") }
     var selectedMajorId by remember { mutableStateOf<Int?>(null) }
-    var selectedClassId by remember { mutableStateOf(if (route.classId >= 0) route.classId else null) }
-    var target by remember { mutableStateOf(if (route.classId >= 0) UploadTarget.KELAS else UploadTarget.JENJANG) }
-    var selectedGrade by remember { mutableStateOf("") }
+    var selectedClassId by remember { mutableStateOf<Int?>(null) }
+    var target by remember { mutableStateOf(UploadTarget.JENJANG) }
+    var selectedGrade by remember { mutableStateOf<Int?>(null) }
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
     var selectedFileName by remember { mutableStateOf<String?>(null) }
+    var prefilled by remember { mutableStateOf(false) }
+    var fileSizeError by remember { mutableStateOf<String?>(null) }
 
-    val teacherSubjects by viewModel.teacherSubjects.collectAsStateWithLifecycle()
+    val subjects by viewModel.subjects.collectAsStateWithLifecycle()
     val classes by viewModel.classes.collectAsStateWithLifecycle()
     val majors by viewModel.majors.collectAsStateWithLifecycle()
+    val grades by viewModel.grades.collectAsStateWithLifecycle()
     val loading by viewModel.loading.collectAsStateWithLifecycle()
-    val uploadResult by viewModel.uploadResult.collectAsStateWithLifecycle()
+    val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
+    val uploadSuccess by viewModel.uploadSuccess.collectAsStateWithLifecycle()
+    val existing by viewModel.existing.collectAsStateWithLifecycle()
+    val linkPreview by viewModel.linkPreview.collectAsStateWithLifecycle()
+    val linkPreviewLoading by viewModel.linkPreviewLoading.collectAsStateWithLifecycle()
 
-    LaunchedEffect(Unit) { viewModel.fetchTeacherRequirements() }
-    LaunchedEffect(teacherSubjects) {
-        if (route.subjectId >= 0) teacherSubjects.find { it.id == route.subjectId }?.let { selectedSubjectName = it.name }
+    LaunchedEffect(Unit) {
+        viewModel.loadReferenceData()
+        if (route.isEdit && route.materiId > 0) viewModel.loadExisting(route.materiId)
     }
-    LaunchedEffect(classes) {
-        if (route.classId >= 0) classes.find { it.id == route.classId }?.let { }
+    LaunchedEffect(existing) {
+        val item = existing
+        if (item != null && !prefilled) {
+            prefilled = true
+            judul = item.name
+            deskripsi = item.description
+            urlLink = item.link
+            selectedSubjectId = item.subject_id
+            selectedFileName = item.file_name.takeIf { it.isNotBlank() }
+            target = when {
+                item.major_id > 0 -> UploadTarget.JURUSAN
+                item.class_id > 0 -> UploadTarget.KELAS
+                else -> UploadTarget.JENJANG
+            }
+            selectedMajorId = item.major_id.takeIf { it > 0 }
+            selectedClassId = item.class_id.takeIf { it > 0 }
+            selectedGrade = item.grade.takeIf { it > 0 }
+        }
     }
-    LaunchedEffect(uploadResult) {
-        if (uploadResult != null) onDone()
+    LaunchedEffect(uploadSuccess) {
+        if (uploadSuccess) onDone()
     }
+    LaunchedEffect(urlLink) { viewModel.onLinkChanged(urlLink) }
 
-    val filePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    val filePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri ?: return@rememberLauncherForActivityResult
+        val (name, size) = queryFileInfo(context, uri)
+        if (size != null && size > MAX_FILE_BYTES) {
+            fileSizeError = "ukuran file melebihi batas maksimal (12Mb)"
+            return@rememberLauncherForActivityResult
+        }
+        fileSizeError = null
         selectedFileUri = uri
-        selectedFileName = queryFileName(context, uri) ?: "upload.pdf"
+        selectedFileName = name ?: "upload"
+    }
+
+    val hasTarget = when (target) {
+        UploadTarget.JENJANG -> selectedGrade != null
+        UploadTarget.JURUSAN -> selectedMajorId != null
+        UploadTarget.KELAS -> selectedClassId != null
     }
     val canSubmit = judul.isNotBlank() &&
         selectedSubjectId != null &&
-        (selectedFileUri != null || urlLink.isNotBlank())
+        hasTarget &&
+        (selectedFileUri != null || selectedFileName != null || urlLink.isNotBlank())
 
     DetailScaffold(
         title = if (route.isEdit) "Edit Materi" else "Unggah Materi",
@@ -136,11 +178,7 @@ fun UploadMateriScreen(
                     onClick = {
                         val data = buildRequestData(judul, deskripsi, urlLink, target, selectedGrade, selectedMajorId, selectedClassId, selectedSubjectId)
                         val filePart = selectedFileUri?.let { buildFilePart(context, it, selectedFileName ?: "upload.pdf") }
-                        if (route.isEdit) {
-                            viewModel.updateMateri(route.materiId, data, filePart)
-                        } else {
-                            viewModel.uploadMateri(data, filePart)
-                        }
+                        viewModel.submit(route.isEdit, route.materiId, data, filePart)
                     },
                     enabled = canSubmit,
                     loading = loading,
@@ -158,16 +196,20 @@ fun UploadMateriScreen(
                 .padding(bottom = Spacing.xl),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
+            if (errorMessage.isNotBlank()) {
+                BannerError(message = errorMessage, onDismiss = { viewModel.clearError() })
+            }
+
             FormCard {
                 FieldLabel(text = "Judul Materi", required = true, counter = "${judul.length}/500")
-                AppTextField(
+                id.diskola.app.ui.components.AppTextField(
                     value = judul,
                     onValueChange = { if (it.length <= 500) judul = it },
                     placeholder = "mis. Struktur Data: Array dan ArrayList",
                 )
 
                 FieldLabel(text = "Deskripsi", required = false, counter = "${deskripsi.length}/5000")
-                AppTextField(
+                id.diskola.app.ui.components.AppTextField(
                     value = deskripsi,
                     onValueChange = { if (it.length <= 5000) deskripsi = it },
                     placeholder = "Ringkasan isi materi (opsional)",
@@ -175,13 +217,10 @@ fun UploadMateriScreen(
 
                 FieldLabel(text = "Mata Pelajaran", required = true)
                 SimpleDropdown(
-                    label = "",
-                    options = teacherSubjects.map { it.name },
-                    selected = selectedSubjectName.ifBlank { "Pilih mata pelajaran" },
-                    onSelected = { name ->
-                        selectedSubjectName = name
-                        selectedSubjectId = teacherSubjects.find { it.name == name }?.id
-                    },
+                    options = subjects.map { it.id.toInt() to it.name },
+                    selected = selectedSubjectId,
+                    placeholder = "Pilih mata pelajaran",
+                    onSelected = { selectedSubjectId = it },
                 )
             }
 
@@ -194,62 +233,76 @@ fun UploadMateriScreen(
                 }
                 TargetRadio("Jurusan", target == UploadTarget.JURUSAN) {
                     target = UploadTarget.JURUSAN
-                    selectedGrade = ""
+                    selectedGrade = null
                     selectedClassId = null
                 }
                 TargetRadio("Kelas", target == UploadTarget.KELAS) {
                     target = UploadTarget.KELAS
-                    selectedGrade = ""
+                    selectedGrade = null
                     selectedMajorId = null
                 }
 
                 when (target) {
                     UploadTarget.JENJANG -> SimpleDropdown(
-                        label = "",
-                        options = listOf("10", "11", "12"),
-                        selected = selectedGrade.ifBlank { "Pilih jenjang" },
+                        options = grades.map { it.id to it.name },
+                        selected = selectedGrade,
+                        placeholder = "Pilih jenjang",
                         onSelected = { selectedGrade = it },
                     )
 
                     UploadTarget.JURUSAN -> SimpleDropdown(
-                        label = "",
-                        options = majors.map { it.name },
-                        selected = majors.find { it.id == selectedMajorId }?.name ?: "Pilih jurusan",
-                        onSelected = { name -> selectedMajorId = majors.find { it.name == name }?.id },
+                        options = majors.map { it.id to it.name },
+                        selected = selectedMajorId,
+                        placeholder = "Pilih jurusan",
+                        onSelected = { selectedMajorId = it },
                     )
 
                     UploadTarget.KELAS -> SimpleDropdown(
-                        label = "",
-                        options = classes.map { it.name },
-                        selected = classes.find { it.id == selectedClassId }?.name ?: "Pilih kelas",
-                        onSelected = { name -> selectedClassId = classes.find { it.name == name }?.id },
+                        options = classes.map { it.id to (if (it.grade > 0) "${it.grade} - ${it.name}" else it.name) },
+                        selected = selectedClassId,
+                        placeholder = "Pilih kelas",
+                        onSelected = { selectedClassId = it },
                     )
                 }
 
-                Text(
-                    "Hanya satu target yang dikirim — mengganti mode akan mengosongkan pilihan sebelumnya.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (!hasTarget) {
+                    Text(
+                        "Pilih salah satu target di atas sebelum mengunggah materi.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             }
 
             FormCard {
                 FieldLabel(text = "File Materi", required = false)
                 FileDropZone(
                     fileName = selectedFileName,
-                    onPick = { filePickerLauncher.launch("*/*") },
+                    onPick = { filePickerLauncher.launch(ALLOWED_MIME_TYPES) },
                     onClear = {
                         selectedFileUri = null
                         selectedFileName = null
+                        fileSizeError = null
                     },
                 )
+                fileSizeError?.let {
+                    Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                }
 
                 FieldLabel(text = "Url Link", required = false)
-                AppTextField(
+                id.diskola.app.ui.components.AppTextField(
                     value = urlLink,
                     onValueChange = { urlLink = it },
                     placeholder = "https://",
                 )
+                if (urlLink.isNotBlank()) {
+                    LinkPreviewCard(
+                        url = urlLink,
+                        loading = linkPreviewLoading,
+                        data = linkPreview,
+                        onClick = {},
+                    )
+                }
 
                 Row(
                     modifier = Modifier
@@ -276,7 +329,6 @@ fun UploadMateriScreen(
     }
 }
 
-/** One bordered block of the upload form. */
 @Composable
 private fun FormCard(content: @Composable () -> Unit) {
     Column(
@@ -294,11 +346,7 @@ private fun FormCard(content: @Composable () -> Unit) {
 @Composable
 private fun FieldLabel(text: String, required: Boolean, counter: String? = null) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
         if (required) {
             Text(" *", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.error)
         }
@@ -344,7 +392,7 @@ private fun FileDropZone(fileName: String?, onPick: () -> Unit, onClear: () -> U
                 color = scheme.onSurface,
             )
             Text(
-                "Format PDF atau gambar · maksimal 12 MB",
+                "PDF, gambar, Word, Excel, atau PowerPoint · maksimal 12 MB",
                 style = MaterialTheme.typography.labelSmall,
                 color = scheme.onSurfaceVariant,
             )
@@ -357,55 +405,18 @@ private fun FileDropZone(fileName: String?, onPick: () -> Unit, onClear: () -> U
     }
 }
 
-@Composable
-private fun TargetRow(label: String, selected: Boolean, onSelect: () -> Unit, dropdown: @Composable () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.width(110.dp)) {
-            RadioButton(selected = selected, onClick = onSelect)
-            Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-        }
-        Box(modifier = Modifier.weight(1f)) { dropdown() }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SimpleDropdown(
-    label: String,
-    options: List<String>,
-    selected: String,
-    onSelected: (String) -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    ExposedDropdownMenuBox(expanded = expanded && enabled, onExpandedChange = { if (enabled) expanded = it }, modifier = modifier) {
-        OutlinedTextField(
-            value = selected,
-            onValueChange = {},
-            readOnly = true,
-            enabled = enabled,
-            label = if (label.isNotBlank()) ({ Text(label) }) else null,
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded && enabled) },
-            modifier = Modifier
-                .menuAnchor(MenuAnchorType.PrimaryEditable, enabled = enabled)
-                .fillMaxWidth(),
-        )
-        ExposedDropdownMenu(expanded = expanded && enabled, onDismissRequest = { expanded = false }) {
-            options.forEach { option ->
-                DropdownMenuItem(text = { Text(option) }, onClick = { onSelected(option); expanded = false })
-            }
-        }
-    }
-}
-
-private fun queryFileName(context: android.content.Context, uri: Uri): String? {
+private fun queryFileInfo(context: android.content.Context, uri: Uri): Pair<String?, Long?> {
     var name: String? = null
+    var size: Long? = null
     context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-        val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-        if (cursor.moveToFirst() && index >= 0) name = cursor.getString(index)
+        if (cursor.moveToFirst()) {
+            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (nameIndex >= 0) name = cursor.getString(nameIndex)
+            val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+            if (sizeIndex >= 0) size = cursor.getLong(sizeIndex)
+        }
     }
-    return name
+    return name to size
 }
 
 private fun buildRequestData(
@@ -413,7 +424,7 @@ private fun buildRequestData(
     desc: String,
     link: String,
     target: UploadTarget,
-    grade: String,
+    grade: Int?,
     majorId: Int?,
     classId: Int?,
     subjectId: Int?,
@@ -426,7 +437,7 @@ private fun buildRequestData(
     if (link.isNotBlank()) map["link"] = link.toRequestBody(plain)
 
     when (target) {
-        UploadTarget.JENJANG -> if (grade.isNotEmpty()) map["grade"] = grade.toRequestBody(plain)
+        UploadTarget.JENJANG -> grade?.let { map["grade"] = it.toString().toRequestBody(plain) }
         UploadTarget.JURUSAN -> majorId?.let { map["school_major_id"] = it.toString().toRequestBody(plain) }
         UploadTarget.KELAS -> classId?.let { map["school_classes_id"] = it.toString().toRequestBody(plain) }
     }
@@ -438,6 +449,8 @@ private fun buildFilePart(context: android.content.Context, uri: Uri, fileName: 
     context.contentResolver.openInputStream(uri)?.use { input ->
         FileOutputStream(file).use { output -> input.copyTo(output) }
     }
-    if (file.length() > 12 * 1024 * 1024L) return null
-    return MultipartBody.Part.createFormData("file", file.name, file.asRequestBody("application/pdf".toMediaTypeOrNull()))
+    if (!file.exists()) return null
+    val mimeType = android.webkit.MimeTypeMap.getSingleton()
+        .getMimeTypeFromExtension(file.extension.lowercase()) ?: "application/octet-stream"
+    return MultipartBody.Part.createFormData("file", file.name, file.asRequestBody(mimeType.toMediaTypeOrNull()))
 }

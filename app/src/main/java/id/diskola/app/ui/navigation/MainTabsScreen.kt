@@ -16,11 +16,13 @@ import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -31,9 +33,23 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import id.diskola.app.dataclass.mock.NotificationItem
+import java.time.LocalDate
 import id.diskola.app.dataclass.mock.formatRupiah
-import id.diskola.app.dataclass.ResponData.MateriItem
-import id.diskola.app.ui.screens.absensi.AbsensiScreen
+import id.diskola.app.ui.screens.jurnal.JurnalDetailScreen
+import id.diskola.app.ui.screens.jurnal.JurnalFormScreen
+import id.diskola.app.ui.screens.jurnal.JurnalScreen
+import id.diskola.app.ui.screens.jurnal.VerifikasiJurnalScreen
+import id.diskola.app.ui.screens.presensi.IzinAddScreen
+import id.diskola.app.ui.screens.presensi.IzinDetailScreen
+import id.diskola.app.ui.screens.presensi.IzinListScreen
+import id.diskola.app.ui.screens.presensi.PresensiMasukScreen
+import id.diskola.app.ui.screens.presensi.CaptureCameraConfig
+import id.diskola.app.ui.screens.presensi.CaptureCameraScreen
+import id.diskola.app.ui.screens.presensi.PresensiOffsiteScreen
+import id.diskola.app.ui.screens.presensi.PresensiScreen
+import id.diskola.app.ui.screens.agenda.AgendaCheckScreen
+import id.diskola.app.ui.screens.agenda.AgendaDetailScreen
+import id.diskola.app.ui.screens.agenda.AgendaMingguanScreen
 import id.diskola.app.ui.screens.akun.AkunAboutScreen
 import id.diskola.app.ui.screens.akun.AkunCardScreen
 import id.diskola.app.ui.screens.akun.AkunDevicesScreen
@@ -54,12 +70,22 @@ import id.diskola.app.ui.screens.materi.MapelScreen
 import id.diskola.app.ui.screens.materi.MateriDetailScreen
 import id.diskola.app.ui.screens.materi.MateriGuruScreen
 import id.diskola.app.ui.screens.materi.MateriListScreen
+import id.diskola.app.ui.screens.materi.PdfViewerScreen
 import id.diskola.app.ui.screens.materi.UploadMateriScreen
-import id.diskola.app.ui.screens.materi.initialsOf
 import id.diskola.app.ui.screens.materi.rememberIsTeacher
-import id.diskola.app.ui.screens.materi.targetLabel
+import id.diskola.app.ui.screens.poin.PoinCariScreen
+import id.diskola.app.ui.screens.poin.PoinFormScreen
+import id.diskola.app.ui.screens.poin.PoinHasilScreen
+import id.diskola.app.ui.screens.poin.PoinSiswaScreen
+import id.diskola.app.viewmodel.PoinGuruViewModel
 import id.diskola.app.ui.screens.notifikasi.NotifikasiDetailScreen
 import id.diskola.app.ui.screens.notifikasi.NotifikasiScreen
+import id.diskola.app.ui.screens.tugas.TugasDetailScreen
+import id.diskola.app.ui.screens.tugas.TugasGuruScreen
+import id.diskola.app.ui.screens.tugas.TugasScoringScreen
+import id.diskola.app.ui.screens.tugas.TugasSiswaScreen
+import id.diskola.app.ui.screens.tugas.TugasTerkumpulScreen
+import id.diskola.app.ui.screens.tugas.UploadTugasScreen
 import id.diskola.app.ui.screens.pembayaran.CheckoutScreen
 import id.diskola.app.ui.screens.pembayaran.PaymentSuccessScreen
 import id.diskola.app.ui.screens.pembayaran.PembayaranScreen
@@ -75,7 +101,10 @@ import id.diskola.app.ui.theme.WindowWidth
 import id.diskola.app.ui.theme.contentContainer
 import id.diskola.app.viewmodel.AkmViewModel
 import id.diskola.app.viewmodel.AkunViewModel
+import id.diskola.app.viewmodel.MateriGuruViewModel
 import id.diskola.app.viewmodel.NotifikasiViewModel
+import id.diskola.app.viewmodel.TugasGuruViewModel
+import id.diskola.app.viewmodel.TugasTerkumpulViewModel
 import id.diskola.app.viewmodel.PembayaranViewModel
 
 private data class TabItem(
@@ -154,13 +183,21 @@ fun MainTabsScreen(onLoggedOut: () -> Unit, modifier: Modifier = Modifier) {
                 composable<Route.MainTab.Pembelajaran> {
                     val isTeacher = rememberIsTeacher()
                     HomeScreen(
-                        isTeacher = isTeacher,
                         onNavigateToMateri = {
                             navController.navigate(if (isTeacher) Route.MateriGuru else Route.Mapel)
                         },
-                        onNavigateToAbsensi = { navController.navigate(Route.Absensi) },
+                        onNavigateToTugas = {
+                            navController.navigate(if (isTeacher) Route.TugasGuru else Route.TugasSiswa)
+                        },
+                        onNavigateToPresensi = { navController.navigate(Route.Presensi) },
+                        onOpenJurnal = { action, attendanceId, plotId -> navController.navigate(Route.Jurnal(action, attendanceId, plotId)) },
+                        onNavigateToAgenda = { navController.navigate(Route.AgendaMingguan) },
+                        onNavigateToPoin = {
+                            navController.navigate(if (isTeacher) Route.PoinGuru else Route.PoinSiswa)
+                        },
                         onNavigateToAsesmen = { navController.navigate(Route.Akm.List) },
                         onNavigateToNotifikasi = { navController.navigate(Route.Notifikasi) },
+                        onLoggedOut = onLoggedOut,
                     )
                 }
                 composable<Route.MainTab.Akun> {
@@ -185,22 +222,32 @@ fun MainTabsScreen(onLoggedOut: () -> Unit, modifier: Modifier = Modifier) {
                 composable<Route.Mapel> {
                     MapelScreen(
                         onBack = { navController.popBackStack() },
-                        onOpenSubject = { navController.navigate(Route.MateriList(it.id, it.name)) },
+                        onOpenSubject = { navController.navigate(Route.MateriList(it.id.toInt(), it.name, isTeacher = false)) },
                     )
                 }
-                composable<Route.MateriGuru> {
+                composable<Route.MateriGuru> { backStackEntry ->
+                    val vm: MateriGuruViewModel = hiltViewModel(backStackEntry)
+                    val materiChanged by backStackEntry.savedStateHandle.getStateFlow("materiChanged", false)
+                        .collectAsStateWithLifecycle()
+                    LaunchedEffect(materiChanged) {
+                        if (materiChanged) {
+                            vm.onMateriChanged()
+                            backStackEntry.savedStateHandle["materiChanged"] = false
+                        }
+                    }
                     MateriGuruScreen(
                         onBack = { navController.popBackStack() },
                         onOpenSubjects = { navController.navigate(Route.MapelGuru) },
-                        onOpenMateri = { navController.navigate(it.toDetailRoute()) },
+                        onOpenMateri = { navController.navigate(Route.MateriDetail(it.id.toInt(), it.subject_id, isTeacher = true)) },
                         onUpload = { navController.navigate(Route.UploadMateri()) },
-                        onEdit = { navController.navigate(it.toEditRoute()) },
+                        onEdit = { navController.navigate(Route.UploadMateri(isEdit = true, materiId = it.id.toInt(), subjectId = it.subject_id)) },
+                        viewModel = vm,
                     )
                 }
                 composable<Route.MapelGuru> {
                     MapelGuruScreen(
                         onBack = { navController.popBackStack() },
-                        onOpenSubject = { navController.navigate(Route.MateriList(it.id, it.name)) },
+                        onOpenSubject = { navController.navigate(Route.MateriList(it.id.toInt(), it.name, isTeacher = true)) },
                     )
                 }
                 composable<Route.MateriList> { backStackEntry ->
@@ -208,26 +255,302 @@ fun MainTabsScreen(onLoggedOut: () -> Unit, modifier: Modifier = Modifier) {
                     MateriListScreen(
                         subjectId = route.subjectId,
                         subjectName = route.subjectName,
+                        isTeacher = route.isTeacher,
                         onBack = { navController.popBackStack() },
-                        onOpenMateri = { navController.navigate(it.toDetailRoute()) },
+                        onOpenMateri = { navController.navigate(Route.MateriDetail(it.id.toInt(), it.subject_id, route.isTeacher)) },
                     )
                 }
-                composable<Route.Absensi> {
-                    AbsensiScreen(onBack = { navController.popBackStack() })
+                composable<Route.Presensi> {
+                    PresensiScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenMasuk = { navController.navigate(Route.PresensiMasuk) },
+                        onOpenOffsite = { navController.navigate(Route.PresensiOffsite) },
+                        onOpenIzin = { navController.navigate(Route.IzinList()) },
+                    )
+                }
+                composable<Route.PresensiMasuk> {
+                    PresensiMasukScreen(
+                        onBack = { navController.popBackStack() },
+                        onDone = { navController.popBackStack() },
+                    )
+                }
+                composable<Route.PresensiOffsite> { backStackEntry ->
+                    val photoPath by backStackEntry.savedStateHandle.getStateFlow<String?>("offsitePhoto", null).collectAsStateWithLifecycle()
+                    PresensiOffsiteScreen(
+                        onBack = { navController.popBackStack() },
+                        onDone = { navController.popBackStack() },
+                        onTakePhoto = { address, lat, lng -> navController.navigate(Route.PresensiOffsiteCamera(address, lat.toString(), lng.toString())) },
+                        capturedPhotoPath = photoPath,
+                        onPhotoHandled = { backStackEntry.savedStateHandle["offsitePhoto"] = null },
+                    )
+                }
+                composable<Route.PresensiOffsiteCamera> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.PresensiOffsiteCamera>()
+                    CaptureCameraScreen(
+                        address = route.address,
+                        lat = route.lat.toDoubleOrNull(),
+                        lng = route.lng.toDoubleOrNull(),
+                        config = CaptureCameraConfig.OffsiteSelfie,
+                        onClose = { navController.popBackStack() },
+                        onCaptured = { path ->
+                            navController.previousBackStackEntry?.savedStateHandle?.set("offsitePhoto", path)
+                            navController.popBackStack()
+                        },
+                    )
+                }
+                composable<Route.Jurnal> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.Jurnal>()
+                    JurnalScreen(
+                        initialAction = route.action,
+                        initialAttendanceId = route.attendanceId,
+                        initialPlotId = route.plotId,
+                        onBack = { navController.popBackStack() },
+                        onOpenVerifikasi = { id, title -> navController.navigate(Route.VerifikasiJurnal(id, title)) },
+                        onOpenForm = { plotId, label -> navController.navigate(Route.JurnalForm(plotId, label)) },
+                        onOpenDetail = { id, createdAt, plot -> navController.navigate(Route.JurnalDetail(id, createdAt, plot)) },
+                    )
+                }
+                composable<Route.VerifikasiJurnal> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.VerifikasiJurnal>()
+                    VerifikasiJurnalScreen(
+                        attendanceId = route.attendanceId,
+                        title = route.title,
+                        onBack = { navController.popBackStack() },
+                        onDone = { navController.popBackStack() },
+                    )
+                }
+                composable<Route.JurnalForm> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.JurnalForm>()
+                    val photoPath by backStackEntry.savedStateHandle.getStateFlow<String?>("jurnalPhoto", null).collectAsStateWithLifecycle()
+                    JurnalFormScreen(
+                        plotId = route.plotId,
+                        plotLabel = route.plotLabel,
+                        capturedPhotoPath = photoPath,
+                        onPhotoHandled = { backStackEntry.savedStateHandle["jurnalPhoto"] = null },
+                        onBack = { navController.popBackStack() },
+                        onTakePhoto = { address, lat, lng -> navController.navigate(Route.JurnalCapture(address, lat?.toString().orEmpty(), lng?.toString().orEmpty())) },
+                        onFinished = { openId ->
+                            navController.popBackStack()
+                            // 307 "journal exists": land on that journal, dated today like legacy
+                            if (openId != null) navController.navigate(Route.JurnalDetail(openId, LocalDate.now().toString(), ""))
+                        },
+                    )
+                }
+                composable<Route.JurnalCapture> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.JurnalCapture>()
+                    CaptureCameraScreen(
+                        address = route.address.ifBlank { null },
+                        lat = route.lat.toDoubleOrNull(),
+                        lng = route.lng.toDoubleOrNull(),
+                        config = CaptureCameraConfig.JurnalScene,
+                        onClose = { navController.popBackStack() },
+                        onCaptured = { path ->
+                            navController.previousBackStackEntry?.savedStateHandle?.set("jurnalPhoto", path)
+                            navController.popBackStack()
+                        },
+                    )
+                }
+                composable<Route.JurnalDetail> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.JurnalDetail>()
+                    JurnalDetailScreen(
+                        attendanceId = route.attendanceId,
+                        createdAt = route.createdAt,
+                        plot = route.plot,
+                        onBack = { navController.popBackStack() },
+                        onSaved = { navController.popBackStack() },
+                    )
+                }
+                composable<Route.IzinList> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.IzinList>()
+                    val changed by backStackEntry.savedStateHandle.getStateFlow("izinChanged", false).collectAsStateWithLifecycle()
+                    IzinListScreen(
+                        initialFilter = route.filter,
+                        onBack = { navController.popBackStack() },
+                        onAdd = { navController.navigate(Route.IzinAdd) },
+                        onOpenDetail = { navController.navigate(Route.IzinDetail(it)) },
+                        changed = changed,
+                        onChangedHandled = { backStackEntry.savedStateHandle["izinChanged"] = false },
+                    )
+                }
+                composable<Route.IzinAdd> {
+                    IzinAddScreen(
+                        onBack = { navController.popBackStack() },
+                        onDone = {
+                            navController.previousBackStackEntry?.savedStateHandle?.set("izinChanged", true)
+                            navController.popBackStack()
+                        },
+                    )
+                }
+                composable<Route.IzinDetail> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.IzinDetail>()
+                    IzinDetailScreen(uuid = route.uuid, onBack = { navController.popBackStack() })
                 }
                 composable<Route.MateriDetail> { backStackEntry ->
                     val route = backStackEntry.toRoute<Route.MateriDetail>()
                     MateriDetailScreen(
-                        route = route,
+                        materiId = route.materiId,
+                        subjectId = route.subjectId,
+                        isTeacher = route.isTeacher,
                         onBack = { navController.popBackStack() },
-                        onOpenFile = {},
-                        onDownloadFile = {},
-                        onOpenLink = {},
+                        onOpenPdf = { filePath, title -> navController.navigate(Route.PdfViewer(filePath, title)) },
                     )
                 }
                 composable<Route.UploadMateri> { backStackEntry ->
                     val route = backStackEntry.toRoute<Route.UploadMateri>()
-                    UploadMateriScreen(route = route, onDone = { navController.popBackStack() })
+                    UploadMateriScreen(
+                        route = route,
+                        onDone = {
+                            navController.previousBackStackEntry?.savedStateHandle?.set("materiChanged", true)
+                            navController.popBackStack()
+                        },
+                    )
+                }
+                composable<Route.PdfViewer> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.PdfViewer>()
+                    PdfViewerScreen(filePath = route.filePath, title = route.title, onBack = { navController.popBackStack() })
+                }
+
+                composable<Route.AgendaMingguan> {
+                    AgendaMingguanScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenDetail = { date, id -> navController.navigate(Route.AgendaDetail(date, id)) },
+                        onOpenCheck = { date, id, mode -> navController.navigate(Route.AgendaCheck(date, id, mode)) },
+                        onOpenPresensi = { navController.navigate(Route.Presensi) },
+                    )
+                }
+                composable<Route.AgendaCheck> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.AgendaCheck>()
+                    AgendaCheckScreen(
+                        date = route.date,
+                        agendaId = route.agendaId,
+                        mode = route.mode,
+                        onBack = { navController.popBackStack() },
+                        onDone = { navController.popBackStack() },
+                        // Presensi replaces this check page; coming back lands on the agenda list, which
+                        // refreshes today's gate on resume.
+                        onOpenPresensi = {
+                            navController.popBackStack()
+                            navController.navigate(Route.Presensi)
+                        },
+                    )
+                }
+                composable<Route.AgendaDetail> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.AgendaDetail>()
+                    AgendaDetailScreen(
+                        date = route.date,
+                        agendaId = route.agendaId,
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+                composable<Route.PoinSiswa> {
+                    PoinSiswaScreen(onBack = { navController.popBackStack() })
+                }
+                composable<Route.PoinGuru> { backStackEntry ->
+                    val vm: PoinGuruViewModel = hiltViewModel(backStackEntry)
+                    PoinCariScreen(
+                        onBack = { navController.popBackStack() },
+                        onStudentReady = { navController.navigate(Route.PoinHasil) },
+                        viewModel = vm,
+                    )
+                }
+                composable<Route.PoinHasil> { backStackEntry ->
+                    val guruEntry = remember(backStackEntry) { navController.getBackStackEntry(Route.PoinGuru) }
+                    val vm: PoinGuruViewModel = hiltViewModel(guruEntry)
+                    PoinHasilScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenForm = { navController.navigate(Route.PoinForm(it)) },
+                        guruViewModel = vm,
+                    )
+                }
+                composable<Route.PoinForm> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.PoinForm>()
+                    val guruEntry = remember(backStackEntry) { navController.getBackStackEntry(Route.PoinGuru) }
+                    val vm: PoinGuruViewModel = hiltViewModel(guruEntry)
+                    PoinFormScreen(
+                        mode = route.mode,
+                        guruViewModel = vm,
+                        onBack = { navController.popBackStack() },
+                        onDone = { navController.popBackStack() },
+                    )
+                }
+
+                composable<Route.TugasSiswa> {
+                    TugasSiswaScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenTugas = { navController.navigate(Route.TugasDetail(it.id.toInt(), it.type, isTeacher = false)) },
+                        onOpenPdf = { filePath, title -> navController.navigate(Route.PdfViewer(filePath, title)) },
+                    )
+                }
+                composable<Route.TugasDetail> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.TugasDetail>()
+                    TugasDetailScreen(
+                        tugasId = route.tugasId, type = route.type, isTeacher = route.isTeacher,
+                        onBack = { navController.popBackStack() },
+                        onOpenPdf = { filePath, title -> navController.navigate(Route.PdfViewer(filePath, title)) },
+                    )
+                }
+                composable<Route.TugasGuru> { backStackEntry ->
+                    val vm: TugasGuruViewModel = hiltViewModel(backStackEntry)
+                    val tugasChanged by backStackEntry.savedStateHandle.getStateFlow("tugasChanged", false)
+                        .collectAsStateWithLifecycle()
+                    LaunchedEffect(tugasChanged) {
+                        if (tugasChanged) {
+                            vm.onTugasChanged()
+                            backStackEntry.savedStateHandle["tugasChanged"] = false
+                        }
+                    }
+                    TugasGuruScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenTugas = { navController.navigate(Route.TugasDetail(it.id.toInt(), it.type, isTeacher = true)) },
+                        onUpload = { navController.navigate(Route.UploadTugas()) },
+                        onEdit = { navController.navigate(Route.UploadTugas(isEdit = true, tugasId = it.id.toInt())) },
+                        onOpenScoredGroup = { navController.navigate(Route.TugasTerkumpul(it.id.toInt())) },
+                        viewModel = vm,
+                    )
+                }
+                composable<Route.UploadTugas> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.UploadTugas>()
+                    UploadTugasScreen(
+                        route = route,
+                        onDone = {
+                            navController.previousBackStackEntry?.savedStateHandle?.set("tugasChanged", true)
+                            navController.popBackStack()
+                        },
+                    )
+                }
+                composable<Route.TugasTerkumpul> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.TugasTerkumpul>()
+                    val vm: TugasTerkumpulViewModel = hiltViewModel(backStackEntry)
+                    val scoreSaved by backStackEntry.savedStateHandle.getStateFlow("scoreSaved", false)
+                        .collectAsStateWithLifecycle()
+                    LaunchedEffect(scoreSaved) {
+                        if (scoreSaved) {
+                            vm.refresh(route.collectedId)
+                            backStackEntry.savedStateHandle["scoreSaved"] = false
+                        }
+                    }
+                    TugasTerkumpulScreen(
+                        collectedId = route.collectedId,
+                        onBack = { navController.popBackStack() },
+                        onOpenTugasReadonly = { navController.navigate(Route.TugasDetail(it, isTeacher = true)) },
+                        onScoreStudent = { assignment -> navController.navigate(Route.TugasScoring(route.collectedId, assignment.id)) },
+                        viewModel = vm,
+                    )
+                }
+                composable<Route.TugasScoring> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.TugasScoring>()
+                    val terkumpulEntry = remember(backStackEntry) { navController.getBackStackEntry(Route.TugasTerkumpul(route.collectedId)) }
+                    val terkumpulVm: TugasTerkumpulViewModel = hiltViewModel(terkumpulEntry)
+                    TugasScoringScreen(
+                        collectedId = route.collectedId,
+                        assignmentId = route.assignmentId,
+                        onBack = { navController.popBackStack() },
+                        onSaved = {
+                            navController.previousBackStackEntry?.savedStateHandle?.set("scoreSaved", true)
+                            navController.popBackStack()
+                        },
+                        terkumpulViewModel = terkumpulVm,
+                    )
                 }
     
                 composable<Route.Akm.List> { backStackEntry ->
@@ -418,23 +741,3 @@ fun MainTabsScreen(onLoggedOut: () -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
-private fun MateriItem.toDetailRoute() = Route.MateriDetail(
-    title = name,
-    description = description,
-    teacher = teacher?.name.orEmpty(),
-    teacherInitials = initialsOf(teacher?.name.orEmpty()),
-    date = created_at_label,
-    target = targetLabel().orEmpty(),
-    fileName = file_name,
-    fileSize = file_size,
-    link = uri?.link?.firstOrNull().orEmpty(),
-)
-
-private fun MateriItem.toEditRoute() = Route.UploadMateri(
-    isEdit = true,
-    materiId = id,
-    materiName = name,
-    materiDesc = description,
-    subjectId = subject?.id ?: -1,
-    link = uri?.link?.firstOrNull().orEmpty(),
-)

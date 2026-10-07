@@ -1,5 +1,7 @@
 package id.diskola.app.ui.navigation
 
+import id.diskola.app.dataclass.ResponData.AgendaCheckMode
+import id.diskola.app.dataclass.ResponData.PoinFormMode
 import kotlinx.serialization.Serializable
 
 /**
@@ -63,9 +65,50 @@ sealed interface Route {
         data object Akun : MainTab
     }
 
-    // Pushed from the Pembelajaran (Home) tab's "Menu Pembelajaran" grid.
+    // Presensi (daily attendance) — pushed from the Pembelajaran (Home) tab's "Menu Pembelajaran" grid.
     @Serializable
-    data object Absensi : Route
+    data object Presensi : Route
+
+    /** Masuk/Pulang sekolah: live map, radius check, submit. */
+    @Serializable
+    data object PresensiMasuk : Route
+
+    /** Presensi Dinas Luar (teachers): address + note + selfie. */
+    @Serializable
+    data object PresensiOffsite : Route
+
+    /** Front-camera selfie for Dinas Luar; returns the watermarked file path through the saved state. */
+    @Serializable
+    data class PresensiOffsiteCamera(val address: String = "", val lat: String = "", val lng: String = "") : Route
+
+    /** `filter`: semua/approved/rejected/pending. */
+    @Serializable
+    data class IzinList(val filter: String = "semua") : Route
+
+    @Serializable
+    data object IzinAdd : Route
+
+    /** Jurnal KBM list. [action] "hadiri"/"isi" + [attendanceId]/[plotId] come from the Hub card and open that row's flow once loaded. */
+    @Serializable
+    data class Jurnal(val action: String = "", val attendanceId: Int = 0, val plotId: Int = 0) : Route
+
+    /** Student "Verifikasi Jurnal" (map + radius + status). */
+    @Serializable
+    data class VerifikasiJurnal(val attendanceId: Int = 0, val title: String = "") : Route
+
+    /** Journal form: teacher (hour chips) or student (one locked hour [plotId], shown as [plotLabel]). */
+    @Serializable
+    data class JurnalForm(val plotId: Int = 0, val plotLabel: String = "") : Route
+
+    /** Scene photo camera; the finished file returns through the saved state ("jurnalPhoto"). */
+    @Serializable
+    data class JurnalCapture(val address: String = "", val lat: String = "", val lng: String = "") : Route
+
+    @Serializable
+    data class JurnalDetail(val attendanceId: Int = 0, val createdAt: String = "", val plot: String = "") : Route
+
+    @Serializable
+    data class IzinDetail(val uuid: String = "") : Route
 
     /** Materi entry point for students — the subject picker. */
     @Serializable
@@ -81,31 +124,73 @@ sealed interface Route {
 
     /** Materials within one subject — shared by both roles. */
     @Serializable
-    data class MateriList(val subjectId: Int = 0, val subjectName: String = "") : Route
+    data class MateriList(val subjectId: Int = 0, val subjectName: String = "", val isTeacher: Boolean = false) : Route
 
+    /** id-based (doc §2.4/§2.9): `MateriDetailViewModel` reads Room first, falls back to the
+     * detail API, and shows "Materi Tidak tersedia" for an invalid id — none of which a
+     * value-carrying route can support (also what an FCM `menu=theory` deep link needs, S4). */
     @Serializable
-    data class MateriDetail(
-        val title: String = "",
-        val description: String = "",
-        val teacher: String = "",
-        val teacherInitials: String = "",
-        val date: String = "",
-        val target: String = "",
-        val fileName: String = "",
-        val fileSize: String = "",
-        val link: String = "",
-    ) : Route
+    data class MateriDetail(val materiId: Int = 0, val subjectId: Int = 0, val isTeacher: Boolean = false) : Route
 
     @Serializable
     data class UploadMateri(
         val isEdit: Boolean = false,
         val materiId: Int = -1,
-        val materiName: String = "",
-        val materiDesc: String = "",
         val subjectId: Int = -1,
-        val link: String = "",
-        val classId: Int = -1,
     ) : Route
+
+    /** In-app PDF viewer (doc §4.1/§4.6), reached only with a local file path already downloaded
+     * by whichever screen opened it (Materi, Tugas; Poin later). */
+    @Serializable
+    data class PdfViewer(val filePath: String = "", val title: String = "") : Route
+
+    /** Tugas entry point for students — the 3-tab Belum/Sudah/Nilai shell (doc §5.3). */
+    @Serializable
+    data object TugasSiswa : Route
+
+    /** Tugas entry point for teachers — "List Tugas" + "Penilaian" shell (doc §6.3). */
+    @Serializable
+    data object TugasGuru : Route
+
+    /** id-based, shared by both roles — `type` tells `TugasDetailViewModel` which student tab to
+     * `ensure*FirstPage()` if the task isn't cached yet (0=backlog,1=done,2=scored, doc §5.4). */
+    @Serializable
+    data class TugasDetail(val tugasId: Int = 0, val type: Int = 0, val isTeacher: Boolean = false) : Route
+
+    @Serializable
+    data class UploadTugas(val isEdit: Boolean = false, val tugasId: Int = -1, val editable: Boolean = true) : Route
+
+    @Serializable
+    data class TugasTerkumpul(val collectedId: Int = 0) : Route
+
+    @Serializable
+    data class TugasScoring(val collectedId: Int = 0, val assignmentId: Int = 0) : Route
+
+    /** Poin entry point for students — "Poin Saya" (Pelanggaran/Prestasi tabs, doc §10). */
+    @Serializable
+    data object PoinSiswa : Route
+
+    /** Poin entry point for teachers = the student search, and the root the Hasil/Form screens
+     * look up to share one `PoinGuruViewModel` (selected student survives the child screens). */
+    @Serializable
+    data object PoinGuru : Route
+
+    @Serializable
+    data object PoinHasil : Route
+
+    @Serializable
+    data class PoinForm(val mode: PoinFormMode = PoinFormMode.VIOLATION) : Route
+
+    /** Agenda Mingguan (teachers only) — month strip + the day's sessions (doc §8). */
+    @Serializable
+    data object AgendaMingguan : Route
+
+    /** Session is read back from the Room cache by `(date, agendaId)` — no Serializable extra. */
+    @Serializable
+    data class AgendaCheck(val date: String = "", val agendaId: Int = 0, val mode: AgendaCheckMode = AgendaCheckMode.CHECK_IN) : Route
+
+    @Serializable
+    data class AgendaDetail(val date: String = "", val agendaId: Int = 0) : Route
 
     /** Asesmen/AKM, pushed from Home's "Asesmen" tile. Students only. UI-only — no backend yet. */
     sealed interface Akm : Route {

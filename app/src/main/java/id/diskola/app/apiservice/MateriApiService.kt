@@ -2,6 +2,7 @@ package id.diskola.app.apiservice
 
 import id.diskola.app.dataclass.ResponData.ClassRoomResponse
 import id.diskola.app.dataclass.ResponData.DetailMateriResponse
+import id.diskola.app.dataclass.ResponData.GradeResponse
 import id.diskola.app.dataclass.ResponData.MajorResponse
 import id.diskola.app.dataclass.ResponData.MapelResponse
 import id.diskola.app.dataclass.ResponData.MateriResponse
@@ -31,6 +32,17 @@ interface MateriApiService {
 
     @GET("mobile/app/learning/theories/teachers/school-majors")
     suspend fun teacherMajor(@Query("take") take: Int = 1000): MajorResponse
+
+    /** Doc `05-pembelajaran-materi-tugas.md` §3.4 last paragraph — feeds the "Ditampilkan ke →
+     * Jenjang" dropdown in the upload form. Was `Map<String, Any>`/never called; the form used a
+     * hardcoded `listOf("10","11","12")` instead. */
+    @GET("mobile/teacher/school-grade")
+    suspend fun teacherSchoolGrade(): GradeResponse
+
+    /** Doc §3.4 last paragraph — feeds "Ditampilkan ke → Kelas". Was `Map<String, Any>`/never
+     * called; the form reused the filter-list endpoint (`assignmentClass`) instead. */
+    @GET("mobile/teacher/school-class-room")
+    suspend fun teacherSchoolClassRoom(): ClassRoomResponse
 
     @GET("mobile/app/learning/theories/teachers/theories")
     suspend fun teacherTheory(
@@ -72,55 +84,26 @@ interface MateriApiService {
     suspend fun deleteTheory(@Path("id") id: Long): Any
 
     // --- STUDENT ---
-    @GET("mobile/student/school-subject")
+    // Doc §2.5's confirmed-from-source contract (`mobile/app/learning/theories/students/...`) —
+    // these used to sit unused as untyped placeholders while the screens called a different,
+    // undocumented `mobile/student/school-subject...` family instead (fixed 30-09-2026, verify on
+    // device that the backend actually serves this path before relying on it further).
+    @GET("mobile/app/learning/theories/students/subjects")
     suspend fun studentSubjects(
-        @Query("take") take: Int = 1000,
+        @Query("take") take: Int = 20,
         @Query("skip") skip: Int = 0
     ): MapelResponse
 
-    @GET("mobile/student/school-subject/{subjectId}/theory")
+    @GET("mobile/app/learning/theories/students/subjects/{subjectId}/theories")
     suspend fun studentTheories(
         @Path("subjectId") subjectId: Int,
-        @Query("take") take: Int = 1000,
+        @Query("take") take: Int = 20,
         @Query("skip") skip: Int = 0
     ): MateriResponse
 
-    @GET("mobile/student/school-subject/{subjectId}/theory/{theoryId}")
+    @GET("mobile/app/learning/theories/students/subjects/{subjectId}/theories/{theoryId}")
     suspend fun studentTheoryDetail(
         @Path("subjectId") subjectId: Int,
         @Path("theoryId") theoryId: Int
     ): DetailMateriResponse
-
-    // --- Placeholder scaffolding below: request/response shapes not yet defined, no UI consumer yet. ---
-
-    @GET("mobile/teacher/school-subject")
-    suspend fun teacherSubjectAlt(
-        @Query("take") take: Int = 1000,
-        @Query("skip") skip: Int = 0
-    ): Map<String, Any>
-
-    @GET("mobile/teacher/school-grade")
-    suspend fun teacherSchoolGrade(): Map<String, Any>
-
-    @GET("mobile/teacher/school-class-room")
-    suspend fun teacherSchoolClassRoom(): Map<String, Any>
-
-    @GET("mobile/app/learning/theories/students/subjects")
-    suspend fun learningStudentSubjects(
-        @Query("take") take: Int = 1000,
-        @Query("skip") skip: Int = 0
-    ): Map<String, Any>
-
-    @GET("mobile/app/learning/theories/students/subjects/{subjectId}/theories")
-    suspend fun learningStudentTheories(
-        @Path("subjectId") subjectId: Int,
-        @Query("take") take: Int = 1000,
-        @Query("skip") skip: Int = 0
-    ): Map<String, Any>
-
-    @GET("mobile/app/learning/theories/students/subjects/{subjectId}/theories/{theoryId}")
-    suspend fun learningStudentTheoryDetail(
-        @Path("subjectId") subjectId: Int,
-        @Path("theoryId") theoryId: Int
-    ): Map<String, Any>
 }

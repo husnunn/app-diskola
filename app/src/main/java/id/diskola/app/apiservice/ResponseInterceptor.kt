@@ -89,6 +89,24 @@ class ResponseInterceptor @Inject constructor(
                 emptyArray()
             }
 
+            // First message per field, de-duplicated — what the legacy `userFacingHttpError` showed
+            // in preference to `message` (used by Agenda Mingguan's check-in/out errors).
+            val validationMessages: List<String> = try {
+                (contentMap["errors"] as? Map<String, *>)?.values
+                    ?.mapNotNull { v ->
+                        when (v) {
+                            is List<*> -> v.firstOrNull() as? String
+                            is String -> v
+                            else -> null
+                        }
+                    }
+                    ?.filter { it.isNotBlank() }
+                    ?.distinct()
+                    ?: emptyList()
+            } catch (e: Exception) {
+                emptyList()
+            }
+
             if ((responseCode / 100) == 2) {
 
                 val mediaType = responseBody?.contentType()
@@ -107,7 +125,7 @@ class ResponseInterceptor @Inject constructor(
                 val retryAfterSeconds = response.header("Retry-After")?.toLongOrNull()
 
                 responseBody?.close()
-                throw ApiException(errorBody, responseCode, errorTypes, errorData, errorCode, retryAfterSeconds)
+                throw ApiException(errorBody, responseCode, errorTypes, errorData, errorCode, retryAfterSeconds, validationMessages)
             }
         } catch (e: Exception) {
             responseBody?.close()
@@ -127,6 +145,8 @@ class ApiException(
      * `02-auth-login-sesi.md` §11), read by [id.diskola.app.utils.session.AuthErrorMapper]. */
     val errorCode: String? = null,
     val retryAfterSeconds: Long? = null,
+    /** Per-field validation texts from the body's `errors` map (distinct, first per field). */
+    val validationMessages: List<String> = emptyList(),
 ) : IOException(message)
 
 //class ResponseInterceptor @Inject constructor(val context: Context, moshi: Moshi) : Interceptor {

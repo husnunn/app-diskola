@@ -1,133 +1,162 @@
 package id.diskola.app.viewmodel
 
+import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import id.diskola.app.apiservice.MateriApiService
-import id.diskola.app.dataclass.ResponData.ClassRoomTable
-import id.diskola.app.dataclass.ResponData.MajorItem
-import id.diskola.app.dataclass.ResponData.MapelItem
-import id.diskola.app.dataclass.ResponData.MateriItem
-import id.diskola.app.dataclass.ResponData.UploadMateriResponse
+import id.diskola.app.dataclass.ResponData.MapelTable
+import id.diskola.app.dataclass.ResponData.MateriTable
+import id.diskola.app.repository.MateriRepository
 import javax.inject.Inject
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import okhttp3.MultipartBody
-import okhttp3.RequestBody
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import timber.log.Timber
 
+/**
+ * Backs the subject pickers (student `TheoryPage` / teacher's own "Mata Pelajaran") and the
+ * per-subject materi list (`MateriPage`, shared by both roles) — doc
+ * `05-pembelajaran-materi-tugas.md` §2.4/§3.4. "Materi Saya" (the teacher's filterable own-list)
+ * has its own `MateriGuruViewModel`; upload/edit has `UploadMateriViewModel`; detail has
+ * `MateriDetailViewModel` — kept separate per `docs/rules-global.md` §5.2 (no God ViewModel).
+ */
 @HiltViewModel
 class MateriViewModel @Inject constructor(
-    private val materiApiService: MateriApiService
+    private val repository: MateriRepository,
 ) : BaseViewModel() {
 
-    private val _materiList = MutableStateFlow<List<MateriItem>>(emptyList())
-    val materiList: StateFlow<List<MateriItem>> = _materiList.asStateFlow()
+    // ---- Subject picker ----
 
-    // khusus guru
-    private val _teacherSubjects = MutableStateFlow<List<MapelItem>>(emptyList())
-    val teacherSubjects: StateFlow<List<MapelItem>> = _teacherSubjects.asStateFlow()
+    private val _subjectQuery = MutableStateFlow("")
+    val subjectQuery: StateFlow<String> = _subjectQuery.asStateFlow()
 
-    // khusus siswa
-    private val _studentSubjects = MutableStateFlow<List<MapelItem>>(emptyList())
-    val studentSubjects: StateFlow<List<MapelItem>> = _studentSubjects.asStateFlow()
+    @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
+    val subjects: StateFlow<List<MapelTable>> = _subjectQuery
+        .debounce(400)
+        .flatMapLatest { query -> repository.observeSubjects(query) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _classes = MutableStateFlow<List<ClassRoomTable>>(emptyList())
-    val classes: StateFlow<List<ClassRoomTable>> = _classes.asStateFlow()
+    private val _subjectsLoading = MutableStateFlow(false)
+    val subjectsLoading: StateFlow<Boolean> = _subjectsLoading.asStateFlow()
 
-    private val _majors = MutableStateFlow<List<MajorItem>>(emptyList())
-    val majors: StateFlow<List<MajorItem>> = _majors.asStateFlow()
+    private var hasNextSubjectPage = true
+    private var loadingMoreSubjects = false
 
-    private val _uploadResult = MutableStateFlow<UploadMateriResponse?>(null)
-    val uploadResult: StateFlow<UploadMateriResponse?> = _uploadResult.asStateFlow()
-
-    private val _deleteSuccess = MutableStateFlow(false)
-    val deleteSuccess: StateFlow<Boolean> = _deleteSuccess.asStateFlow()
-
-    // simpan filter terakhir
-    private var lastTeacherSubjectId: Int? = null
-    private var lastTeacherClassId: Int? = null
-    private var lastStudentSubjectId: Int? = null
-
-    fun getMateriTeacher(subjectId: Int? = null, classId: Int? = null) {
-        launchWithHandling {
-            lastTeacherSubjectId = subjectId
-            lastTeacherClassId = classId
-
-            val response = materiApiService.teacherTheory(
-                take = 1000,
-                skip = 0,
-                school_subject = subjectId,
-                school_class = classId
-            )
-            _materiList.value = response.data.distinctBy { it.id }
-        }
+    fun onSubjectQueryChange(query: String) {
+        _subjectQuery.value = query
     }
 
-    fun getMateriStudent(subjectId: Int) {
-        launchWithHandling {
-            lastStudentSubjectId = subjectId
-            val response = materiApiService.studentTheories(subjectId = subjectId)
-            _materiList.value = response.data.distinctBy { it.id }
-        }
-    }
-
-    fun fetchTeacherRequirements() {
-        launchWithHandling {
-            val subjectsRes = materiApiService.teacherSubject(take = 1000, skip = 0)
-            val classesRes = materiApiService.assignmentClass()
-            val majorsRes = materiApiService.teacherMajor()
-
-            _teacherSubjects.value = subjectsRes.data
-            _classes.value = classesRes.data
-            _majors.value = majorsRes.data
-        }
-    }
-
-    fun fetchStudentSubjects() {
-        launchWithHandling {
-            val response = materiApiService.studentSubjects(take = 1000, skip = 0)
-            _studentSubjects.value = response.data
-        }
-    }
-
-    fun uploadMateri(
-        data: Map<String, RequestBody>,
-        file: MultipartBody.Part?
-    ) {
-        launchWithHandling {
-            val response = materiApiService.createTheory(data, file)
-            _uploadResult.value = response
-        }
-    }
-
-    fun updateMateri(
-        id: Int,
-        data: Map<String, RequestBody>,
-        file: MultipartBody.Part?
-    ) {
-        launchWithHandling {
-            val response = materiApiService.updateTheory(id, data, file)
-            _uploadResult.value = response
-        }
-    }
-
-    fun deleteMateri(id: Long, isStudent: Boolean = false) {
-        launchWithHandling {
-            materiApiService.deleteTheory(id)
-            _deleteSuccess.value = true
-
-            if (isStudent) {
-                lastStudentSubjectId?.let { getMateriStudent(it) }
-            } else {
-                getMateriTeacher(lastTeacherSubjectId, lastTeacherClassId)
+    fun openSubjectPicker(isTeacher: Boolean) {
+        if (subjects.value.isNotEmpty()) return
+        viewModelScope.launch {
+            _subjectsLoading.value = true
+            try {
+                if (isTeacher) repository.ensureTeacherSubjectsFirstPage() else repository.ensureStudentSubjectsFirstPage()
+            } catch (e: Exception) {
+                Timber.e(e)
+            } finally {
+                _subjectsLoading.value = false
             }
         }
     }
 
-    fun refreshMateri(isStudent: Boolean) {
-        if (isStudent) {
-            lastStudentSubjectId?.let { getMateriStudent(it) }
-        } else {
-            getMateriTeacher(lastTeacherSubjectId, lastTeacherClassId)
+    /** Only while the search box is empty and a previous page came back full — mirrors the
+     * legacy `PagedListBoundaryCallback` (doc §2.4). */
+    fun loadMoreSubjects(isTeacher: Boolean) {
+        if (_subjectQuery.value.isNotBlank() || loadingMoreSubjects || !hasNextSubjectPage) return
+        loadingMoreSubjects = true
+        viewModelScope.launch {
+            try {
+                hasNextSubjectPage = if (isTeacher) {
+                    repository.loadMoreTeacherSubjects(subjects.value.size)
+                } else {
+                    repository.loadMoreStudentSubjects(subjects.value.size)
+                }
+            } catch (e: Exception) {
+                Timber.e(e)
+            } finally {
+                loadingMoreSubjects = false
+            }
+        }
+    }
+
+    fun refreshSubjects(isTeacher: Boolean) {
+        viewModelScope.launch {
+            _subjectsLoading.value = true
+            try {
+                hasNextSubjectPage = if (isTeacher) repository.refreshTeacherSubjects() else repository.refreshStudentSubjects()
+            } catch (e: Exception) {
+                Timber.e(e)
+            } finally {
+                _subjectsLoading.value = false
+            }
+        }
+    }
+
+    // ---- Materi within one subject ----
+
+    private val _currentSubjectId = MutableStateFlow(0)
+    private var currentIsTeacher = false
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val materiOfSubject: StateFlow<List<MateriTable>> = _currentSubjectId
+        .flatMapLatest { id -> if (id > 0) repository.observeMateriBySubject(id) else flowOf(emptyList()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _materiLoading = MutableStateFlow(false)
+    val materiLoading: StateFlow<Boolean> = _materiLoading.asStateFlow()
+
+    private var hasNextMateriPage = true
+    private var loadingMoreMateri = false
+
+    fun openSubjectMateri(subjectId: Int, isTeacher: Boolean) {
+        currentIsTeacher = isTeacher
+        _currentSubjectId.value = subjectId
+        viewModelScope.launch {
+            _materiLoading.value = true
+            try {
+                repository.ensureSubjectMateriFirstPage(subjectId, isTeacher)
+            } catch (e: Exception) {
+                Timber.e(e)
+            } finally {
+                _materiLoading.value = false
+            }
+        }
+    }
+
+    fun loadMoreMateri() {
+        val subjectId = _currentSubjectId.value
+        if (subjectId <= 0 || loadingMoreMateri || !hasNextMateriPage) return
+        loadingMoreMateri = true
+        viewModelScope.launch {
+            try {
+                hasNextMateriPage = repository.loadMoreSubjectMateri(subjectId, currentIsTeacher, materiOfSubject.value.size)
+            } catch (e: Exception) {
+                Timber.e(e)
+            } finally {
+                loadingMoreMateri = false
+            }
+        }
+    }
+
+    fun refreshMateri() {
+        val subjectId = _currentSubjectId.value
+        if (subjectId <= 0) return
+        viewModelScope.launch {
+            _materiLoading.value = true
+            try {
+                hasNextMateriPage = repository.refreshSubjectMateri(subjectId, currentIsTeacher)
+            } catch (e: Exception) {
+                Timber.e(e)
+            } finally {
+                _materiLoading.value = false
+            }
         }
     }
 }

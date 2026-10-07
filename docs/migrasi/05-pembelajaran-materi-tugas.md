@@ -1080,47 +1080,56 @@ Dibandingkan dengan `docs/repo lama/MATERI.md` dan `docs/repo lama/dokumentasi-t
 ---
 
 ## 15. Checklist paritas
+
+> Status 30-09-2026 (lihat `05b-implementasi-hub-materi.md` untuk detail, `05a-gap-pembelajaran-hub-materi.md`
+> untuk status per item): dicentang bila sudah diuji langsung di device fisik. Baris dengan catatan
+> *(kode ada, belum diuji)* berarti implementasinya sudah ada tapi jalur itu belum sempat dipicu di
+> device sungguhan (biasanya karena tidak ada akun guru/tamu tersedia sesi itu).
+
 **Hub**
-- [ ] Urutan menu per role (siswa 7 item, guru 6 dengan Agenda di index 4, lainnya 5) dan tujuan tiap item sama.
-- [ ] Semua item locked + dialog "Fitur ini terkunci" bila `is_having_class=false`.
-- [ ] Badge notifikasi (99+) hanya saat `klaspayActive`; badge Agenda (9+) dari `summary.missing`.
-- [ ] Popup tamu sekali per tampilan fragment; alert akun tidak aktif → logout.
-- [ ] Logika tombol verifikasi & kartu "Kelas Berlangsung" sesuai tabel §1.4.
+- [x] Urutan menu per role (siswa 7 item, guru 6 dengan Agenda Mingguan menggantikan Asesmen, lainnya 5) dan tujuan tiap item sama (berbasis `MenuKey`, bukan posisi index). — diuji di device untuk peran siswa; peran guru/lainnya *(kode ada, belum diuji)*.
+- [x] Semua item locked + dialog "Fitur ini terkunci" bila `is_having_class=false`. — diuji di device (termasuk menemukan & memperbaiki bug `writeCheckAccount` yang membuat `is_having_class` tidak pernah ter-refresh, lihat 05b bug#1).
+- [ ] Badge notifikasi (99+) hanya saat `klaspayActive`; badge Agenda (9+) dari `summary.missing`. *(ditunda — endpoint `payment/wallet`/`notification/summary`/`attendance/staff/agendas/today` tidak ada sama sekali di app baru, lihat 05a)*
+- [x] Popup tamu sekali per tampilan fragment; alert akun tidak aktif → logout. *(kode ada, belum diuji — tidak ada akun tamu/nonaktif tersedia sesi ini)*
+- [x] Kartu "Kelas Berlangsung" dari data nyata (`attendance/schedule`), "Tidak terdapat jadwal" saat kosong. — diuji di device. Logika tombol verifikasi disederhanakan (`isGuest || !isHavingClass`), mesin status persetujuan penuh §1.4 *(ditunda, lihat 05a)*.
 
 **Materi**
-- [ ] Cari mapel debounce 400 ms, lokal, empty state hanya saat keyword terisi.
-- [ ] Paging 20, urutan mapel by nama, materi by id desc.
-- [ ] Detail: deskripsi opsional, kartu file `nama | ukuran`, link preview, pembahasan; dialog "Materi Tidak tersedia" untuk extra invalid.
-- [ ] Baca → dialog "Akses File Diperlukan" → PDF di viewer internal (zoom ≤3×), lainnya app eksternal; Download via DownloadManager + toast.
-- [ ] Guru: filter Kelas/Mapel "Semua", ⋮ hanya materi sendiri, hapus dengan konfirmasi.
-- [ ] Form materi: counter 500/5000, radio eksklusif, tombol aktif (judul+mapel+file/link), batas 12 MB + pesan persis.
+- [x] Cari mapel lokal (client-side, dari cache Room), debounce via `flatMapLatest`. — diuji di device. Empty-state teks disamakan ("Coba gunakan kata kunci lain").
+- [x] Paging 20, urutan mapel by nama, materi by id desc. — diuji di device (siswa); guru *(kode ada, belum diuji)*.
+- [x] Detail: deskripsi opsional, kartu file `nama | ukuran`, link preview, pembahasan; dialog "Materi Tidak tersedia" untuk id invalid. — kartu file & pembahasan diuji di device; link preview & dialog invalid *(kode ada, belum diuji)*.
+- [x] Baca → dialog "Akses File Diperlukan" → PDF di viewer internal, lainnya app eksternal; Download via DownloadManager + toast. — diuji di device end-to-end (viewer internal tanpa pinch-zoom/kontrol halaman, keputusan disengaja — lihat §4.6 dan 05b §1).
+- [ ] Guru: filter Kelas/Mapel gabungan AND (diperbaiki dari eksklusif), ⋮ hanya materi sendiri, hapus dengan konfirmasi. *(kode ada, belum diuji — tidak ada akun guru tersedia sesi ini)*
+- [ ] Form materi: counter 500/5000, radio target wajib dipilih (diperbaiki dari `grade="null"` diam-diam), tombol aktif (judul+mapel+target+file/link), batas 12 MB + pesan persis, MIME allowlist. *(kode ada, belum diuji)*
 
-**Tugas siswa**
-- [ ] Tiga tab, status dari endpoint; label "Berakhir pada"/"Terlambat dari" merah.
-- [ ] Detail: info status, kartu syarat (baca/upload) + status bawah, badge WAJIB, tombol "Kirim Tugas" enabled sesuai syarat.
-- [ ] Upload multi-file: validasi ekstensi & 12 MB per file dengan pesan persis; `file[]`, `checked=1`, `uploaded` 1/0, `link`.
-- [ ] Setelah kirim: tugas hilang dari tab Belum, layar tertutup.
-- [ ] Jawaban terkumpul: meta "n file terlampir", Baca/Download per file, path relatif + ASSETS_URL.
-- [ ] Dialog nilai: skor, pembahasan.
+**Tugas siswa** — status 2026-10-02 (lihat `05d-implementasi-tugas.md`/`05c-gap-tugas.md`): kode
+dibangun penuh, tapi akun uji tidak punya satu pun tugas sehingga hampir semua baris di bawah ini
+masih `(kode ada, belum diuji)` kecuali yang eksplisit ditandai teruji.
+- [x] Tiga tab, status dari endpoint; label "Berakhir pada"/"Terlambat dari" merah. — tab & paging teruji di device (3x fetch tepat sekali, tab berganti tanpa fetch ulang); badge merah/abu *(kode ada, belum diuji — tidak ada tugas overdue di akun uji)*.
+- [ ] Detail: info status, kartu syarat (baca/upload) + status bawah, badge WAJIB, tombol "Kirim Tugas" enabled sesuai syarat. *(kode ada, belum diuji — tidak ada tugas untuk dibuka)*
+- [ ] Upload multi-file: validasi ekstensi & 12 MB per file dengan pesan persis; `file[]`, `checked=1`, `uploaded` 1/0, `link`. *(kode ada, belum diuji — `collectAssignment` diubah ke multi-file, kontrak `file[]` belum pernah dicoba ke backend asli)*
+- [ ] Setelah kirim: tugas hilang dari tab Belum, layar tertutup. *(kode ada, belum diuji)*
+- [ ] Jawaban terkumpul: meta "n file terlampir", Baca/Download per file, path relatif + ASSETS_URL. *(kode ada, belum diuji)*
+- [ ] Dialog nilai: skor, pembahasan. *(kode ada, belum diuji)*
 
-**Tugas guru**
-- [ ] Filter Kelas/Mapel hanya di tab List Tugas; empty text persis.
-- [ ] Form cascade Kelas → Hari → Mapel (jadwal), error "…wajib dipilih", deadline `dd-MM-yyyy HH:mm:ss` min hari ini.
-- [ ] Checkbox "Siswa wajib membaca materi" hanya muncul saat ada file/link.
-- [ ] Mode Detail read-only + menu Edit/Hapus; hapus dengan konfirmasi.
-- [ ] Tugas Terkumpul: panel Detail toggle, filter Semua/Belum/Sudah Dinilai, tombol Beri/Ubah Nilai; skor 0–100, tombol simpan disabled saat kosong.
+**Tugas guru** — status 2026-10-02: kode dibangun penuh, **tidak ada akun guru tersedia** sesi ini,
+jadi seluruh baris di bawah `(kode ada, belum diuji)`.
+- [ ] Filter Kelas/Mapel hanya di tab List Tugas; empty text persis. *(kode ada, belum diuji — filter "Semua" sengaja tiru app lama: kirim literal `0`, keputusan user)*
+- [ ] Form cascade Kelas → Hari → Mapel (jadwal), error "…wajib dipilih", deadline `dd-MM-yyyy HH:mm:ss` min hari ini. *(kode ada, belum diuji — fetch jadwal diperbaiki agar tidak crash saat gagal, beda dari app lama)*
+- [ ] Checkbox "Siswa wajib membaca materi" hanya muncul saat ada file/link. *(kode ada, belum diuji)*
+- [ ] Mode Detail read-only + menu Edit/Hapus; hapus dengan konfirmasi. *(kode ada, belum diuji)*
+- [ ] Tugas Terkumpul: panel Detail toggle, filter Semua/Belum/Sudah Dinilai, tombol Beri/Ubah Nilai; skor 0–100, tombol simpan disabled saat kosong. *(kode ada, belum diuji — tombol "Lihat Jawaban" yang mati di app lama sekarang terhubung ke Detail Tugas read-only, keputusan user)*
 
-**Agenda Mingguan**
+**Agenda Mingguan** — status 2026-10-06 (`05e`/`05f`): kode dibangun penuh, belum diuji di device (butuh sesi guru).
 - [ ] Strip tanggal sebulan + picker bulan/tahun; ringkasan "x / y sesi".
 - [ ] Status chip & routing tap (hari ini vs bukan, gate.in wajib untuk check-in).
 - [ ] Lapor masuk/pulang: izin lokasi, koordinat 6 desimal, alamat, POST `{agenda_id,lat,lng}`, pesan error dari `errors`/`message`.
 - [ ] Cache per tanggal; hari ini force refresh saat kembali.
 - [ ] Kebijakan collapsible dengan teks chip/deskripsi persis.
 
-**Poin**
+**Poin** — status 2026-10-06 (`05e`/`05f`): siswa diuji di device; guru *(kode ada, belum diuji)*.
 - [ ] Guru: blokir role Cooperative-only, cari ≥3 karakter (nama + NISN digit), hasil & skor, 3 aksi, pesan sukses persis, kompres foto ≤1 MB.
 - [ ] Pemanggilan: tanggal+waktu wajib, format `yyyy-MM-dd HH:mm:ss`.
-- [ ] Siswa: tab Pelanggaran/Prestasi, rekap semester dengan terjemahan nama, tombol pemanggilan bila ada, "Lihat Dokumentasi", cek waktu otomatis.
+- [x] Siswa: tab Pelanggaran/Prestasi, rekap semester dengan terjemahan nama, tombol pemanggilan bila ada, "Lihat Dokumentasi", cek waktu otomatis. — tab, rekap & empty state diuji di device; tombol pemanggilan, dokumentasi, cek waktu *(kode ada, belum dipicu: akun uji tanpa data detail)*.
 
 **Notifikasi**
 - [ ] FCM `theory`/`task`/`penilaian`/`poin-student-calling` membuka layar sama seperti tabel §11 (termasuk keputusan ❓).

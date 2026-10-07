@@ -50,7 +50,7 @@ data class SessionStudent(
 @JsonClass(generateAdapter = true)
 data class SessionTeacher(
     val id: Int = 0,
-    val nik: String = "",
+    val nip: String = "",
     val name: String = "",
 )
 

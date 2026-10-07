@@ -1,14 +1,11 @@
 package id.diskola.app.dataclass.ResponData
 
 import androidx.annotation.Keep
-import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import androidx.room.Relation
 import com.squareup.moshi.JsonClass
 import id.diskola.app.di.module.NullToEmptyString
-import timber.log.Timber
 
 @Keep
 @JsonClass(generateAdapter = true)
@@ -99,7 +96,10 @@ data class MapelTable(
     val image: String = "",
     val label: String = "",
     val teacher_id: Int = 0,
-    val user_id: Int = 0
+    val user_id: Int = 0,
+    // Denormalized so subject-list rows (doc §2.4 item text, §3.4 dropdown label) don't need a
+    // Room join back to `teacher` — the API response already carries the name right here.
+    val teacher_name: String = "",
 ) {
     companion object {
         fun fromMapelItem(item: MapelItem): MapelTable = MapelTable(
@@ -108,23 +108,11 @@ data class MapelTable(
             item.icon_image,
             item.message_label,
             item.teacher?.id ?: 0,
-            item.teacher?.user?.id ?: 0
+            item.teacher?.user?.id ?: 0,
+            item.teacher?.name.orEmpty(),
         )
     }
 }
-
-@Entity(
-    tableName = "mapel_teacher", primaryKeys = ["mapelId", "teacherId"], indices = [
-        Index(name = "mapelteacherIdx", value = ["mapelId"], unique = false),
-        Index(name = "teachermapelIdx", value = ["teacherId"], unique = false)
-    ]
-)
-data class MapelTeacherCrossRef(val mapelId: Long = 0L, val teacherId: Long = 0L)
-
-data class MapelWithTeacher(
-    @Embedded val crossRef: MapelTeacherCrossRef,
-    @Relation(parentColumn = "mapelId", entityColumn = "id") val mapel: MapelTable
-)
 
 @Entity(tableName = "materi", indices = [Index(name = "materi_idx", value = ["id"], unique = true)])
 data class MateriTable(
@@ -145,6 +133,14 @@ data class MateriTable(
     val class_id: Int = 0,
     val major_id: Int = 0,
     val explanation_file_path: String = "",
+    // Denormalized display fields — doc §2.4/§3.4 list rows need the teacher's name and the
+    // "Ditampilkan ke" target's name, and the API response already carries them nested; storing
+    // them flat here avoids a Room join back to `teacher`/`classroom`/`major` on every list read.
+    val teacher_name: String = "",
+    val subject_name: String = "",
+    val class_name: String = "",
+    val major_name: String = "",
+    val link: String = "",
 ) {
     companion object {
         fun fromMateriItem(it: MateriItem): MateriTable = MateriTable(
@@ -162,65 +158,15 @@ data class MateriTable(
             it.teacher?.id ?: 0,
             it.teacher?.user?.id ?: 0,
             it.grade ?: 0,
-            (it.school_class as? Map<*, *>)?.also { Timber.e("class: $it") }?.get("id")?.toString()
-                ?.toDouble()?.toInt() ?: 0,
-            (it.school_major as? Map<*, *>)?.also { Timber.e("major: $it") }?.get("id")?.toString()
-                ?.toDouble()?.toInt() ?: 0,
-            it.file_edited
+            (it.school_class as? Map<*, *>)?.get("id")?.toString()?.toDoubleOrNull()?.toInt() ?: 0,
+            (it.school_major as? Map<*, *>)?.get("id")?.toString()?.toDoubleOrNull()?.toInt() ?: 0,
+            it.file_edited,
+            it.teacher?.name.orEmpty(),
+            it.subject?.name.orEmpty(),
+            (it.school_class as? Map<*, *>)?.get("name")?.toString().orEmpty(),
+            (it.school_major as? Map<*, *>)?.get("name")?.toString().orEmpty(),
+            it.uri?.link?.firstOrNull().orEmpty(),
         )
     }
 }
 
-@Entity(
-    tableName = "materi_link",
-    indices = [Index(value = ["materi_id", "link"], unique = true)]
-)
-data class MateriLinkTable(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val materi_id: Long = 0,
-    val link: String = ""
-)
-
-data class MateriWithLink(
-    @Embedded val materi: MateriTable,
-    @Relation(parentColumn = "id", entityColumn = "materi_id")
-    val link: List<MateriLinkTable> = emptyList()
-)
-
-@Entity(
-    tableName = "teacher",
-    indices = [Index(name = "teacher_idx", value = ["id"], unique = true)]
-)
-data class TeacherTable(
-    @PrimaryKey val id: Long = 0L,
-    val name: String = "",
-    val nip: String = "",
-    val address: String = "",
-    val sosmed_user_id: Int = 0
-) {
-    companion object {
-        fun fromTeacherItem(item: TeacherItem, name: String? = null): TeacherTable = TeacherTable(
-            item.id.toLong(),
-            if (name.isNullOrEmpty()) item.name else name,
-            item.nip,
-            item.address,
-            item.user?.id ?: 0
-        )
-    }
-}
-
-data class MapelTeacher(
-    @Embedded val mapel: MapelTable,
-    @Relation(parentColumn = "teacher_id", entityColumn = "id")
-    val teacher: TeacherTable?
-)
-
-data class MateriMapelTeacher(
-    @Embedded val materi: MateriTable,
-    @Relation(parentColumn = "subject_id", entityColumn = "id")
-    val mapel: MapelTable,
-    @Relation(parentColumn = "teacher_id", entityColumn = "id")
-    val teacher: TeacherTable?,
-    @Relation(parentColumn = "user_id", entityColumn = "id")
-    val userTable: UserTable?
-)

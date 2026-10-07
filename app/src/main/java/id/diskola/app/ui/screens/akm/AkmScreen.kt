@@ -19,8 +19,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import android.content.Intent
-import android.provider.Settings
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Assignment
 import androidx.compose.material.icons.rounded.EventBusy
@@ -31,7 +29,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -46,14 +43,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.diskola.app.dataclass.akm.AkmItem
 import id.diskola.app.dataclass.akm.AkmScoreItem
 import id.diskola.app.dataclass.akm.AkmStatus
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppDialog
+import id.diskola.app.ui.components.AutoTimeGate
 import id.diskola.app.ui.components.ButtonVariant
 import id.diskola.app.ui.components.DetailScaffold
 import id.diskola.app.ui.components.EmptyState
@@ -62,7 +58,6 @@ import id.diskola.app.ui.components.UnderlineTabRow
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
-import id.diskola.app.utils.DateUtil
 import id.diskola.app.viewmodel.AkmViewModel
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -96,30 +91,7 @@ fun AkmScreen(
     val strictMode by viewModel.strictMode.collectAsStateWithLifecycle()
     val statuses by viewModel.statuses.collectAsStateWithLifecycle()
     var tabIndex by rememberSaveable { mutableIntStateOf(0) }
-    val context = LocalContext.current
-    val timeAlreadyAutomatic = remember {
-        val dateUtil = DateUtil()
-        dateUtil.isTimeAutomatic(context) && dateUtil.isTimeZoneAutomatic(context)
-    }
-    var timeGateVisible by rememberSaveable { mutableStateOf(showTimeGate && !timeAlreadyAutomatic) }
     var reuploadDialog by remember { mutableStateOf<ReuploadDialog?>(null) }
-
-    // Re-check when returning from Settings — the gate should clear on its own once the user
-    // actually switches the clock back to automatic, without requiring another navigation.
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME && timeGateVisible) {
-                val dateUtil = DateUtil()
-                if (dateUtil.isTimeAutomatic(context) && dateUtil.isTimeZoneAutomatic(context)) {
-                    timeGateVisible = false
-                }
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
     val calendar = remember { Calendar.getInstance() }
     val monthLabel = remember { SimpleDateFormat("MMMM yyyy", Locale("id", "ID")).format(calendar.time) }
     val scheduleDays = remember {
@@ -180,23 +152,12 @@ fun AkmScreen(
         }
     }
 
-    if (timeGateVisible) {
-        AppDialog(
-            onDismiss = { timeGateVisible = false },
-            title = "Atur Waktu Otomatis",
-            body = "Harap atur tanggal dan waktu ponsel ke Otomatis. Asesmen tidak dapat dimulai bila waktu perangkat diatur manual.",
-            primaryButtonText = "Buka Pengaturan",
-            onPrimaryClick = {
-                runCatching { context.startActivity(Intent(Settings.ACTION_DATE_SETTINGS)) }
-            },
-            secondaryButtonText = "Jangan Ubah",
-            onSecondaryClick = {
-                timeGateVisible = false
-                onBack()
-            },
-            dismissible = false,
-        )
-    }
+    AutoTimeGate(
+        title = "Atur Waktu Otomatis",
+        body = "Harap atur tanggal dan waktu ponsel ke Otomatis. Asesmen tidak dapat dimulai bila waktu perangkat diatur manual.",
+        onCancel = onBack,
+        enabled = showTimeGate,
+    )
 
     when (val dialog = reuploadDialog) {
         is ReuploadDialog.Confirm -> AppDialog(

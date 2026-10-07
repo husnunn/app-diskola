@@ -68,8 +68,55 @@ class SessionStore @Inject constructor(
         preference.putInt(SessionKeys.USER_ID, response.data?.id ?: 0)
         preference.putBoolean(SessionKeys.IS_ACTIVE, response.is_active ?: true)
 
-        val schoolToStore = response.data?.school?.toSession() ?: selectedSchool.toSession()
+        // When the response carries no `school`, `selectedSchool` has no coordinates — never let that
+        // overwrite the stored ones (Presensi's radius check reads them).
+        val schoolToStore = response.data?.school?.toSession()
+            ?: selectedSchool.toSession().keepingGeoFrom(school)
         writeJson(SessionKeys.SCHOOL_JSON, schoolAdapter, schoolToStore)
+
+        // Doc §1.4/`05-pembelajaran-materi-tugas.md`: Home re-runs `check-account` on every
+        // landing/resume specifically to keep `is_having_class`/role current (a class assignment
+        // made after login must unlock the Hub without forcing a re-login) — mirrors the same
+        // `rule`/`student_class` mapping `writeLoginAccount` uses below.
+        val rule = response.rule
+        val isStudentRole = rule?.is_student ?: false
+        val isTeacherRole = (rule?.is_teacher ?: false) && !isStudentRole
+        val studentClass = response.data?.student?.student_class
+        val classRoomId = studentClass?.class_room?.id ?: 0
+        val classRoomName = studentClass?.class_room?.name?.takeIf { it.isNotBlank() }
+        val isHavingClass = if (isStudentRole) (studentClass?.id ?: 0) > 0 else isTeacherRole
+
+        preference.putBoolean(SessionKeys.IS_STUDENT, isStudentRole)
+        preference.putBoolean(SessionKeys.IS_TEACHER, isTeacherRole)
+        preference.putBoolean(SessionKeys.IS_HAVING_CLASS, isHavingClass)
+        response.rule_label?.let { preference.putString(SessionKeys.ROLES, it) }
+
+        if (isStudentRole) {
+            writeJson(
+                SessionKeys.STUDENT_JSON, studentAdapter,
+                SessionStudent(
+                    id = response.data?.student?.id ?: 0,
+                    nisn = response.data?.student?.nisn.orEmpty(),
+                    nis = response.data?.student?.nis.orEmpty(),
+                    name = response.data?.student?.name.orEmpty(),
+                    className = classRoomName ?: NO_CLASS_LABEL,
+                    classRoomId = classRoomId,
+                    studentClassId = studentClass?.id ?: 0,
+                ),
+            )
+        } else if (isTeacherRole) {
+            // login-account's own `data.teacher` is absent on the real backend response (confirmed
+            // via device logcat) — check-account is the only call that actually returns it, so this
+            // is the one real write site for TEACHER_JSON, not writeLoginAccount's (see below).
+            writeJson(
+                SessionKeys.TEACHER_JSON, teacherAdapter,
+                SessionTeacher(
+                    id = response.data?.teacher?.id ?: 0,
+                    nip = response.data?.teacher?.nip.orEmpty(),
+                    name = response.data?.teacher?.name?.takeIf { it.isNotBlank() } ?: response.data?.name.orEmpty(),
+                ),
+            )
+        }
 
         response.data?.let { data ->
             writeJson(
@@ -145,13 +192,17 @@ class SessionStore @Inject constructor(
                     studentClassId = studentClass?.id ?: 0,
                 ),
             )
-        } else if (isTeacherRole) {
+        } else if (isTeacherRole && data?.teacher != null) {
+            // Confirmed via device logcat (2026-10-02): the real login-account response never
+            // actually includes `data.teacher` for a teacher login — this branch is kept as a
+            // defensive mapping in case a future backend version adds it, but check-account's
+            // `writeCheckAccount` is the one write site that reliably populates TEACHER_JSON today.
             writeJson(
                 SessionKeys.TEACHER_JSON, teacherAdapter,
                 SessionTeacher(
-                    id = data?.teacher?.id ?: 0,
-                    nik = data?.teacher?.nik.orEmpty(),
-                    name = data?.name.orEmpty(),
+                    id = data.teacher?.id ?: 0,
+                    nip = data.teacher?.nip.orEmpty(),
+                    name = data.name.orEmpty(),
                 ),
             )
         }
@@ -265,6 +316,19 @@ class SessionStore @Inject constructor(
             preference.putBoolean(SessionKeys.IS_ACTIVE, true)
         }
     }
+
+    private fun SessionSchool.keepingGeoFrom(stored: SessionSchool): SessionSchool =
+        if (stored.uuid == uuid && coordinateLatitude == 0.0 && coordinateLongitude == 0.0) {
+            copy(
+                address = address.ifBlank { stored.address },
+                cityName = cityName.ifBlank { stored.cityName },
+                coordinateRadius = stored.coordinateRadius,
+                coordinateLatitude = stored.coordinateLatitude,
+                coordinateLongitude = stored.coordinateLongitude,
+            )
+        } else {
+            this
+        }
 
     private fun <T> readJson(key: String, adapter: JsonAdapter<T>): T? {
         val raw = preference.getString(key)

@@ -10,15 +10,19 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import id.diskola.app.apiservice.AbsensiApiService
+import id.diskola.app.apiservice.AgendaApiService
 import id.diskola.app.apiservice.AsesmenApiService
 import id.diskola.app.apiservice.AuthApiService
 import id.diskola.app.apiservice.CommonApiService
+import id.diskola.app.apiservice.JurnalApiService
 import id.diskola.app.apiservice.KlaspayApiService
+import id.diskola.app.apiservice.KonselingApiService
 import id.diskola.app.apiservice.LogFileInterceptor
 import id.diskola.app.apiservice.MateriApiService
+import id.diskola.app.apiservice.PresensiApiService
 import id.diskola.app.apiservice.RequestInterceptor
 import id.diskola.app.apiservice.ResponseInterceptor
+import id.diskola.app.apiservice.TugasApiService
 import id.diskola.app.BuildConfig
 import okhttp3.Cache
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -65,8 +69,14 @@ object ApiModule {
     @Provides
     @Singleton
     @JvmStatic
-    fun provideAbsensiApiService(retrofit: Retrofit): AbsensiApiService =
-        retrofit.create(AbsensiApiService::class.java)
+    fun provideJurnalApiService(retrofit: Retrofit): JurnalApiService =
+        retrofit.create(JurnalApiService::class.java)
+
+    @Provides
+    @Singleton
+    @JvmStatic
+    fun provideTugasApiService(retrofit: Retrofit): TugasApiService =
+        retrofit.create(TugasApiService::class.java)
 
     @Provides
     @Singleton
@@ -85,6 +95,24 @@ object ApiModule {
     @JvmStatic
     fun provideKlaspayApiService(retrofit: Retrofit): KlaspayApiService =
         retrofit.create(KlaspayApiService::class.java)
+
+    @Provides
+    @Singleton
+    @JvmStatic
+    fun provideKonselingApiService(retrofit: Retrofit): KonselingApiService =
+        retrofit.create(KonselingApiService::class.java)
+
+    @Provides
+    @Singleton
+    @JvmStatic
+    fun provideAgendaApiService(retrofit: Retrofit): AgendaApiService =
+        retrofit.create(AgendaApiService::class.java)
+
+    @Provides
+    @Singleton
+    @JvmStatic
+    fun providePresensiApiService(retrofit: Retrofit): PresensiApiService =
+        retrofit.create(PresensiApiService::class.java)
 
     @Provides
     @Singleton

@@ -700,26 +700,31 @@ Dibanding `docs/repo lama/api/01-auth-akun.md` dan `docs/repo lama/REBUILD_PROMP
 
 ## 16. Checklist paritas
 
-- [ ] Launcher menampilkan splash putih + logo; orientasi portrait.
-- [ ] Notifikasi FCM yang di-tap saat sudah login membuka layar tujuan tanpa menunggu cek versi.
-- [ ] Cek versi: dialog "Update Tersedia" non-cancelable → Play Store → aplikasi ditutup.
-- [ ] Onboarding 3 slide hanya sekali; tetap tidak muncul lagi setelah logout.
-- [ ] Tombol MASUK nonaktif sampai NISN terisi, sekolah dipilih, dan S&K dicentang.
-- [ ] Tautan S&K membuka dialog HTML kebijakan; "SAYA PAHAM" mencentang checkbox.
-- [ ] Pemilih sekolah: cari (debounce 500 ms), pull-to-refresh, infinite scroll 20/halaman, kota tersembunyi jika kosong.
-- [ ] check-account gagal → bottom sheet "Login Gagal" + "Coba Lagi".
-- [ ] Layar password menampilkan avatar, nama, peran, kelas, NIS/NIK; keyboard langsung muncul.
-- [ ] Password salah → "Password yang anda masukkan salah".
-- [ ] Login di perangkat kedua → dialog "Perangkat Lain Terdeteksi" + catatan admin.
-- [ ] "Hubungi Kami" → WhatsApp 6287887219649 (fallback telepon).
-- [ ] Password default → notifikasi lokal "Ganti Password" + dialog ganti password di Home (wajib jika Klaspay aktif).
-- [ ] Login Google → dialog tamu dengan frasa persis (kondisi tampil sesuai keputusan Q1) → layar "masuk sebagai".
-- [ ] SSO dengan sekolah → "iya, itu saya"/"tidak, bukan saya"; tanpa sekolah → pilih sekolah + "daftar".
-- [ ] SSO dengan Klaspay belum aktif → aktivasi wallet (alert "Aktivasi Pin Wallet") → Home.
-- [ ] Reset password: tombol aktif > 3 karakter, halaman terkirim dengan countdown 3 menit "kirim ulang m:s".
-- [ ] Dialog email/verifikasi/ganti password muncul sesuai prioritas §8.2 dan muncul ulang saat flag berubah.
-- [ ] Deep link verify-email menandai email terverifikasi dan menampilkan dialog "Email Terverifikasi".
-- [ ] Akun nonaktif / sesi 401 / perangkat lain / sekolah tidak terdaftar → logout dengan pesan masing-masing.
-- [ ] Logout diblokir jika ada ujian AKM belum dikumpulkan → diarahkan ke daftar ujian.
-- [ ] Logout: data lokal terhapus, topik FCM diganti ke `unlogged`, `DELETE logout` dipanggil, kembali ke form login (bukan onboarding).
-- [ ] 503/504 → dialog "Perbaikan Sistem"; tanpa internet → pesan gangguan koneksi.
+> Status 30-09-2026 (lihat `02b-implementasi-auth-login-logout.md` untuk detail): dicentang bila
+> sudah diuji langsung di device fisik. Baris dengan catatan *(kode ada, belum diuji)* berarti
+> implementasinya sudah ada tapi jalur itu belum sempat dipicu di device sungguhan.
+
+- [ ] Launcher menampilkan splash putih + logo; orientasi portrait. *(portrait sudah dikunci; splash
+      tetap beranimasi sesuai desain Fase 1 — disengaja, bukan bug, lihat 02a S6)*
+- [ ] Notifikasi FCM yang di-tap saat sudah login membuka layar tujuan tanpa menunggu cek versi. *(belum dikerjakan — 02a S4, bagian dokumen 03)*
+- [ ] Cek versi: dialog "Update Tersedia" non-cancelable → Play Store → aplikasi ditutup. *(kode ada, belum terpicu — server dev tidak sedang minta update)*
+- [x] Onboarding 3 slide hanya sekali; tetap tidak muncul lagi setelah logout. — diuji di device: onboarding tampil, "selesai" → login; setelah logout kembali ke login (bukan onboarding lagi).
+- [x] Tombol MASUK nonaktif sampai NISN terisi, sekolah dipilih, dan S&K dicentang. — diuji di device.
+- [ ] Tautan S&K membuka dialog HTML kebijakan; "SAYA PAHAM" mencentang checkbox. *(kode ada, belum diuji)*
+- [x] Pemilih sekolah: cari (debounce 500 ms), pull-to-refresh, infinite scroll 20/halaman, kota tersembunyi jika kosong. — pencarian lokal diuji di device (cache Room, hasil real dari `dev.api.diskola.id`); pull-to-refresh/infinite-scroll belum sempat dipicu (daftar uji terlalu pendek).
+- [ ] check-account gagal → bottom sheet "Login Gagal" + "Coba Lagi". *(kode ada, belum diuji — hanya jalur sukses yang dicoba)*
+- [x] Layar password menampilkan avatar, nama, peran, kelas, NIS/NIK; keyboard langsung muncul. — diuji di device (data asli: "dev tts 5", STUDENT, TES TTS, NISN 202005).
+- [ ] Password salah → "Password yang anda masukkan salah". *(kode ada, belum diuji)*
+- [ ] Login di perangkat kedua → dialog "Perangkat Lain Terdeteksi" + catatan admin. *(kode ada, belum diuji)*
+- [ ] "Hubungi Kami" → WhatsApp 6287887219649 (fallback telepon). *(kode ada, belum diuji)*
+- [x] Password default → notifikasi lokal "Ganti Password" + dialog ganti password muncul setelah login. — diuji di device (akun uji memang masih pakai password default). **Belum** dipindah ke sistem prioritas dialog Home / gating "wajib jika Klaspay aktif" (02a P5, pekerjaan fase Home).
+- [ ] Login Google → dialog tamu dengan frasa persis (kondisi tampil sesuai keputusan Q1) → layar "masuk sebagai". *(kode ada, belum diuji — butuh akun Google uji)*
+- [ ] SSO dengan sekolah → "iya, itu saya"/"tidak, bukan saya"; tanpa sekolah → pilih sekolah + "daftar". *(kode ada, belum diuji)*
+- [ ] SSO dengan Klaspay belum aktif → aktivasi wallet (alert "Aktivasi Pin Wallet") → Home. *(kode ada, belum diuji)*
+- [ ] Reset password: tombol aktif > 3 karakter, halaman terkirim dengan countdown 3 menit "kirim ulang m:s". *(kode ada, belum diuji end-to-end)*
+- [ ] Dialog email/verifikasi/ganti password muncul sesuai prioritas §8.2 dan muncul ulang saat flag berubah. *(belum dikerjakan — bagian fase Home, dokumen 03)*
+- [ ] Deep link verify-email menandai email terverifikasi dan menampilkan dialog "Email Terverifikasi". *(belum dikerjakan — bagian fase Home)*
+- [ ] Akun nonaktif / sesi 401 / perangkat lain / sekolah tidak terdaftar → logout dengan pesan masing-masing. *(401 terpusat sudah ada di kode — `SessionEvents`/dialog "Sesi Berakhir" — belum dipicu di device; is_active/sekolah tidak terdaftar masih bagian fase Home)*
+- [ ] Logout diblokir jika ada ujian AKM belum dikumpulkan → diarahkan ke daftar ujian. *(diimplementasikan via proksi `akm_synced_exam`, 02a R3 — belum diuji karena belum ada ujian terunduh di akun uji)*
+- [x] Logout: data lokal terhapus, topik FCM diganti ke `unlogged`, `DELETE logout` dipanggil, kembali ke form login (bukan onboarding). — **diuji penuh di device**: log jaringan menunjukkan `DELETE /api/logout` → 200, dialog konfirmasi "Anda yakin akan keluar dari aplikasi?" tampil, kembali ke Login (bukan onboarding).
+- [ ] 503/504 → dialog "Perbaikan Sistem"; tanpa internet → pesan gangguan koneksi. *(belum dibuat — prioritas rendah, lihat 02a R9)*

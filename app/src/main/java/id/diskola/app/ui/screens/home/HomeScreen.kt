@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,9 +20,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -37,8 +36,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,18 +45,28 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
+import id.diskola.app.utils.JurnalRow
+import id.diskola.app.utils.JurnalRules
 import id.diskola.app.ui.components.AdaptiveTileGrid
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppCard
+import id.diskola.app.BuildConfig
+import id.diskola.app.repository.FeatureGateRepository
+import id.diskola.app.ui.components.AppDialog
+import id.diskola.app.ui.components.AppLoadingDialog
+import id.diskola.app.ui.components.FeatureUnavailableSheet
 import id.diskola.app.ui.components.ButtonVariant
 import id.diskola.app.ui.components.CardVariant
+import id.diskola.app.ui.components.CounterBadge
 import id.diskola.app.ui.components.iconFor
 import id.diskola.app.ui.theme.HeroOverlap
 import id.diskola.app.ui.theme.Spacing
 import id.diskola.app.ui.theme.extendedColors
 import id.diskola.app.utils.session.SessionStore
-import id.diskola.app.viewmodel.SessionRefreshViewModel
-import androidx.compose.ui.graphics.Brush
+import id.diskola.app.viewmodel.HomeViewModel
+import id.diskola.app.viewmodel.formatScheduleClock
 
 private data class HomeUser(val schoolName: String, val schoolCity: String, val name: String, val avatarUrl: String)
 
@@ -72,49 +81,95 @@ private fun readHomeUser(sessionStore: SessionStore): HomeUser {
     )
 }
 
-private data class MenuTileData(val icon: String, val label: String, val locked: Boolean, val implemented: Boolean)
+/** Doc §1.8: routing keyed by role/feature identity, not grid position — the legacy app's
+ * position-based routing silently breaks for a user who is somehow both `is_student` and
+ * `is_teacher` (doc §1.8's ❓, not reproduced here since `MenuKey` never relies on position). */
+enum class MenuKey { MATERI, TUGAS, PRESENSI, JURNAL, AGENDA_MINGGUAN, ASESMEN, POIN, MAGANG }
 
-/** Asesmen is a student-only module; teachers get Agenda Mingguan in that slot instead. */
-private fun menuTilesFor(isTeacher: Boolean) = listOf(
-    MenuTileData("auto_stories", "Materi", locked = false, implemented = true),
-    MenuTileData("assignment", "Tugas", locked = false, implemented = false),
-    MenuTileData("how_to_reg", "Presensi", locked = false, implemented = true),
-    MenuTileData("edit_note", "Jurnal", locked = false, implemented = false),
-    MenuTileData("event_note", "Agenda", locked = false, implemented = false),
-    if (isTeacher) {
-        MenuTileData("event_available", "Agenda Mingguan", locked = false, implemented = false)
-    } else {
-        MenuTileData("quiz", "Asesmen", locked = false, implemented = true)
-    },
-    MenuTileData("workspace_premium", "Poin", locked = false, implemented = false),
-    MenuTileData("business_center", "Magang", locked = true, implemented = false),
-    MenuTileData("menu_book", "Perpus", locked = true, implemented = false),
-)
+private data class MenuTileData(val key: MenuKey, val icon: String, val label: String, val implemented: Boolean, val locked: Boolean)
+
+/** Doc §1.5's exact per-role item list — no "Agenda" (harian) tile (that was never in the doc's
+ * table, only "Agenda Mingguan" for teachers) and no "Perpus" tile (also not in the table for any
+ * role); both existed in this screen's pre-rebuild version and are dropped here. */
+private fun menuTilesFor(sessionStore: SessionStore): List<MenuTileData> {
+    val locked = !sessionStore.isHavingClass
+    fun tile(key: MenuKey, icon: String, label: String, implemented: Boolean) =
+        MenuTileData(key, icon, label, implemented, locked)
+    return when {
+        sessionStore.isStudent -> listOf(
+            tile(MenuKey.MATERI, "auto_stories", "Materi", true),
+            tile(MenuKey.TUGAS, "assignment", "Tugas", true),
+            tile(MenuKey.PRESENSI, "how_to_reg", "Presensi", true),
+            tile(MenuKey.JURNAL, "edit_note", "Jurnal", true),
+            tile(MenuKey.ASESMEN, "quiz", "Asesmen", true),
+            tile(MenuKey.POIN, "workspace_premium", "Poin", true),
+            tile(MenuKey.MAGANG, "business_center", "Magang", false),
+        )
+        sessionStore.isTeacher -> listOf(
+            tile(MenuKey.MATERI, "auto_stories", "Materi", true),
+            tile(MenuKey.TUGAS, "assignment", "Tugas", true),
+            tile(MenuKey.PRESENSI, "how_to_reg", "Presensi", true),
+            tile(MenuKey.JURNAL, "edit_note", "Jurnal", true),
+            tile(MenuKey.AGENDA_MINGGUAN, "event_note", "Agenda Mingguan", true),
+            tile(MenuKey.POIN, "workspace_premium", "Poin", true),
+        )
+        else -> listOf(
+            tile(MenuKey.MATERI, "auto_stories", "Materi", true),
+            tile(MenuKey.TUGAS, "assignment", "Tugas", true),
+            tile(MenuKey.PRESENSI, "how_to_reg", "Presensi", true),
+            tile(MenuKey.JURNAL, "edit_note", "Jurnal", true),
+            tile(MenuKey.POIN, "workspace_premium", "Poin", true),
+        )
+    }
+}
 
 @Composable
 fun HomeScreen(
     onNavigateToMateri: () -> Unit,
-    onNavigateToAbsensi: () -> Unit,
+    onNavigateToTugas: () -> Unit,
+    onNavigateToPresensi: () -> Unit,
+    onNavigateToPoin: () -> Unit,
+    onNavigateToAgenda: () -> Unit,
+    onOpenJurnal: (action: String, attendanceId: Int, plotId: Int) -> Unit,
     onNavigateToAsesmen: () -> Unit,
     onNavigateToNotifikasi: () -> Unit,
+    onLoggedOut: () -> Unit,
     modifier: Modifier = Modifier,
-    isTeacher: Boolean = false,
-    sessionViewModel: SessionRefreshViewModel = hiltViewModel(),
+    viewModel: HomeViewModel = hiltViewModel(),
 ) {
-    val menuTiles = remember(isTeacher) { menuTilesFor(isTeacher) }
-    var user by remember { mutableStateOf(readHomeUser(sessionViewModel.sessionStore)) }
+    val sessionStore = viewModel.sessionStore
+    val sessionVersion by viewModel.sessionVersion.collectAsStateWithLifecycle()
+    // Not `remember`ed, and re-evaluated whenever `sessionVersion` bumps (after `writeCheckAccount`
+    // actually lands — `sessionStore` itself is a plain SharedPreferences reader, not an observable,
+    // so nothing else would tell Compose to recompute this after the async response arrives).
+    val menuTiles = remember(sessionVersion) { menuTilesFor(sessionStore) }
+    var user by remember { mutableStateOf(readHomeUser(sessionStore)) }
     var comingSoonDialog by remember { mutableStateOf(false) }
     var lockedDialog by remember { mutableStateOf(false) }
-    val unreadCount = 3 // TODO: source from NotifikasiViewModel once wired to a shared instance.
+    var verifyDialog by remember { mutableStateOf(false) }
+    var guestPopupOpen by remember { mutableStateOf(false) }
+    var guestPopupChecked by remember { mutableStateOf(false) }
+    val ongoingClass by viewModel.ongoingClass.collectAsStateWithLifecycle()
+    val scheduleLoaded by viewModel.scheduleLoaded.collectAsStateWithLifecycle()
+    val accountInactive by viewModel.accountInactive.collectAsStateWithLifecycle()
+    val agendaMissing by viewModel.agendaMissing.collectAsStateWithLifecycle()
+    val featureChecking by viewModel.featureChecking.collectAsStateWithLifecycle()
+    val featureUnavailable by viewModel.featureUnavailable.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     fun refreshAccount() {
-        sessionViewModel.refreshProfile(onComplete = { user = readHomeUser(sessionViewModel.sessionStore) })
+        viewModel.refresh()
+        user = readHomeUser(sessionStore)
+        if (!guestPopupChecked) {
+            guestPopupChecked = true
+            if (sessionStore.isGuest) guestPopupOpen = true
+        }
     }
 
-    // check-account carries role/NIS/kelas/sekolah, so Home always re-verifies it: once on
-    // landing here (including switching back from another tab, a fresh composition), and again
-    // whenever the app is foregrounded while already on this screen.
-    LaunchedEffect(Unit) { refreshAccount() }
+    // Doc §1.4: `loadData()` re-runs on every onResume, not just the first landing — a single
+    // lifecycle observer covers both, since `Lifecycle.addObserver` replays the current state
+    // (including `ON_RESUME`) to a newly-added observer. A separate `LaunchedEffect(Unit)` here
+    // would double-fire `check-account` on first launch (confirmed via device logcat).
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -124,12 +179,18 @@ fun HomeScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    val showVerifyButton = sessionStore.isGuest || !sessionStore.isHavingClass
+
     fun onTileClick(tile: MenuTileData) {
         when {
-            tile.label == "Materi" -> onNavigateToMateri()
-            tile.label == "Presensi" -> onNavigateToAbsensi()
-            tile.label == "Asesmen" -> onNavigateToAsesmen()
             tile.locked -> lockedDialog = true
+            tile.key == MenuKey.MATERI -> onNavigateToMateri()
+            tile.key == MenuKey.TUGAS -> onNavigateToTugas()
+            tile.key == MenuKey.PRESENSI -> viewModel.openFeature(FeatureGateRepository.PRESENSI, onNavigateToPresensi)
+            tile.key == MenuKey.ASESMEN -> onNavigateToAsesmen()
+            tile.key == MenuKey.POIN -> onNavigateToPoin()
+            tile.key == MenuKey.JURNAL -> viewModel.openFeature(FeatureGateRepository.JURNAL_KBM) { onOpenJurnal("", 0, 0) }
+            tile.key == MenuKey.AGENDA_MINGGUAN -> onNavigateToAgenda()
             else -> comingSoonDialog = true
         }
     }
@@ -139,7 +200,7 @@ fun HomeScreen(
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
     ) {
-        HomeHero(user = user, unreadCount = unreadCount, onNotifClick = onNavigateToNotifikasi, onRefresh = { user = readHomeUser(sessionViewModel.sessionStore) })
+        HomeHero(user = user, onNotifClick = onNavigateToNotifikasi, onRefresh = { refreshAccount() })
 
         Column(
             modifier = Modifier
@@ -150,12 +211,27 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(0.dp))
             Box(modifier = Modifier.offset(y = -HeroOverlap)) {
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
-                    OngoingClassCard(onHadiri = onNavigateToAbsensi, onIsiJurnal = { comingSoonDialog = true })
+                    if (showVerifyButton) {
+                        VerifyDataButton(onClick = { verifyDialog = true })
+                    } else {
+                        OngoingClassCard(
+                            item = ongoingClass,
+                            loaded = scheduleLoaded,
+                            isStudent = sessionStore.isStudent,
+                            onHadiri = { row -> onOpenJurnal("hadiri", row.attendanceId ?: 0, row.plotId) },
+                            onIsiJurnal = { row -> onOpenJurnal("isi", row.attendanceId ?: 0, row.plotId) },
+                        )
+                    }
 
                     Text("Menu Pembelajaran", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
 
                     AdaptiveTileGrid(items = menuTiles) { tile, tileModifier ->
-                        MenuGridTile(tile = tile, onClick = { onTileClick(tile) }, modifier = tileModifier)
+                        MenuGridTile(
+                            tile = tile,
+                            badge = if (tile.key == MenuKey.AGENDA_MINGGUAN) agendaMissing else 0,
+                            onClick = { onTileClick(tile) },
+                            modifier = tileModifier,
+                        )
                     }
 
                     Box(
@@ -177,26 +253,85 @@ fun HomeScreen(
         }
     }
 
+    if (featureChecking) AppLoadingDialog(message = "Memeriksa ketersediaan fitur…")
+    featureUnavailable?.let { unavailable ->
+        FeatureUnavailableSheet(
+            isTeacher = sessionStore.isTeacher,
+            serverMessage = unavailable.message,
+            onOpenWebsite = {
+                val path = when (unavailable.name) {
+                    FeatureGateRepository.PRESENSI -> "/presensi/presensi-guru-staff/presensi"
+                    FeatureGateRepository.JURNAL_KBM -> "/jurnal-kbm/presensi-kelas"
+                    else -> ""
+                }
+                runCatching {
+                    context.startActivity(
+                        android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(BuildConfig.PORTAL_URL + path)),
+                    )
+                }
+                viewModel.dismissFeatureUnavailable()
+            },
+            onDismiss = viewModel::dismissFeatureUnavailable,
+        )
+    }
     if (comingSoonDialog) {
-        AlertDialog(
-            onDismissRequest = { comingSoonDialog = false },
-            title = { Text("Belum dibuat di mockup ini") },
-            text = { Text("Modul Pembelajaran ini masuk fase berikutnya. Yang sudah jadi: Auth, Akun, Notifikasi, dan Pembayaran/Klaspay.") },
-            confirmButton = { AppButton(text = "Mengerti", onClick = { comingSoonDialog = false }, variant = ButtonVariant.Text) },
+        AppDialog(
+            onDismiss = { comingSoonDialog = false },
+            title = "Fitur dalam pengembangan",
+            body = "Menu ini sedang dalam proses pembangunan, ditunggu updatenya yah...",
+            primaryButtonText = "Ok Deh",
+            onPrimaryClick = { comingSoonDialog = false },
         )
     }
     if (lockedDialog) {
-        AlertDialog(
-            onDismissRequest = { lockedDialog = false },
-            title = { Text("Menu Belum Terbuka") },
-            text = { Text("Anda belum tergabung di kelas manapun, jadi menu ini masih terkunci. Hubungi operator sekolah untuk penempatan kelas.") },
-            confirmButton = { AppButton(text = "Mengerti", onClick = { lockedDialog = false }, variant = ButtonVariant.Text) },
+        AppDialog(
+            onDismiss = { lockedDialog = false },
+            title = "Fitur ini terkunci",
+            body = "Oops, nampaknya anda belum terdaftar di kelas manapun. Hubungi admin sekolah anda untuk mengakses fitur ini",
+            primaryButtonText = "Ok Deh",
+            onPrimaryClick = { lockedDialog = false },
+        )
+    }
+    if (guestPopupOpen && sessionStore.isGuest) {
+        AppDialog(
+            onDismiss = { guestPopupOpen = false },
+            title = "Anda Masuk sebagai Tamu",
+            body = "Beberapa fitur mungkin terbatas. Lakukan verifikasi data Jika Anda ingin menjadi guru atau siswa, untuk medapatkan akses penuh",
+            primaryButtonText = "Oke, Terimakasi",
+            onPrimaryClick = { guestPopupOpen = false },
+        )
+    }
+    if (verifyDialog) {
+        AppDialog(
+            onDismiss = { verifyDialog = false },
+            title = "VERIFIKASI DATA PENGGUNA",
+            body = "Apakah NISN/NIS/NIK anda telah terdaftar disekolah anda?",
+            primaryButtonText = "Sudah",
+            onPrimaryClick = {
+                verifyDialog = false
+                comingSoonDialog = true
+            },
+            secondaryButtonText = "Belum",
+            onSecondaryClick = {
+                verifyDialog = false
+                comingSoonDialog = true
+            },
+        )
+    }
+    if (accountInactive) {
+        AppDialog(
+            onDismiss = {},
+            dismissible = false,
+            title = "Peringatan",
+            body = "Akun anda tidak aktif, hubungi admin sekolah untuk aktivasi",
+            primaryButtonText = "Baik",
+            onPrimaryClick = { viewModel.confirmInactiveLogout(onComplete = onLoggedOut) },
         )
     }
 }
 
 @Composable
-private fun HomeHero(user: HomeUser, unreadCount: Int, onNotifClick: () -> Unit, onRefresh: () -> Unit) {
+private fun HomeHero(user: HomeUser, onNotifClick: () -> Unit, onRefresh: () -> Unit) {
     val extended = MaterialTheme.extendedColors
     Column(
         modifier = Modifier
@@ -230,20 +365,10 @@ private fun HomeHero(user: HomeUser, unreadCount: Int, onNotifClick: () -> Unit,
                 }
             }
             IconButton(onClick = onRefresh) { Icon(Icons.Rounded.Refresh, contentDescription = "Refresh", tint = Color.White) }
-            Box {
-                IconButton(onClick = onNotifClick) { Icon(Icons.Rounded.Notifications, contentDescription = "Notifikasi", tint = Color.White) }
-                if (unreadCount > 0) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .size(16.dp)
-                            .background(MaterialTheme.colorScheme.error, CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(unreadCount.toString(), style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = Color.White)
-                    }
-                }
-            }
+            // Doc §1.4: the badge itself needs a `payment/wallet`→`notification/summary` chain that
+            // doesn't exist anywhere in this app yet (confirmed by a full-repo search) — deferred,
+            // see doc `05a`. The bell still opens Notifikasi.
+            IconButton(onClick = onNotifClick) { Icon(Icons.Rounded.Notifications, contentDescription = "Notifikasi", tint = Color.White) }
         }
         Spacer(modifier = Modifier.height(Spacing.sm))
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -264,8 +389,23 @@ private fun HomeHero(user: HomeUser, unreadCount: Int, onNotifClick: () -> Unit,
     }
 }
 
+/** Doc §1.4/§1.7's simplified "button active" cases (`role_label=Guest` or `!is_having_class`) —
+ * the full `APPROVED`/`CLEAR`/`IN_REVIEW`/`REJECTED` approval-progress state machine needs a
+ * `sosmedViewModel.checkUser()`-equivalent endpoint this app doesn't call anywhere yet, so the
+ * greyed/red disabled-with-status-label states aren't reproduced (deferred, see doc `05a`). */
 @Composable
-private fun OngoingClassCard(onHadiri: () -> Unit, onIsiJurnal: () -> Unit) {
+private fun VerifyDataButton(onClick: () -> Unit) {
+    AppButton(text = "verifikasi data", onClick = onClick, modifier = Modifier.fillMaxWidth())
+}
+
+@Composable
+private fun OngoingClassCard(
+    item: JurnalRow?,
+    loaded: Boolean,
+    isStudent: Boolean,
+    onHadiri: (JurnalRow) -> Unit,
+    onIsiJurnal: (JurnalRow) -> Unit,
+) {
     AppCard(variant = CardVariant.Elevated) {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -285,24 +425,48 @@ private fun OngoingClassCard(onHadiri: () -> Unit, onIsiJurnal: () -> Unit) {
                         .background(MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(iconFor("code"), contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    val iconUrl = item?.iconUrl
+                    if (!iconUrl.isNullOrBlank()) {
+                        AsyncImage(model = iconUrl, contentDescription = null, modifier = Modifier.size(28.dp))
+                    } else {
+                        Icon(Icons.Rounded.MenuBook, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    }
                 }
                 Column(modifier = Modifier.padding(start = Spacing.md)) {
-                    Text("Informatika", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
-                    Text("07.30 – 09.00 · Ruang Lab 2", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        item?.subjectName?.takeIf { it.isNotBlank() } ?: "Tidak terdapat jadwal",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    if (item != null) {
+                        Text(
+                            "${formatScheduleClock(item.start)} – ${formatScheduleClock(item.end)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else if (loaded) {
+                        Text("—", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
-            Spacer(modifier = Modifier.height(Spacing.md))
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                AppButton(text = "Hadiri", onClick = onHadiri, modifier = Modifier.weight(1f))
-                AppButton(text = "Isi Jurnal", onClick = onIsiJurnal, variant = ButtonVariant.Tonal, modifier = Modifier.weight(1f))
+            // Only students get the shortcuts, and only the one their row allows (legacy `PembelajaranPage`).
+            val action = if (item != null && isStudent) JurnalRules.studentUi(item).action else JurnalRules.StudentAction.NONE
+            if (item != null && action != JurnalRules.StudentAction.NONE) {
+                Spacer(modifier = Modifier.height(Spacing.md))
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    if (action == JurnalRules.StudentAction.HADIRI) {
+                        AppButton(text = "Hadiri", onClick = { onHadiri(item) }, modifier = Modifier.weight(1f))
+                    } else {
+                        AppButton(text = "Isi Jurnal", onClick = { onIsiJurnal(item) }, variant = ButtonVariant.Tonal, modifier = Modifier.weight(1f))
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun MenuGridTile(tile: MenuTileData, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun MenuGridTile(tile: MenuTileData, badge: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .height(88.dp)
@@ -319,6 +483,9 @@ private fun MenuGridTile(tile: MenuTileData, onClick: () -> Unit, modifier: Modi
             Icon(iconFor(tile.icon), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
             Spacer(modifier = Modifier.height(4.dp))
             Text(tile.label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+        }
+        if (!tile.locked && badge > 0) {
+            CounterBadge(count = badge, max = 9, modifier = Modifier.align(Alignment.TopEnd))
         }
         if (tile.locked) {
             Box(

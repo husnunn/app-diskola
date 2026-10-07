@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicTextField
@@ -60,6 +61,8 @@ fun AppTextField(
     visualTransformation: VisualTransformation = VisualTransformation.None,
     trailing: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
+    /** More than 1 turns the field into a growing multi-line box (e.g. "Tujuan Pembelajaran"). */
+    minLines: Int = 1,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val focused by interactionSource.collectIsFocusedAsState()
@@ -92,11 +95,11 @@ fun AppTextField(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(52.dp)
+                .heightIn(min = 52.dp)
                 .background(containerColor, DiskolaExtraShapes.textField)
                 .border(borderWidth, borderColor, DiskolaExtraShapes.textField)
                 .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 16.dp, vertical = if (minLines > 1) 14.dp else 0.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -113,7 +116,8 @@ fun AppTextField(
                         onValueChange = onValueChange,
                         enabled = enabled && !readOnly && onClick == null,
                         readOnly = readOnly,
-                        singleLine = true,
+                        singleLine = minLines <= 1,
+                        minLines = minLines,
                         textStyle = MaterialTheme.typography.bodyLarge.copy(
                             color = if (readOnly) scheme.onSurfaceVariant else scheme.onSurface,
                         ),

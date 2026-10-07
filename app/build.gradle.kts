@@ -33,6 +33,8 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "WEB_CLIENT_ID", "\"$webClientId\"")
+        // Google Maps key for Agenda Mingguan's check-in map; read from local.properties (never committed).
+        manifestPlaceholders["MAPS_API_KEY"] = properties.getProperty("MAPS_API_KEY") ?: ""
     }
 
     buildTypes {
@@ -45,6 +47,7 @@ android {
             )
             buildConfigField("String", "API_URL", properties.getProperty("API_URL_PROD", ""))
             buildConfigField("String", "ASSETS_URL", properties.getProperty("ASSETS_URL_PROD", "\"\""))
+            buildConfigField("String", "PORTAL_URL", "\"https://portal.diskola.id\"")
         }
         debug {
             applicationIdSuffix = ".debug"
@@ -52,6 +55,7 @@ android {
             isDebuggable = true
             buildConfigField("String", "API_URL", properties.getProperty("API_URL_DEV", ""))
             buildConfigField("String", "ASSETS_URL", properties.getProperty("ASSETS_URL_DEV", "\"\""))
+            buildConfigField("String", "PORTAL_URL", "\"https://dev.portal.diskola.id\"")
         }
     }
     compileOptions {
@@ -148,6 +152,16 @@ dependencies {
     // Lokasi (GPS)
     implementation(libs.play.services.location)
     implementation(libs.play.services.maps)
+    implementation(libs.maps.compose)
+
+    // Selfie camera for Presensi Dinas Luar
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+
+    // QR scan for Jurnal "Hadiri kelas" (no preview UI, no camera permission of our own)
+    implementation(libs.play.services.code.scanner)
     implementation(libs.play.services.auth)
     implementation(libs.play.services.identity)
 

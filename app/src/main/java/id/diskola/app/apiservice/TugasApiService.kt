@@ -1,5 +1,13 @@
 package id.diskola.app.apiservice
 
+import id.diskola.app.dataclass.ResponData.AssignmentAnswerDetailResponse
+import id.diskola.app.dataclass.ResponData.AssignmentDayResp
+import id.diskola.app.dataclass.ResponData.AssignmentResponse
+import id.diskola.app.dataclass.ResponData.AssignmentScheduleResp
+import id.diskola.app.dataclass.ResponData.CollectHomeworkResponse
+import id.diskola.app.dataclass.ResponData.HomeworkCollectedResponse
+import id.diskola.app.dataclass.ResponData.HomeworkCreateResponse
+import id.diskola.app.dataclass.ResponData.HomeworkResponse
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.http.Body
@@ -14,9 +22,8 @@ import retrofit2.http.Query
 import retrofit2.http.QueryMap
 
 /**
- * Placeholder scaffolding: request/response shapes not yet defined, no UI consumer yet.
- * `mobile/app/learning/assignment/teachers/class` ("Daftar kelas") is intentionally not
- * duplicated here — it's already [MateriApiService.assignmentClass].
+ * `mobile/app/learning/assignment/teachers/class` ("Daftar kelas") is intentionally not duplicated
+ * here — it's already [MateriApiService.assignmentClass].
  */
 interface TugasApiService {
 
@@ -25,53 +32,55 @@ interface TugasApiService {
     suspend fun studentAssignmentBacklog(
         @Query("take") take: Int = 10,
         @Query("skip") skip: Int = 0
-    ): Map<String, Any>
+    ): HomeworkResponse
 
     @GET("mobile/app/learning/assignment/students/done")
     suspend fun studentAssignmentDone(
         @Query("take") take: Int = 10,
         @Query("skip") skip: Int = 0
-    ): Map<String, Any>
+    ): HomeworkResponse
 
     @GET("mobile/app/learning/assignment/students/scored")
     suspend fun studentAssignmentScored(
         @Query("take") take: Int = 10,
         @Query("skip") skip: Int = 0
-    ): Map<String, Any>
+    ): HomeworkResponse
 
+    /** Doc §5.5/§6.4: jawaban boleh lebih dari satu file (`file[]`) — bukan satu file seperti
+     * placeholder sebelumnya. */
     @Multipart
     @POST("mobile/app/learning/assignment/students/{id}/collect")
     suspend fun collectAssignment(
         @Path("id") id: Int,
         @PartMap data: Map<String, @JvmSuppressWildcards RequestBody>,
-        @Part file: MultipartBody.Part?
-    ): Map<String, Any>
+        @Part files: List<MultipartBody.Part>
+    ): CollectHomeworkResponse
 
     @GET("mobile/app/learning/assignment/students/{subjectAssignmentId}/collect/{studentAssignmentId}")
     suspend fun getAssignmentAnswerDetail(
         @Path("subjectAssignmentId") subjectAssignmentId: Int,
         @Path("studentAssignmentId") studentAssignmentId: Int
-    ): Map<String, Any>
+    ): AssignmentAnswerDetailResponse
 
     // --- Guru ---
     @GET("mobile/app/learning/assignment/teachers/backlog")
-    suspend fun teacherAssignmentBacklog(@QueryMap filter: Map<String, String> = emptyMap()): Map<String, Any>
+    suspend fun teacherAssignmentBacklog(@QueryMap filter: Map<String, String> = emptyMap()): HomeworkResponse
 
     @GET("mobile/app/learning/assignment/teachers/schedule-day")
-    suspend fun teacherAssignmentScheduleDay(): Map<String, Any>
+    suspend fun teacherAssignmentScheduleDay(): AssignmentDayResp
 
     @GET("mobile/app/learning/assignment/teachers/schedule")
     suspend fun teacherAssignmentSchedule(
-        @Query("class") classId: Int,
+        @Query("school_class_id") classId: Int,
         @Query("day") day: String
-    ): Map<String, Any>
+    ): AssignmentScheduleResp
 
     @Multipart
     @POST("mobile/app/learning/assignment/teachers/create")
     suspend fun createAssignment(
         @PartMap data: Map<String, @JvmSuppressWildcards RequestBody>,
         @Part file: MultipartBody.Part?
-    ): Map<String, Any>
+    ): HomeworkCreateResponse
 
     @Multipart
     @POST("mobile/app/learning/assignment/teachers/update/{id}")
@@ -79,21 +88,24 @@ interface TugasApiService {
         @Path("id") id: Int,
         @PartMap data: Map<String, @JvmSuppressWildcards RequestBody>,
         @Part file: MultipartBody.Part?
-    ): Map<String, Any>
+    ): HomeworkCreateResponse
 
     @DELETE("mobile/app/learning/assignment/teachers/delete/{id}")
-    suspend fun deleteAssignment(@Path("id") id: Int): Map<String, Any>
+    suspend fun deleteAssignment(@Path("id") id: Int): Any
 
     @GET("mobile/app/learning/assignment/teachers/scored")
-    suspend fun teacherAssignmentScoredGroups(): Map<String, Any>
+    suspend fun teacherAssignmentScoredGroups(
+        @Query("take") take: Int = 10,
+        @Query("skip") skip: Int = 0
+    ): HomeworkCollectedResponse
 
     @GET("mobile/app/learning/assignment/teachers/scored/{id}")
-    suspend fun teacherAssignmentScoredDetail(@Path("id") id: Int): Map<String, Any>
+    suspend fun teacherAssignmentScoredDetail(@Path("id") id: Int): AssignmentResponse
 
     @POST("mobile/app/learning/assignment/teachers/scored/{colledtedId}/student-assignment/{assignmentId}")
     suspend fun saveAssignmentScore(
         @Path("colledtedId") colledtedId: Int,
         @Path("assignmentId") assignmentId: Int,
         @Body request: Map<String, Any>
-    ): Map<String, Any>
+    ): Any
 }

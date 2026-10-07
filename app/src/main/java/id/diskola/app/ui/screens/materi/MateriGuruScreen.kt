@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -28,8 +27,8 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,42 +39,43 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import id.diskola.app.dataclass.ResponData.MateriItem
+import id.diskola.app.dataclass.ResponData.MateriTable
 import id.diskola.app.ui.components.AppBottomSheet
 import id.diskola.app.ui.components.AppDialog
+import id.diskola.app.ui.components.BannerError
 import id.diskola.app.ui.components.DetailScaffold
 import id.diskola.app.ui.components.EmptyState
+import id.diskola.app.ui.components.SearchableOptionSheet
+import id.diskola.app.ui.components.SelectOption
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
-import id.diskola.app.viewmodel.MateriViewModel
+import id.diskola.app.viewmodel.MateriGuruViewModel
 
-/** "Materi Saya" — everything the signed-in teacher has uploaded, newest first. */
+/** "Materi Saya" — everything the signed-in teacher has uploaded, newest first. Kelas/Mapel
+ * filters are combined with AND (decision: fix the legacy exclusive-filter bug, doc §3.4). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MateriGuruScreen(
     onBack: () -> Unit,
     onOpenSubjects: () -> Unit,
-    onOpenMateri: (MateriItem) -> Unit,
+    onOpenMateri: (MateriTable) -> Unit,
     onUpload: () -> Unit,
-    onEdit: (MateriItem) -> Unit,
+    onEdit: (MateriTable) -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: MateriViewModel = hiltViewModel(),
+    viewModel: MateriGuruViewModel = hiltViewModel(),
 ) {
     val materials by viewModel.materiList.collectAsStateWithLifecycle()
-    val subjects by viewModel.teacherSubjects.collectAsStateWithLifecycle()
+    val subjects by viewModel.subjects.collectAsStateWithLifecycle()
     val classes by viewModel.classes.collectAsStateWithLifecycle()
+    val subjectFilter by viewModel.subjectFilter.collectAsStateWithLifecycle()
+    val classFilter by viewModel.classFilter.collectAsStateWithLifecycle()
+    val loading by viewModel.listLoading.collectAsStateWithLifecycle()
+    val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
 
-    var subjectFilter by remember { mutableStateOf<Int?>(null) }
-    var classFilter by remember { mutableStateOf<Int?>(null) }
     var openSheet by remember { mutableStateOf<GuruFilter?>(null) }
-    var kebabFor by remember { mutableStateOf<MateriItem?>(null) }
-    var deleteFor by remember { mutableStateOf<MateriItem?>(null) }
-
-    LaunchedEffect(Unit) { viewModel.fetchTeacherRequirements() }
-    LaunchedEffect(subjectFilter, classFilter) {
-        viewModel.getMateriTeacher(subjectId = subjectFilter, classId = classFilter)
-    }
+    var kebabFor by remember { mutableStateOf<MateriTable?>(null) }
+    var deleteFor by remember { mutableStateOf<MateriTable?>(null) }
 
     DetailScaffold(
         title = "Materi",
@@ -100,42 +100,48 @@ fun MateriGuruScreen(
                 ) {
                     FilterField(
                         label = "KELAS",
-                        value = classes.find { it.id == classFilter }?.name ?: "Semua",
+                        value = classes.find { it.id == classFilter }?.let { classLabel(it.grade, it.name) } ?: "Semua",
                         onClick = { openSheet = GuruFilter.Kelas },
                         modifier = Modifier.weight(1f),
                     )
                     FilterField(
                         label = "MATA PELAJARAN",
-                        value = subjects.find { it.id == subjectFilter }?.name ?: "Semua",
+                        value = subjects.find { it.id == subjectFilter?.toLong() }?.name ?: "Semua",
                         onClick = { openSheet = GuruFilter.Mapel },
                         modifier = Modifier.weight(1f),
                     )
                 }
 
-                if (materials.isEmpty()) {
+                if (errorMessage.isNotBlank()) {
+                    BannerError(message = errorMessage, onDismiss = { viewModel.clearError() })
+                }
+
+                if (materials.isEmpty() && !loading) {
                     EmptyState(
-                        title = "Belum ada materi",
-                        description = "Unggah materi pertama Anda lewat tombol Tambah.",
+                        title = "Belum terdapat materi",
+                        description = "Silahkan upload materi untuk siswa",
                         icon = Icons.Rounded.UploadFile,
                     )
                 } else {
-                    LazyColumn(
-                        contentPadding = PaddingValues(start = ScreenHorizontalPadding, end = ScreenHorizontalPadding, bottom = 96.dp),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                    ) {
-                        item {
-                            Text(
-                                "Materi yang Anda unggah · urut terbaru",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        items(materials, key = { it.id }) { item ->
-                            MateriGuruListItem(
-                                item = item,
-                                onClick = { onOpenMateri(item) },
-                                onMoreClick = { kebabFor = item },
-                            )
+                    PullToRefreshBox(isRefreshing = loading, onRefresh = { viewModel.refresh() }, modifier = Modifier.fillMaxSize()) {
+                        LazyColumn(
+                            contentPadding = PaddingValues(start = ScreenHorizontalPadding, end = ScreenHorizontalPadding, bottom = 96.dp),
+                            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                        ) {
+                            item {
+                                Text(
+                                    "Materi yang Anda unggah · urut terbaru",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            items(materials, key = { it.id }) { item ->
+                                MateriGuruListItem(
+                                    item = item,
+                                    onClick = { onOpenMateri(item) },
+                                    onMoreClick = { kebabFor = item },
+                                )
+                            }
                         }
                     }
                 }
@@ -157,21 +163,24 @@ fun MateriGuruScreen(
     openSheet?.let { filter ->
         val title = if (filter == GuruFilter.Kelas) "Pilih Kelas" else "Pilih Mata Pelajaran"
         val options = buildList {
-            add(null to "Semua")
-            if (filter == GuruFilter.Kelas) classes.forEach { add(it.id to it.name) }
-            else subjects.forEach { add(it.id to it.name) }
-        }
-        val selected = if (filter == GuruFilter.Kelas) classFilter else subjectFilter
-        AppBottomSheet(title = title, onDismiss = { openSheet = null }) {
-            Column {
-                options.forEach { (id, label) ->
-                    SheetOptionRow(label = label, selected = id == selected) {
-                        if (filter == GuruFilter.Kelas) classFilter = id else subjectFilter = id
-                        openSheet = null
-                    }
-                }
+            add(SelectOption(null, "Semua"))
+            if (filter == GuruFilter.Kelas) {
+                classes.sortedWith(compareBy({ it.grade }, { it.name.lowercase() })).forEach { add(SelectOption(it.id, classLabel(it.grade, it.name))) }
+            } else {
+                subjects.sortedBy { it.name.lowercase() }.forEach { add(SelectOption(it.id.toInt(), it.name)) }
             }
         }
+        SearchableOptionSheet(
+            title = title,
+            options = options,
+            selectedId = if (filter == GuruFilter.Kelas) classFilter else subjectFilter,
+            onSelect = { option ->
+                if (filter == GuruFilter.Kelas) viewModel.setClassFilter(option.id) else viewModel.setSubjectFilter(option.id)
+                openSheet = null
+            },
+            onDismiss = { openSheet = null },
+            searchPlaceholder = if (filter == GuruFilter.Kelas) "Cari kelas" else "Cari mata pelajaran",
+        )
     }
 
     kebabFor?.let { item ->
@@ -196,7 +205,7 @@ fun MateriGuruScreen(
             body = "Anda yakin akan menghapus materi ${item.name}? Materi akan hilang dari daftar siswa.",
             primaryButtonText = "Hapus",
             onPrimaryClick = {
-                viewModel.deleteMateri(item.id.toLong())
+                viewModel.deleteMateri(item.id.toInt())
                 deleteFor = null
             },
             secondaryButtonText = "Batal",
@@ -204,6 +213,9 @@ fun MateriGuruScreen(
         )
     }
 }
+
+/** "<grade> - <name>" when grade>0, matching doc §3.4's dropdown label rule; otherwise the bare name. */
+private fun classLabel(grade: Int, name: String): String = if (grade > 0) "$grade - $name" else name
 
 internal enum class GuruFilter { Kelas, Mapel }
 
@@ -229,24 +241,6 @@ private fun FilterField(label: String, value: String, onClick: () -> Unit, modif
             )
         }
         Icon(Icons.Rounded.ExpandMore, contentDescription = null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
-    }
-}
-
-@Composable
-internal fun SheetOptionRow(label: String, selected: Boolean, onClick: () -> Unit) {
-    val scheme = MaterialTheme.colorScheme
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .clickable(onClick = onClick)
-            .padding(horizontal = Spacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, color = scheme.onSurface, modifier = Modifier.weight(1f))
-        if (selected) {
-            Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = scheme.primary)
-        }
     }
 }
 

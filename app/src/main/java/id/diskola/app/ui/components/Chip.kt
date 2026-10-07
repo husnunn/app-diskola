@@ -95,7 +95,7 @@ fun StatusBadge(label: String, tone: BadgeTone, modifier: Modifier = Modifier) {
 
 /** Small numeric counter badge, e.g. unread notifications. */
 @Composable
-fun CounterBadge(count: Int, modifier: Modifier = Modifier) {
+fun CounterBadge(count: Int, modifier: Modifier = Modifier, max: Int = 99) {
     if (count <= 0) return
     Box(
         modifier = modifier
@@ -106,7 +106,7 @@ fun CounterBadge(count: Int, modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = if (count > 99) "99+" else count.toString(),
+            text = if (count > max) "$max+" else count.toString(),
             style = MaterialTheme.typography.labelSmall,
             color = Color.White,
         )

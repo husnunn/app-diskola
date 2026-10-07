@@ -1012,6 +1012,13 @@ Bug/anti-pattern (perbaikan internal yang tidak mengubah perilaku boleh langsung
 ---
 
 ## 21. Checklist paritas
+
+> Status 2026-10-07 (`07a-gap-presensi.md`/`07b-implementasi-presensi.md`): **Presensi harian** (tile, Data Absensi, Rekap,
+> Masuk/Pulang, Dinas Luar, Izin) dibangun; Data Absensi, Rekap, daftar/detail Izin, feature gate, dan alert blokir
+> Dinas Luar diuji di device. Masuk/Pulang, Dinas Luar+kamera, kirim Izin, dan mock location *(kode ada, belum diuji)*.
+> **Jurnal KBM** (daftar, Hadir kelas + QR, form guru & siswa, foto KBM, Detail) dibangun 2026-10-07
+> (`07c-gap-jurnal.md`/`07d-implementasi-jurnal.md`): kode + aturan murni (`JurnalRulesTest`) lolos, **belum diuji di device**
+> (HP uji terkunci). Magang belum dikerjakan. Butir geofence/background location **dibuang** (keputusan 2026-10-07).
 - [ ] Tile Presensi/Jurnal terkunci bila `is_having_class`=false; feature gate + fail-open.
 - [ ] Dialog "Harap atur tanggal dan waktu ponsel ke "Otomatis"" di Presensi, Jurnal, Jadwal Magang (tiap resume).
 - [ ] Data Absensi: cache-first, warna merah terlambat/pulang awal/kosong, "Libur", label izin disetujui, detail offsite.

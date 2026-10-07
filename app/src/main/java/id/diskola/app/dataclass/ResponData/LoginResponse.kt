@@ -129,9 +129,11 @@ data class LoginAccountUserData(
     val last_logged_in_at: String?,
     val school: LoginSchoolData?,
     val roles: List<LoginRoleItem>?,
-    // Not on the legacy REBUILD_PROMPT sample, but required to compute `is_having_class`/`class_id`
-    // and to fill the `student`/`teacher` prefs JSON (doc 02 §4.3) — confirm shape against a real
-    // login-account response once available.
+    // Required to compute `is_having_class`/`class_id` and to fill the `student`/`teacher` prefs
+    // JSON (doc 02 §4.3). Confirmed via device logcat (2026-10-02): the real login-account response
+    // includes `student` but never `teacher` for a teacher login — `SessionStore.writeCheckAccount`
+    // (fed by the separate check-account call) is the one write site that reliably fills
+    // TEACHER_JSON; see its doc comment.
     val student: StudentItem? = null,
     val teacher: TeacherItem? = null,
     val is_klaspay_activated: Boolean?,

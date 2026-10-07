@@ -23,7 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import id.diskola.app.dataclass.ResponData.MateriItem
+import id.diskola.app.dataclass.ResponData.MateriTable
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.Spacing
 
@@ -36,23 +36,23 @@ fun initialsOf(name: String): String = name
     .joinToString("")
     .ifBlank { "?" }
 
-/** Moshi leaves the class/major relations untyped; pull a display name out when one is present. */
-private fun Any?.relationName(): String? = ((this as? Map<*, *>)?.get("name") as? String)?.takeIf { it.isNotBlank() }
-
-/** Who the material was published to. Null when the payload carries no usable relation. */
-fun MateriItem.targetLabel(): String? = school_class.relationName()?.let { "Kelas $it" }
-    ?: school_major.relationName()?.let { "Jurusan $it" }
-    ?: grade?.takeIf { it != 0 }?.let { "Jenjang $it" }
+/** Who the material was published to — doc §3.4's "Ditampilkan ke" (Kelas/Jurusan/Jenjang), one
+ * of which is always set server-side. */
+fun MateriTable.targetLabel(): String? = when {
+    class_name.isNotBlank() -> "Kelas $class_name"
+    major_name.isNotBlank() -> "Jurusan $major_name"
+    grade != 0 -> "Jenjang $grade"
+    else -> null
+}
 
 /** Material card for the per-subject list — leads with the teacher's initials avatar. */
 @Composable
 fun MateriListItem(
-    item: MateriItem,
+    item: MateriTable,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val teacher = item.teacher?.name.orEmpty()
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -67,7 +67,7 @@ fun MateriListItem(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                initialsOf(teacher),
+                initialsOf(item.teacher_name),
                 style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
                 color = scheme.primary,
             )
@@ -81,8 +81,8 @@ fun MateriListItem(
                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black),
                 color = scheme.onSurface,
             )
-            if (teacher.isNotBlank()) {
-                Text(teacher, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+            if (item.teacher_name.isNotBlank()) {
+                Text("Guru · ${item.teacher_name}", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
             }
             MateriMetaRow(item)
         }
@@ -92,7 +92,7 @@ fun MateriListItem(
 /** Teacher's own-material card — no avatar, with an overflow menu for edit/delete. */
 @Composable
 fun MateriGuruListItem(
-    item: MateriItem,
+    item: MateriTable,
     onClick: () -> Unit,
     onMoreClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -125,7 +125,7 @@ fun MateriGuruListItem(
 }
 
 @Composable
-private fun MateriMetaRow(item: MateriItem) {
+private fun MateriMetaRow(item: MateriTable) {
     val scheme = MaterialTheme.colorScheme
     Row(
         verticalAlignment = Alignment.CenterVertically,
