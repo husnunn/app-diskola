@@ -1,6 +1,5 @@
 *.iml
 .gradle
-/local.properties
 /.idea/caches
 /.idea/libraries
 /.idea/modules.xml
@@ -12,4 +11,25 @@
 /captures
 .externalNativeBuild
 .cxx
+
+# ---- Secrets & signing: never commit ----
+# Per-machine config holding API URLs/keys and signing passwords (read by app/build.gradle.kts)
 local.properties
+keystore.properties
+secrets.properties
+.env
+.env.*
+
+# Signing keys / certificates
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+
+# Firebase / Google service credentials
+google-services.json
+GoogleService-Info.plist
+*service-account*.json
+*firebase-adminsdk*.json
