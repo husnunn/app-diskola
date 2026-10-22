@@ -19,10 +19,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Download
-import androidx.compose.material.icons.rounded.InsertDriveFile
+import androidx.compose.material.icons.rounded.AttachFile
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Lightbulb
+import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.UploadFile
-import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -44,9 +45,13 @@ import id.diskola.app.dataclass.ResponData.HomeworkTable
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppDialog
 import id.diskola.app.ui.components.BannerError
-import id.diskola.app.ui.components.ButtonVariant
+import id.diskola.app.ui.components.BadgeTone
 import id.diskola.app.ui.components.DetailScaffold
+import id.diskola.app.ui.components.FileViewerHost
+import id.diskola.app.ui.components.displayNameOf
+import id.diskola.app.ui.components.openLink
 import id.diskola.app.ui.components.LinkPreviewCard
+import id.diskola.app.ui.components.LoadingState
 import id.diskola.app.ui.components.SectionLabel
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
@@ -120,12 +125,7 @@ fun TugasDetailScreen(
 
     LaunchedEffect(tugasId, type, isTeacher) { viewModel.load(tugasId, type, isTeacher) }
     LaunchedEffect(submitSuccess) { if (submitSuccess) onBack() }
-    LaunchedEffect(openFileIntent) {
-        openFileIntent?.let {
-            try { context.startActivity(it) } catch (_: Exception) {}
-            viewModel.consumeOpenFileIntent()
-        }
-    }
+    FileViewerHost(intent = openFileIntent, fileName = null, onConsumed = viewModel::consumeOpenFileIntent)
     LaunchedEffect(pdfPath) {
         pdfPath?.let { path ->
             onOpenPdf(path, item?.title.orEmpty())
@@ -192,7 +192,7 @@ fun TugasDetailScreen(
             // handled by the dialog below
             Box(modifier = Modifier.padding(padding).fillMaxSize())
         } else if (current == null) {
-            Box(modifier = Modifier.padding(padding).fillMaxSize())
+            LoadingState(modifier = Modifier.padding(padding).padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md))
         } else {
             Column(
                 modifier = Modifier
@@ -200,88 +200,80 @@ fun TugasDetailScreen(
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = ScreenHorizontalPadding)
-                    .padding(bottom = Spacing.xxxl),
+                    .padding(top = Spacing.md, bottom = Spacing.xxxl),
                 verticalArrangement = Arrangement.spacedBy(Spacing.xl),
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    Text(
-                        current.title.ifBlank { "Tanpa judul" },
-                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Black),
-                        color = scheme.onSurface,
-                    )
-                    val meta = listOf(current.subject_name, current.teacher_name.takeIf { it.isNotBlank() }?.let { "Guru · $it" })
-                        .filterNotNull().filter { it.isNotBlank() }
-                    if (meta.isNotEmpty()) {
-                        Text(meta.joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
-                    }
-                }
-
                 if (errorMessage.isNotBlank()) BannerError(message = errorMessage, onDismiss = { viewModel.clearError() })
                 infoMessage?.let { BannerError(message = it, onDismiss = { viewModel.consumeInfoMessage() }) }
                 fileSizeError?.let {
                     BannerError(message = it, onDismiss = { fileSizeError = null })
                 }
 
-                if (!isTeacher) {
-                    when {
-                        isFinished -> Text("Kamu sudah mengerjakan tugas", style = MaterialTheme.typography.bodyMedium, color = scheme.primary)
-                        current.is_overdue -> Text("Waktu pengumpulan tugas terlambat", style = MaterialTheme.typography.bodyMedium, color = scheme.error)
-                    }
-                }
+                TugasHeaderCard(item = current, type = type, isTeacher = isTeacher)
 
                 if (showRequirementsAndSubmit && (needRead || needUpload)) {
                     RequirementCard(needRead = needRead, needUpload = needUpload, readDone = readDone, uploadDone = uploadDone)
                 }
 
-                if (current.description.isNotBlank()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        SectionLabel("DESKRIPSI")
-                        Text(current.description, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+                DetailSection("DESKRIPSI") {
+                    if (current.description.isNotBlank()) TextCard(current.description)
+                    else EmptyNote(NO_DESCRIPTION, Icons.Rounded.Description)
+                }
+
+                DetailSection(
+                    title = "SOAL",
+                    badge = if (needRead) "Wajib dibaca" else null,
+                ) {
+                    if (current.file_name.isNotBlank()) {
+                        TugasFileCard(
+                            fileName = current.file_name,
+                            fileSize = formatFileSize(current.file_size),
+                            loading = fileLoading,
+                            readLabel = if (readDone) "Sudah dibaca ✓" else "Baca tugas",
+                            onOpen = { permissionDialogFor = Triple(current.file_path, current.file_name, true) },
+                            onDownload = { viewModel.downloadFile(current.file_path, current.file_name) },
+                        )
+                    } else {
+                        EmptyNote(NO_QUESTION_FILE, Icons.Rounded.AttachFile)
+                    }
+                    if (current.link.isNotBlank()) {
+                        LinkPreviewCard(
+                            url = current.link,
+                            loading = teacherLinkPreviewLoading,
+                            data = teacherLinkPreview,
+                            // legacy: tapping the question link opens it and counts as having read the question
+                            onClick = { if (openLink(context, current.link) && !isTeacher) viewModel.markRead() },
+                        )
+                    } else {
+                        EmptyNote(NO_QUESTION_LINK, Icons.Rounded.Link)
                     }
                 }
 
-                if (current.file_name.isNotBlank() || current.link.isNotBlank()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        SectionLabel(if (needRead) "SOAL · WAJIB DIBACA" else "SOAL")
-                        if (current.file_name.isNotBlank()) {
-                            TugasFileCard(
-                                fileName = current.file_name,
-                                fileSize = formatFileSize(current.file_size),
-                                loading = fileLoading,
-                                readLabel = if (readDone) "Sudah dibaca ✓" else "Baca tugas",
-                                onOpen = { permissionDialogFor = Triple(current.file_path, current.file_name, true) },
-                                onDownload = { viewModel.downloadFile(current.file_path, current.file_name) },
-                            )
-                        }
-                        if (current.link.isNotBlank()) {
-                            LinkPreviewCard(
-                                url = current.link,
-                                loading = teacherLinkPreviewLoading,
-                                data = teacherLinkPreview,
-                                onClick = { if (!isTeacher) viewModel.openFile(current.link, "soal", true) },
-                            )
-                        }
-                    }
-                }
-
-                if (answerFiles.isNotEmpty() || current.link_student.isNotBlank()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        SectionLabel("JAWABAN TERKUMPUL")
+                // Students who already submitted always get this section, even when nothing was attached.
+                if (answerFiles.isNotEmpty() || current.link_student.isNotBlank() || (!isTeacher && isFinished)) {
+                    DetailSection(
+                        title = "JAWABAN TERKUMPUL",
+                        badge = if (answerFiles.isNotEmpty()) "${answerFiles.size} file" else null,
+                        badgeTone = BadgeTone.Neutral,
+                    ) {
                         if (answerFiles.isNotEmpty()) {
-                            Text("${answerFiles.size} file terlampir", style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
-                        }
-                        answerFiles.forEach { file ->
-                            TugasFileCard(
-                                fileName = file.file_name,
-                                fileSize = formatFileSize(file.file_size),
-                                loading = fileLoading,
-                                readLabel = "Baca",
-                                onOpen = { permissionDialogFor = Triple(file.file_path, file.file_name, false) },
-                                onDownload = { viewModel.downloadFile(file.file_path, file.file_name) },
-                            )
+                            answerFiles.forEach { file ->
+                                TugasFileCard(
+                                    fileName = file.file_name,
+                                    fileSize = formatFileSize(file.file_size),
+                                    loading = fileLoading,
+                                    readLabel = "Baca",
+                                    onOpen = { permissionDialogFor = Triple(file.file_path, file.file_name, false) },
+                                    onDownload = { viewModel.downloadFile(file.file_path, file.file_name) },
+                                )
+                            }
+                        } else {
+                            EmptyNote(NO_ANSWER_FILE, Icons.Rounded.AttachFile)
                         }
                         if (current.link_student.isNotBlank()) {
-                            LinkPreviewCard(url = current.link_student, loading = false, data = null, onClick = {})
+                            LinkPreviewCard(url = current.link_student, loading = false, data = null, onClick = { openLink(context, current.link_student) })
+                        } else {
+                            EmptyNote(NO_ANSWER_LINK, Icons.Rounded.Link)
                         }
                     }
                 }
@@ -298,17 +290,19 @@ fun TugasDetailScreen(
                     )
                 }
 
-                if (current.explanation_file_path.isNotBlank()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        SectionLabel("PEMBAHASAN")
+                DetailSection("PEMBAHASAN") {
+                    if (current.explanation_file_path.isNotBlank()) {
+                        val explanationName = displayNameOf(current.explanation_file_path)
                         TugasFileCard(
-                            fileName = current.explanation_file_path,
+                            fileName = explanationName,
                             fileSize = "",
                             loading = fileLoading,
-                            readLabel = "baca materi",
-                            onOpen = { permissionDialogFor = Triple(current.explanation_file_path, current.title, false) },
-                            onDownload = { viewModel.downloadFile(current.explanation_file_path, current.title) },
+                            readLabel = "Baca pembahasan",
+                            onOpen = { permissionDialogFor = Triple(current.explanation_file_path, explanationName, false) },
+                            onDownload = { viewModel.downloadFile(current.explanation_file_path, explanationName) },
                         )
+                    } else {
+                        EmptyNote(NO_EXPLANATION, Icons.Rounded.Lightbulb)
                     }
                 }
             }
@@ -385,58 +379,6 @@ private fun RequirementRow(number: Int, label: String, done: Boolean) {
 }
 
 @Composable
-private fun TugasFileCard(
-    fileName: String,
-    fileSize: String,
-    loading: Boolean,
-    readLabel: String,
-    onOpen: () -> Unit,
-    onDownload: () -> Unit,
-) {
-    val scheme = MaterialTheme.colorScheme
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(scheme.surfaceContainerLowest, DiskolaExtraShapes.card)
-            .border(1.dp, scheme.outlineVariant, DiskolaExtraShapes.card)
-            .padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier.size(44.dp).background(scheme.errorContainer, DiskolaExtraShapes.iconBox),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Rounded.InsertDriveFile, contentDescription = null, tint = scheme.onErrorContainer)
-            }
-            Column(modifier = Modifier.padding(start = Spacing.md)) {
-                Text(
-                    if (fileSize.isBlank()) fileName else "$fileName | $fileSize",
-                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                    color = scheme.onSurface,
-                )
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            AppButton(
-                text = readLabel,
-                onClick = onOpen,
-                loading = loading,
-                leadingIcon = { Icon(Icons.Rounded.Visibility, contentDescription = null) },
-                modifier = Modifier.weight(1f),
-            )
-            AppButton(
-                text = "Download",
-                onClick = onDownload,
-                variant = ButtonVariant.Outlined,
-                leadingIcon = { Icon(Icons.Rounded.Download, contentDescription = null) },
-                modifier = Modifier.weight(1f),
-            )
-        }
-    }
-}
-
-@Composable
 private fun KumpulkanJawabanSection(
     selectedFiles: List<SelectedAnswerFile>,
     studentLink: String,
@@ -447,6 +389,7 @@ private fun KumpulkanJawabanSection(
     onLinkChanged: (String) -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
+    val context = LocalContext.current
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         SectionLabel("KUMPULKAN JAWABAN · WAJIB")
         Text(
@@ -498,7 +441,7 @@ private fun KumpulkanJawabanSection(
             placeholder = "https://",
         )
         if (studentLink.isNotBlank()) {
-            LinkPreviewCard(url = studentLink, loading = linkPreviewLoading, data = linkPreview, onClick = {})
+            LinkPreviewCard(url = studentLink, loading = linkPreviewLoading, data = linkPreview, onClick = { openLink(context, studentLink) })
         }
     }
 }

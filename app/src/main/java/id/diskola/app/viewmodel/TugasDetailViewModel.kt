@@ -238,6 +238,9 @@ class TugasDetailViewModel @Inject constructor(
         }
     }
 
+    /** The question link was opened: that counts as reading the question (legacy `downloded` requirement). */
+    fun markRead() { _readDone.value = true }
+
     fun consumeOpenFileIntent() { _openFileIntent.value = null }
     fun consumePdfPath() { _pdfPath.value = null }
     fun consumeInfoMessage() { _infoMessage.value = null }

@@ -5,6 +5,7 @@ import id.diskola.app.dataclass.ResponData.AkmExamData
 import id.diskola.app.dataclass.ResponData.AkmInstructionData
 import id.diskola.app.dataclass.ResponData.AkmQuestionData
 import id.diskola.app.dataclass.ResponData.AkmScheduleData
+import id.diskola.app.utils.AkmRules
 import id.diskola.app.utils.resolveAssetUrl
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -19,6 +20,8 @@ enum class AkmStatus(val label: String) {
     BelumSinkron("Belum sinkron"),
     MengunduhSoal("Mengunduh soal"),
     SiapDikerjakan("Siap dikerjakan"),
+    /** Submit requested but the server has not confirmed it yet (offline queue / auto-submit pending) — legacy `FINISHED`. */
+    ProsesUpload("Proses upload jawaban"),
     SudahDikumpulkan("Sudah dikumpulkan"),
     MenungguPenilaian("Menunggu penilaian"),
     SudahDinilai("Sudah dinilai"),
@@ -35,21 +38,24 @@ data class AkmItem(
     val endDay: Int,
     val questionCount: Int,
     val needsPassword: Boolean,
+    /** The server says this student already passed the password dialog (`password_checked`); the device's own record and the session marker refine it. */
+    val passwordChecked: Boolean = false,
     /** First non-blank `exams[].assessment_category`, shown as the "Kategori" participant row. */
     val category: String,
     /** First non-blank `exams[].assessment_period`, shown as the "Periode" participant row. */
     val period: String,
-    /** Epoch millis of `date`+`startAt` — a proctor "opening" a session isn't a real field; the
+    /** Epoch millis of `date`+`startAt`, null when the server sent none — a proctor "opening" a session isn't a real field; the
      * legacy app itself gates "Mulai" on `Date() > date_start`, so we do the same. */
-    val startAtMillis: Long,
-    /** Epoch millis of `date`+`endAt` — once passed, the schedule stops being an active exam to
-     * join (it moves to the Nilai tab instead, driven by the scored endpoint). */
-    val endAtMillis: Long,
+    val startAtMillis: Long?,
+    /** Epoch millis of `date`+`endAt`, null when unreadable (then nothing is auto-submitted on a guess, see `AkmRules.deadlineAction`). */
+    val endAtMillis: Long?,
     val showScore: Boolean,
     val hasExplain: Boolean?,
+    /** The "Dibatalkan" mark: label on the card, status row + stamp on the detail (doc 06 §4.4). Visual only. */
+    val watermark: AkmRules.AkmWatermark = AkmRules.AkmWatermark.None,
 ) {
-    fun hasStarted(now: Long = System.currentTimeMillis()) = now >= startAtMillis
-    fun hasEnded(now: Long = System.currentTimeMillis()) = now >= endAtMillis
+    fun hasStarted(now: Long = System.currentTimeMillis()) = startAtMillis?.let { now >= it } ?: true
+    fun hasEnded(now: Long = System.currentTimeMillis()) = AkmRules.isTimeUp(now, endAtMillis)
 }
 
 data class AkmScoreItem(
@@ -59,6 +65,12 @@ data class AkmScoreItem(
     val score: Int,
     val status: AkmStatus,
     val hasExplanation: Boolean,
+    /** The server's own `status` text ("Tidak Mengerjakan", "Sesi Terlewat", …): decides whether a re-upload is offered. */
+    val scoreStatus: String = "",
+    /** Same rows as the detail screen's participant table (doc 06 §14: "info seperti detail"). */
+    val category: String = "",
+    val period: String = "",
+    val watermark: AkmRules.AkmWatermark = AkmRules.AkmWatermark.None,
 )
 
 data class AkmInstruction(
@@ -84,7 +96,6 @@ enum class QuestionType(val label: String) {
     TabelPernyataan("Tabel pernyataan"),
     /** `PAIR` — text or image variant, see [AkmQuestion.pairIsImage]. */
     Menjodohkan("Menjodohkan"),
-    TidakDidukung("Tipe soal belum didukung"),
 }
 
 data class AkmOption(val id: Int, val text: String, val imageUrl: String, val isTrue: Boolean)
@@ -129,18 +140,18 @@ data class AkmQuestion(
 
 data class AkmSubtestScore(val label: String, val score: Int)
 
-private val API_DATE_FORMAT = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale("id", "ID"))
-private val DAY_MONTH_YEAR_TIME = SimpleDateFormat("d MMM yyyy · HH.mm", Locale("id", "ID"))
+// SimpleDateFormat is not thread-safe and caches the time zone it was created in: build one per use.
+private fun dateFormat(pattern: String) = SimpleDateFormat(pattern, Locale("id", "ID"))
 
 /** Ported from `OnKlasDbUtil.processAkmResponse()` — same field derivation as the legacy AkmTable. */
-fun AkmScheduleData.toAkmItem(): AkmItem {
+fun AkmScheduleData.toAkmItem(known: AkmRules.AkmWatermark? = null): AkmItem {
     val examList = exams ?: listOfNotNull(exam)
     val name = examList.distinctBy { it.name }.joinToString(", ") { it.name }.ifBlank { "Asesmen" }
     val questionCount = examList.sumOf { it.numberOfQuestions }
-    val startMillis = runCatching { API_DATE_FORMAT.parse("$date $startAt")?.time }.getOrNull() ?: 0L
-    val endMillis = runCatching { API_DATE_FORMAT.parse("$date $endAt")?.time }.getOrNull() ?: startMillis
-    val endLabel = runCatching { DAY_MONTH_YEAR_TIME.format(endMillis) }.getOrDefault("$date $endAt")
-    val endDay = runCatching { SimpleDateFormat("d", Locale("id", "ID")).format(startMillis).toInt() }.getOrDefault(0)
+    val startMillis = AkmRules.parseDateTime(date, startAt)
+    val endMillis = AkmRules.parseDateTime(date, endAt)
+    val endLabel = endMillis?.let { runCatching { dateFormat("d MMM yyyy · HH.mm").format(it) }.getOrNull() } ?: "$date $endAt".trim()
+    val endDay = (startMillis ?: endMillis)?.let { runCatching { dateFormat("d").format(it).toInt() }.getOrNull() } ?: 0
 
     return AkmItem(
         id = id,
@@ -149,6 +160,7 @@ fun AkmScheduleData.toAkmItem(): AkmItem {
         endDay = endDay,
         questionCount = questionCount,
         needsPassword = requires_password,
+        passwordChecked = password_checked,
         // Docs (`asesmen-akm-daftar-detail-nilai.md:224-225`): first exam carrying a non-blank
         // value wins. The legacy fallback to a previously cached value has no equivalent here —
         // there is no Room cache — so a blank stays blank and renders as "-".
@@ -157,15 +169,16 @@ fun AkmScheduleData.toAkmItem(): AkmItem {
         startAtMillis = startMillis,
         endAtMillis = endMillis,
         showScore = show_score,
-        hasExplain = has_explain,
+        hasExplain = hasExplanation,
+        watermark = AkmRules.watermark(watermark_bool, watermark_label, known),
     )
 }
 
-fun AkmScheduleData.toAkmScoreItem(status: AkmStatus): AkmScoreItem {
+fun AkmScheduleData.toAkmScoreItem(status: AkmStatus, known: AkmRules.AkmWatermark? = null): AkmScoreItem {
     val examList = exams ?: listOfNotNull(exam)
     val name = examList.distinctBy { it.name }.joinToString(", ") { it.name }.ifBlank { "Asesmen" }
-    val dateMillis = runCatching { API_DATE_FORMAT.parse("$date $endAt")?.time }.getOrNull()
-    val dateLabel = dateMillis?.let { runCatching { SimpleDateFormat("d MMM yyyy", Locale("id", "ID")).format(it) }.getOrNull() } ?: date
+    val dateMillis = AkmRules.parseDateTime(date, endAt)
+    val dateLabel = dateMillis?.let { runCatching { dateFormat("d MMM yyyy").format(it) }.getOrNull() } ?: date
     val score = (exam_score?.takeIf { it >= 0 } ?: examList.firstOrNull()?.score ?: 0.0).toInt()
 
     return AkmScoreItem(
@@ -174,7 +187,11 @@ fun AkmScheduleData.toAkmScoreItem(status: AkmStatus): AkmScoreItem {
         dateLabel = dateLabel,
         score = score,
         status = status,
-        hasExplanation = has_explain == true,
+        hasExplanation = hasExplanation == true,
+        scoreStatus = this@toAkmScoreItem.status,
+        category = examList.firstOrNull { it.assessment_category.isNotBlank() }?.assessment_category.orEmpty(),
+        period = examList.firstOrNull { it.assessment_period.isNotBlank() }?.assessment_period.orEmpty(),
+        watermark = AkmRules.watermark(watermark_bool, watermark_label, known),
     )
 }
 
@@ -206,26 +223,24 @@ fun AkmInstructionData.toAkmInstruction(answeredQuestionIds: Set<Int>): AkmInstr
 fun AkmQuestionData.toQuestionType(): QuestionType = when (answerType) {
     "MULTIPLE CHOICE" -> QuestionType.PilihanGanda
     "STATEMENT" -> when {
-        answers.size == 1 -> QuestionType.BenarSalah
+        // doc 06 §4.3: the table flag decides first — a one-row table is still a table, not a single Benar/Salah.
         answers.firstOrNull()?.showFalse == true -> QuestionType.TabelPernyataan
+        answers.size == 1 -> QuestionType.BenarSalah
         else -> QuestionType.MultiJawaban
     }
-    "ESSAY", "SHORT_ESSAY_NUM", "SHORT_ESSAY_WORD" -> QuestionType.EsaiSingkat
     "PAIR" -> QuestionType.Menjodohkan
-    else -> QuestionType.TidakDidukung
+    // ESSAY, SHORT_ESSAY_NUM, SHORT_ESSAY_WORD and any type this version does not know: legacy renders them as an essay box,
+    // so the student can still answer and the "Kumpulkan" button is never blocked by one unsupported question.
+    else -> QuestionType.EsaiSingkat
 }
 
 /**
- * [answerOrder] is the (possibly shuffled) list of answer ids in display order — when the
- * instruction is random (`docs/repo lama/asesmen/asesmen-teknis-download-storage.md` §2.4/§2.7),
- * the same order MUST be used again when building the submit payload
- * ([buildAnswerPayload]/[buildStatementAnswer]), since both work off "index into the displayed
- * options" — a mismatch there would submit the wrong answer for whatever the student actually
- * picked on screen.
+ * Options keep the order stored in the downloaded package: an `isRandom` instruction is shuffled once by `AkmDownloadWorker` and
+ * persisted, so the order shown is the order stored and nothing here reshuffles it.
  */
-fun AkmQuestionData.toAkmQuestion(instructionId: Int, answerOrder: List<Int>? = null): AkmQuestion {
+fun AkmQuestionData.toAkmQuestion(instructionId: Int): AkmQuestion {
     val type = toQuestionType()
-    val orderedAnswers = answerOrder?.let { order -> order.mapNotNull { id -> answers.find { it.id == id } } } ?: answers
+    val orderedAnswers = answers
     val options = when (type) {
         QuestionType.BenarSalah -> listOf(
             AkmOption(id = orderedAnswers.getOrNull(0)?.id ?: 0, text = "Benar", imageUrl = "", isTrue = orderedAnswers.getOrNull(0)?.isTrue == true),
@@ -265,89 +280,25 @@ fun AkmQuestionData.toAkmQuestion(instructionId: Int, answerOrder: List<Int>? = 
 }
 
 /**
- * Builds the `List<Map>` submit payload exactly per `AkmAnswerPayload.kt` in the legacy app.
- * [answerOrderFor] must return the SAME per-question shuffle order used to render the options the
- * student actually saw and picked from (see [toAkmQuestion]) — otherwise a selected index maps back
- * to the wrong answer row.
+ * An answer to one question, keyed by **answer ids** (not by position on screen) so it stays valid whatever order the options are
+ * drawn in and survives a restart — it is what `akm_answer` persists ([AkmAnswerCodec]).
  */
-fun buildAnswerPayload(
-    instructions: List<AkmInstructionData>,
-    answers: Map<Int, AkmPlayerAnswer>,
-    answerOrderFor: (Int) -> List<Int>? = { null },
-): List<Map<String, Any?>> = instructions.flatMap { instruction ->
-    instruction.questions.mapNotNull { q ->
-        val answer = answers[q.id] ?: return@mapNotNull null
-        val orderedAnswers = answerOrderFor(q.id)?.let { order -> order.mapNotNull { id -> q.answers.find { it.id == id } } } ?: q.answers
-        val value: Any? = when (q.answerType) {
-            "MULTIPLE CHOICE" -> (answer as? AkmPlayerAnswer.Choice)?.let { orderedAnswers.getOrNull(it.index)?.id } ?: 0
-            "STATEMENT" -> buildStatementAnswer(orderedAnswers, answer)
-            "PAIR" -> buildPairAnswer(orderedAnswers, answer as? AkmPlayerAnswer.PairAnswer)
-            else -> (answer as? AkmPlayerAnswer.Essay)?.text.orEmpty()
-        }
-        mapOf(
-            "instruction_id" to instruction.id,
-            "question_id" to q.id,
-            "answerType" to q.answerType,
-            "answer" to value,
-        )
-    }
-}
-
-private fun buildStatementAnswer(rows: List<AkmAnswerData>, answer: AkmPlayerAnswer): List<Map<String, Any?>> {
-    // Tabel Pernyataan tracks each row's own Benar/Salah pick by row id (independent per row),
-    // unlike BenarSalah/MultiJawaban's shared "which display index is selected" model below.
-    if (answer is AkmPlayerAnswer.TableAnswer) {
-        return rows.map { row ->
-            mapOf("id" to row.id, "isTrue" to if (row.isTrue) 1 else 0, "answered" to if (answer.rows[row.id] == true) 1 else 0)
-        }
-    }
-    val selectedIndices = when (answer) {
-        is AkmPlayerAnswer.Choice -> setOf(answer.index)
-        is AkmPlayerAnswer.MultiChoice -> answer.indices
-        else -> emptySet()
-    }
-    return rows.mapIndexed { index, row ->
-        // BenarSalah stores its "Benar"/"Salah" toggle as index 0/1 over the single real row —
-        // both options point at the same row id, so `answered` is what actually carries the pick.
-        val isSelected = if (rows.size == 1) selectedIndices.contains(0) else index in selectedIndices
-        mapOf("id" to row.id, "isTrue" to if (row.isTrue) 1 else 0, "answered" to if (isSelected) 1 else 0)
-    }
-}
-
-/** Recovers the owner id from a swapped `second_file_path` filename, exactly like the legacy
- * `AkmAnswerPayload.normalizedPairAnswers()` (`AkmAnswerPayload.kt:79-115`) — image-pairing's
- * `selected_id` can drift from what's actually displayed after repeated drag swaps, so the
- * filename (pattern `a{soal}_{idGambar}_2.jpg`) is treated as the source of truth on submit. */
-private val pairImageSecondPathOwnerRegex = Regex("""a\d+_(\d+)_2\.jpg$""")
-
-/**
- * Legacy only applies the filename-normalization for the image-pairing type
- * (`if (question.type != ANSWER_PAIRING_IMAGE) return pairAnswers`, `AkmAnswerPayload.kt:85`).
- * We skip that explicit type check: text-pairing rows never carry a `second_file_path` (it stays
- * blank), the regex simply never matches a blank string, and [selectedId] is used as-is — same
- * end result without threading an extra flag through.
- */
-private fun buildPairAnswer(rows: List<AkmAnswerData>, answer: AkmPlayerAnswer.PairAnswer?): List<Map<String, Any?>> =
-    rows.map { row ->
-        val selectedId = answer?.arrangement?.get(row.id) ?: row.selected_id
-        val currentSecondFilePath = answer?.secondFilePaths?.get(row.id) ?: row.secondFilePath
-        val ownerIdFromPath = pairImageSecondPathOwnerRegex.find(currentSecondFilePath)?.groupValues?.getOrNull(1)?.toIntOrNull()
-        val finalSelectedId = if (ownerIdFromPath != null && ownerIdFromPath > 0) ownerIdFromPath else selectedId
-        mapOf("id" to row.id, "answered" to finalSelectedId)
-    }
-
-/** An answer to one question — the shape depends on the question type. Kept separate from the
- * `AkmAnswer` sealed interface name already used elsewhere so payload-building stays unambiguous. */
 sealed interface AkmPlayerAnswer {
-    data class Choice(val index: Int) : AkmPlayerAnswer
-    data class MultiChoice(val indices: Set<Int>) : AkmPlayerAnswer
+    /** Pilihan ganda: the chosen option's answer id. */
+    data class Choice(val answerId: Int) : AkmPlayerAnswer
+
+    /** Benar/Salah over the single statement row: [isTrue] = "Benar" was picked. */
+    data class TrueFalse(val isTrue: Boolean) : AkmPlayerAnswer
+
+    /** Pilihan ganda multi jawaban: the ticked options' answer ids. */
+    data class MultiChoice(val answerIds: Set<Int>) : AkmPlayerAnswer
+
+    /** Esai / isian — an empty text still counts as answered, like legacy (`QuestionEssayVh`, doc 06 §7.1). */
     data class Essay(val text: String) : AkmPlayerAnswer
-    /** Tabel Pernyataan — row id -> Benar(true)/Salah(false). Only rows the student has actually
-     * toggled are present; untouched rows fall back to "Salah"/unanswered at payload time. */
+
+    /** Tabel pernyataan: row id -> Benar (true) / Salah (false); only rows the student touched. */
     data class TableAnswer(val rows: Map<Int, Boolean>) : AkmPlayerAnswer
-    /** Menjodohkan — row id -> current `selected_id` after 0+ swaps, snapshotting ALL rows every
-     * time (not just the swapped pair), so payload-building never falls back to a stale default.
-     * [secondFilePaths] mirrors the same row ids -> the row's current (possibly swapped)
-     * `second_file_path`, needed only for the image variant's filename-based normalization. */
-    data class PairAnswer(val arrangement: Map<Int, Int>, val secondFilePaths: Map<Int, String> = emptyMap()) : AkmPlayerAnswer
+
+    /** Menjodohkan: row id -> `selected_id` of the item currently paired with it, for **every** row. */
+    data class PairAnswer(val arrangement: Map<Int, Int>) : AkmPlayerAnswer
 }

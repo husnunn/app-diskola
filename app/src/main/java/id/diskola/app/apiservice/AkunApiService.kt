@@ -1,5 +1,8 @@
 package id.diskola.app.apiservice
 
+import id.diskola.app.dataclass.ResponData.ActionMessageResponse
+import id.diskola.app.dataclass.ResponData.ChangePasswordRequest
+import id.diskola.app.dataclass.ResponData.UpdateProfileRequest
 import okhttp3.MultipartBody
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -10,7 +13,10 @@ import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-/** Placeholder scaffolding: request/response shapes not yet defined, no UI consumer yet. */
+/**
+ * Typed so far: `updateProfile` and `changePassword` (the e-mail / default-password dialogs in front of wallet activation). The rest
+ * is placeholder scaffolding for the Akun phase.
+ */
 interface AkunApiService {
 
     @GET("mobile/app/accounts/user/{userId}")
@@ -53,14 +59,14 @@ interface AkunApiService {
     @PUT("mobile/app/accounts/user/{userUuid}/change-profile")
     suspend fun updateProfile(
         @Path("userUuid") userUuid: String,
-        @Body request: Map<String, Any>
-    ): Map<String, Any>
+        @Body request: UpdateProfileRequest
+    ): ActionMessageResponse
 
     @PUT("mobile/app/accounts/user/{userUuid}/change-password")
     suspend fun changePassword(
         @Path("userUuid") userUuid: String,
-        @Body request: Map<String, Any>
-    ): Map<String, Any>
+        @Body request: ChangePasswordRequest
+    ): ActionMessageResponse
 
     @GET("mobile/app/accounts/user/shipping-address")
     suspend fun getShippingAddress(): Map<String, Any>

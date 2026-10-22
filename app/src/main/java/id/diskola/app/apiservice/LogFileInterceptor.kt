@@ -1,5 +1,6 @@
 package id.diskola.app.apiservice
 
+import id.diskola.app.utils.LogRedactor
 import id.diskola.app.utils.Utils
 import id.diskola.app.di.module.LogFile
 import okhttp3.Interceptor
@@ -27,7 +28,7 @@ class LogFileInterceptor @Inject constructor(private val utils: Utils) : Interce
             utils.logFile(buildString {
                 append("requesting: [${request.method}] ${request.url}\n")
                 request.headers.forEach {
-                    append("${it.first}: ${it.second}\n")
+                    if (!LogRedactor.isSensitiveHeader(it.first)) append("${it.first}: ${it.second}\n")
                 }
 
                 val requestBody = request.body
@@ -45,7 +46,7 @@ class LogFileInterceptor @Inject constructor(private val utils: Utils) : Interce
                         append("--> END ${request.method} (${requestBody.contentLength()}-byte body)")
                     }
                 }
-            }.also { Timber.e("request data: $it") })
+            }.let(LogRedactor::redact).also { Timber.e("request data: $it") })
 
             utils.logFile(buildString {
                 append("response: [$responseCode - ${response.request.method}] ${response.request.url}\n")
@@ -53,7 +54,7 @@ class LogFileInterceptor @Inject constructor(private val utils: Utils) : Interce
                     responseBody?.source()?.also { it.request(Long.MAX_VALUE) }?.buffer?.clone()
                         ?.readString(Charset.forName("UTF-8"))
                 )
-            })
+            }.let(LogRedactor::redact))
         }
 
         return response

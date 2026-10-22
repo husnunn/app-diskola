@@ -11,11 +11,13 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import id.diskola.app.apiservice.AgendaApiService
+import id.diskola.app.apiservice.AkunApiService
 import id.diskola.app.apiservice.AsesmenApiService
 import id.diskola.app.apiservice.AuthApiService
 import id.diskola.app.apiservice.CommonApiService
 import id.diskola.app.apiservice.JurnalApiService
 import id.diskola.app.apiservice.KlaspayApiService
+import id.diskola.app.apiservice.NotifikasiApiService
 import id.diskola.app.apiservice.KonselingApiService
 import id.diskola.app.apiservice.LogFileInterceptor
 import id.diskola.app.apiservice.MateriApiService
@@ -24,6 +26,7 @@ import id.diskola.app.apiservice.RequestInterceptor
 import id.diskola.app.apiservice.ResponseInterceptor
 import id.diskola.app.apiservice.TugasApiService
 import id.diskola.app.BuildConfig
+import id.diskola.app.utils.LogRedactor
 import okhttp3.Cache
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
@@ -99,6 +102,18 @@ object ApiModule {
     @Provides
     @Singleton
     @JvmStatic
+    fun provideAkunApiService(retrofit: Retrofit): AkunApiService =
+        retrofit.create(AkunApiService::class.java)
+
+    @Provides
+    @Singleton
+    @JvmStatic
+    fun provideNotifikasiApiService(retrofit: Retrofit): NotifikasiApiService =
+        retrofit.create(NotifikasiApiService::class.java)
+
+    @Provides
+    @Singleton
+    @JvmStatic
     fun provideKonselingApiService(retrofit: Retrofit): KonselingApiService =
         retrofit.create(KonselingApiService::class.java)
 
@@ -152,9 +167,13 @@ object ApiModule {
     @JvmStatic
     fun provideHttpLoggingInterceptor(): HttpLoggingInterceptor =
         HttpLoggingInterceptor { message ->
-            Timber.tag("API_REQUEST").e(message)
+            Timber.tag("API_REQUEST").e(LogRedactor.redact(message))
         }.apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            redactHeader("Authorization")
+            redactHeader("Cookie")
+            redactHeader("Set-Cookie")
+            // Bodies carry PINs and tokens: only a debug build may log them (and even then the values are masked).
+            level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
         }
 
     @Provides

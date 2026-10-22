@@ -37,6 +37,12 @@ class SessionStore @Inject constructor(
     val isEmailVerified: Boolean get() = preference.getBoolean(SessionKeys.IS_EMAIL_VERIFIED)
     val defaultPass: Boolean get() = preference.getBoolean(SessionKeys.DEFAULT_PASS)
     val klaspayActive: Boolean get() = preference.getBoolean(SessionKeys.KLASPAY_ACTIVE)
+    val isEmailVerifying: Boolean get() = preference.getBoolean(SessionKeys.IS_EMAIL_VERIFYING)
+    val isToppers: Boolean get() = preference.getBoolean(SessionKeys.IS_TOPPERS)
+    val toppersStatus: String get() = preference.getString(SessionKeys.TOPPERS_STATUS)
+
+    /** `wallet_id` of the signed-in wallet (legacy pref `klaspay_id`) — what "unregister toppers" sends as `user_id`. */
+    val klaspayId: String get() = preference.getString(SessionKeys.KLASPAY_ID)
     val userId: Int get() = preference.getInt(SessionKeys.USER_ID)
     val userUuid: String get() = preference.getString(SessionKeys.USER_UUID)
     val fcmToken: String get() = preference.getString(SessionKeys.FCM_TOKEN)
@@ -70,7 +76,7 @@ class SessionStore @Inject constructor(
 
         // When the response carries no `school`, `selectedSchool` has no coordinates — never let that
         // overwrite the stored ones (Presensi's radius check reads them).
-        val schoolToStore = response.data?.school?.toSession()
+        val schoolToStore = response.data?.school?.toSession()?.keepingCityFrom(school)
             ?: selectedSchool.toSession().keepingGeoFrom(school)
         writeJson(SessionKeys.SCHOOL_JSON, schoolAdapter, schoolToStore)
 
@@ -316,6 +322,36 @@ class SessionStore @Inject constructor(
             preference.putBoolean(SessionKeys.IS_ACTIVE, true)
         }
     }
+
+    /**
+     * `payment/wallet` answered with a wallet: it exists, so the gate opens, and the toppers flags + wallet id are stored. Written
+     * only after the response (legacy read `klaspay_id` before the response had landed and could keep it empty).
+     */
+    fun writeWallet(walletId: String, isToppers: Boolean, toppersStatus: String) {
+        preference.putBoolean(SessionKeys.KLASPAY_ACTIVE, true)
+        preference.putBoolean(SessionKeys.IS_TOPPERS, isToppers)
+        preference.putString(SessionKeys.TOPPERS_STATUS, toppersStatus)
+        if (walletId.isNotBlank()) preference.putString(SessionKeys.KLASPAY_ID, walletId)
+    }
+
+    /** The verification mail went out (`mobile/email/verify` succeeded). */
+    fun markEmailVerifying() {
+        preference.putBoolean(SessionKeys.IS_EMAIL_VERIFYING, true)
+    }
+
+    /** The default password has been replaced. */
+    fun markPasswordChanged() {
+        preference.putBoolean(SessionKeys.DEFAULT_PASS, false)
+    }
+
+    /** The account's contact details after a successful `change-profile`. */
+    fun writeUserContact(email: String, phone: String, username: String) {
+        writeJson(SessionKeys.USER_JSON, userAdapter, user.copy(email = email, phone = phone, username = username))
+    }
+
+    /** A response without `city_name` must not blank the city that is already stored for the same school. */
+    private fun SessionSchool.keepingCityFrom(stored: SessionSchool): SessionSchool =
+        if (stored.uuid == uuid && cityName.isBlank()) copy(cityName = stored.cityName) else this
 
     private fun SessionSchool.keepingGeoFrom(stored: SessionSchool): SessionSchool =
         if (stored.uuid == uuid && coordinateLatitude == 0.0 && coordinateLongitude == 0.0) {

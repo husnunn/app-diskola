@@ -10,6 +10,7 @@ import id.diskola.app.utils.session.SessionEvent
 import id.diskola.app.utils.session.SessionEvents
 import id.diskola.app.utils.session.SessionKeys
 import okhttp3.Interceptor
+import okhttp3.MediaType
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import timber.log.Timber
@@ -61,17 +62,13 @@ class ResponseInterceptor @Inject constructor(
         // with U+FFFD, and reconstructing the body from that string afterwards re-encodes those
         // replacement characters — irreversibly corrupting the payload (confirmed live: a
         // downloaded question image's JPEG header `FF D8 FF E0` came back as repeated `EF BF BD`,
-        // U+FFFD's UTF-8 encoding). Detect this by content-type's top-level type rather than
-        // assuming everything is JSON; unknown/missing content-type falls through to the existing
-        // JSON-parsing path unchanged, since every real API endpoint here does set one.
-        val topLevelType = responseBody?.contentType()?.type
-        val isBinary = topLevelType == "image" || topLevelType == "video" || topLevelType == "audio" ||
-            responseBody?.contentType()?.subtype?.contains("octet-stream", ignoreCase = true) == true
-        if (isBinary) {
-            if ((responseCode / 100) == 2) return response
-            responseBody?.close()
-            throw ApiException(defaultErrorMsg, responseCode)
-        }
+        // U+FFFD's UTF-8 encoding; a task's PDF did the same and rendered as blank pages).
+        // Only JSON/text/XML are read as text ([isBinaryBody]); every other explicit content type —
+        // `application/pdf`, Office files, archives, images, media — is passed through untouched.
+        // A missing content-type falls through to the JSON-parsing path unchanged, since every real
+        // API endpoint here does set one. Error bodies (non-2xx) are small, so they always take the
+        // text path and keep their server message.
+        if (isBinaryBody(responseBody?.contentType()) && (responseCode / 100) == 2) return response
 
         return try {
             val content = responseBody?.source()?.apply { request(Long.MAX_VALUE) }?.buffer?.clone()
@@ -242,3 +239,19 @@ class ApiException(
 //        }
 //    }
 //}
+
+/**
+ * True when a body must reach the caller byte-for-byte instead of being read as UTF-8 text.
+ * Text is limited to what the API actually answers with (JSON) plus plain text/XML/form bodies; any other
+ * explicit content type is binary. `null` (no content-type) is not binary — it keeps the JSON path.
+ */
+internal fun isBinaryBody(contentType: MediaType?): Boolean {
+    contentType ?: return false
+    val type = contentType.type.lowercase()
+    val subtype = contentType.subtype.lowercase()
+    val textual = type == "text" ||
+        subtype == "json" || subtype.endsWith("+json") ||
+        subtype == "xml" || subtype.endsWith("+xml") ||
+        subtype == "x-www-form-urlencoded" || subtype == "javascript"
+    return !textual
+}

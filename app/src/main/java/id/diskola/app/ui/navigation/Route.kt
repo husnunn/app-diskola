@@ -23,7 +23,7 @@ sealed interface Route {
     @Serializable
     data object AuthGraph : Route
 
-    /** Auth sub-graph — wrapped once by `AuthScaffold`'s ambient-gradient background. All state
+    /** Auth sub-graph — each screen is framed by `SystemBarsFrame` (status/navigation bar + keyboard safe area) in `AppNavHost`. All state
      * (selected school, check-account result, SSO response) lives in the `LoginViewModel`/
      * `SsoViewModel` scoped to this graph's own back-stack entry, not in route arguments — the
      * legacy `LoginForm`/`LoginProcess`/`LoginSso` fragments shared one Activity-scoped ViewModel
@@ -44,14 +44,28 @@ sealed interface Route {
         @Serializable
         data class ResetPasswordSent(val email: String = "") : Auth
 
-        /** `isSso=true` skips the password step (doc §6) and shows the "Aktivasi Pin Wallet" alert. */
+        /**
+         * `isSso=true` skips the password step (doc §6) and shows the "Aktivasi Pin Wallet" alert. [returnToMain] = opened from
+         * the Pembelajaran bell: finishing goes back to where it came from instead of starting Main again.
+         */
         @Serializable
-        data class KlaspayActivation(val isSso: Boolean = false) : Auth
+        data class KlaspayActivation(val isSso: Boolean = false, val returnToMain: Boolean = false) : Auth
     }
 
     /** Host for the bottom-nav shell (Pembelajaran/Pembayaran/Akun) + pushed detail routes. */
     @Serializable
     data object Main : Route
+
+    /**
+     * "Atur Pin Baru" after "Lupa pin?" — [token] is the `reset_token` the server just returned for a verified e-mail, so it is not
+     * checked again. Outside the shell like [SetPinLink] so both share one screen and the framing for the system bars.
+     */
+    @Serializable
+    data class SetPin(val token: String) : Route
+
+    /** "Atur Pin Baru" opened from the mailed link `https://(dev.)api.diskola.id/api/payment/reset-pin/token/<token>`; the token is validated first. */
+    @Serializable
+    data class SetPinLink(val token: String) : Route
 
     /** Fase 2 — 3-tab shell (replaces the old Dashboard/Materi/Absensi/Profile 4-tab shell). */
     sealed interface MainTab : Route {
@@ -88,9 +102,9 @@ sealed interface Route {
     @Serializable
     data object IzinAdd : Route
 
-    /** Jurnal KBM list. [action] "hadiri"/"isi" + [attendanceId]/[plotId] come from the Hub card and open that row's flow once loaded. */
+    /** Jurnal KBM list. */
     @Serializable
-    data class Jurnal(val action: String = "", val attendanceId: Int = 0, val plotId: Int = 0) : Route
+    data object Jurnal : Route
 
     /** Student "Verifikasi Jurnal" (map + radius + status). */
     @Serializable
@@ -192,7 +206,7 @@ sealed interface Route {
     @Serializable
     data class AgendaDetail(val date: String = "", val agendaId: Int = 0) : Route
 
-    /** Asesmen/AKM, pushed from Home's "Asesmen" tile. Students only. UI-only — no backend yet. */
+    /** Asesmen/AKM (school exams), pushed from Home's "Asesmen" tile. Students only. */
     sealed interface Akm : Route {
         @Serializable
         data object List : Akm
@@ -200,12 +214,18 @@ sealed interface Route {
         @Serializable
         data class Detail(val id: Int = 0) : Akm
 
+        /** "Sebelum Memulai Ujian": between the start gates (password, terms, online check) and the session; "Mulai Ujian" opens the session. */
+        @Serializable
+        data class Priming(val id: Int = 0) : Akm
+
         /** Exam lobby — the instruction tree, shown in exam mode. */
         @Serializable
         data class Resume(val id: Int = 0) : Akm
 
+        /** One instruction of exam [id]; [number] is the 1-based question to open on. Everything else is read from Room, so this
+         * route alone restores the screen after the process was killed. */
         @Serializable
-        data class Question(val id: Int = 0) : Akm
+        data class Question(val id: Int = 0, val instructionId: Int = 0, val number: Int = 1) : Akm
 
         @Serializable
         data class Score(val id: Int = 0) : Akm
@@ -242,8 +262,18 @@ sealed interface Route {
         data object About : AkunSub
     }
 
-    /** Klaspay/Pembayaran subscreens, pushed from the Pembayaran tab. UI-only — no backend yet. */
+    /**
+     * Klaspay/Pembayaran subscreens, pushed from the Pembayaran tab. Except [ConfirmPin] they are UI-only dummy-data screens no longer
+     * reachable from the hub; each payment sub-phase replaces its own and the rest go in the last one.
+     */
     sealed interface PembayaranSub : Route {
+        /**
+         * The PIN prompt. The PIN goes back to the asking screen through `PinResultChannel` under [requestKey] — never as a route
+         * argument. [forPayment] only changes the button label ("Bayar Sekarang" instead of "Konfirmasi").
+         */
+        @Serializable
+        data class ConfirmPin(val requestKey: String, val channelName: String = "", val forPayment: Boolean = false) : PembayaranSub
+
         @Serializable
         data object TopUp : PembayaranSub
 

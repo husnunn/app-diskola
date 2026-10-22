@@ -23,8 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Assignment
 import androidx.compose.material.icons.rounded.EventBusy
 import androidx.compose.material.icons.rounded.Key
-import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.LockOpen
+import android.widget.Toast
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -49,16 +48,20 @@ import id.diskola.app.dataclass.akm.AkmScoreItem
 import id.diskola.app.dataclass.akm.AkmStatus
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppDialog
+import id.diskola.app.ui.components.BannerError
 import id.diskola.app.ui.components.AutoTimeGate
 import id.diskola.app.ui.components.ButtonVariant
 import id.diskola.app.ui.components.DetailScaffold
 import id.diskola.app.ui.components.EmptyState
 import id.diskola.app.ui.components.LoadingState
 import id.diskola.app.ui.components.UnderlineTabRow
+import id.diskola.app.ui.components.WatermarkLabel
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
-import id.diskola.app.viewmodel.AkmViewModel
+import id.diskola.app.utils.AkmRules
+import id.diskola.app.viewmodel.AkmListViewModel
+import id.diskola.app.viewmodel.ReuploadResult
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -66,6 +69,7 @@ import kotlinx.coroutines.delay
 
 private sealed interface ReuploadDialog {
     data class Confirm(val id: Int) : ReuploadDialog
+    data class Cooldown(val seconds: Int) : ReuploadDialog
     data object NotFound : ReuploadDialog
 }
 
@@ -82,14 +86,16 @@ fun AkmScreen(
     onOpenScore: (Int) -> Unit,
     modifier: Modifier = Modifier,
     showTimeGate: Boolean = false,
-    viewModel: AkmViewModel = hiltViewModel(),
+    viewModel: AkmListViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
     val items by viewModel.items.collectAsStateWithLifecycle()
     val scores by viewModel.scores.collectAsStateWithLifecycle()
     val loading by viewModel.loading.collectAsStateWithLifecycle()
     val selectedDay by viewModel.selectedDay.collectAsStateWithLifecycle()
-    val strictMode by viewModel.strictMode.collectAsStateWithLifecycle()
     val statuses by viewModel.statuses.collectAsStateWithLifecycle()
+    val notice by viewModel.notice.collectAsStateWithLifecycle()
+    val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
     var tabIndex by rememberSaveable { mutableIntStateOf(0) }
     var reuploadDialog by remember { mutableStateOf<ReuploadDialog?>(null) }
     val calendar = remember { Calendar.getInstance() }
@@ -119,9 +125,16 @@ fun AkmScreen(
         title = "Asesmen",
         onBack = onBack,
         modifier = modifier,
-        actions = { StrictModeChip(strict = strictMode) },
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+            // A failed refresh keeps the copy stored on this device on screen; say so instead of showing an empty or stale list silently.
+            (errorMessage.takeIf { it.isNotBlank() } ?: notice)?.let { message ->
+                BannerError(
+                    message = if (errorMessage.isNotBlank()) message else "Menampilkan data tersimpan di perangkat. $message",
+                    onDismiss = { viewModel.clearError() },
+                    modifier = Modifier.padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.sm),
+                )
+            }
             UnderlineTabRow(
                 options = listOf("Jadwal", "Nilai"),
                 selectedIndex = tabIndex,
@@ -139,6 +152,11 @@ fun AkmScreen(
                     selectedDay = selectedDay,
                     onSelectDay = viewModel::selectDay,
                     items = items.filter { it.endDay == selectedDay && !it.hasEnded(now) },
+                    // Exams with answers still on their way are always reachable, whatever day the strip is on (legacy lost them
+                    // from the list once their day or end time passed; the logout block then pointed at an empty screen).
+                    pending = items.filter { item ->
+                        statuses[item.id] in pendingStates && !(item.endDay == selectedDay && !item.hasEnded(now))
+                    },
                     statusOf = { statuses[it] ?: AkmStatus.BelumSinkron },
                     onOpen = onOpenDetail,
                 )
@@ -146,7 +164,10 @@ fun AkmScreen(
                 ScoreTab(
                     scores = scores,
                     onOpen = onOpenScore,
-                    onReupload = { reuploadDialog = ReuploadDialog.Confirm(it) },
+                    onReupload = { id ->
+                        val left = viewModel.cooldownSecondsLeft(id)
+                        reuploadDialog = if (left > 0) ReuploadDialog.Cooldown(left) else ReuploadDialog.Confirm(id)
+                    },
                 )
             }
         }
@@ -162,21 +183,36 @@ fun AkmScreen(
     when (val dialog = reuploadDialog) {
         is ReuploadDialog.Confirm -> AppDialog(
             onDismiss = { reuploadDialog = null },
-            title = "Upload Ulang Jawaban",
-            body = "Jawaban lokal akan dikirim ulang ke server. Upload ulang hanya dapat dilakukan sekali per menit dan harus dari perangkat yang dipakai saat ujian.",
-            primaryButtonText = "Upload",
+            title = "Upload ulang ujian",
+            body = "Yakin ingin upload ulang jawaban ujian ini?",
+            primaryButtonText = "Ya, Upload",
             onPrimaryClick = {
-                val resent = viewModel.reuploadAnswer(dialog.id)
-                reuploadDialog = if (resent) null else ReuploadDialog.NotFound
+                reuploadDialog = null
+                viewModel.reupload(dialog.id) { result ->
+                    when (result) {
+                        ReuploadResult.Sent -> Toast.makeText(context, "Jawaban berhasil dikirim", Toast.LENGTH_SHORT).show()
+                        is ReuploadResult.Failed -> Toast.makeText(context, "Gagal mengirim jawaban. Coba lagi", Toast.LENGTH_SHORT).show()
+                        is ReuploadResult.Cooldown -> reuploadDialog = ReuploadDialog.Cooldown(result.seconds)
+                        ReuploadResult.NoLocalData -> reuploadDialog = ReuploadDialog.NotFound
+                    }
+                }
             },
             secondaryButtonText = "Batal",
             onSecondaryClick = { reuploadDialog = null },
         )
 
+        is ReuploadDialog.Cooldown -> AppDialog(
+            onDismiss = { reuploadDialog = null },
+            title = "Tunggu",
+            body = "Upload ulang tersedia dalam ${dialog.seconds} detik",
+            primaryButtonText = "Tutup",
+            onPrimaryClick = { reuploadDialog = null },
+        )
+
         ReuploadDialog.NotFound -> AppDialog(
             onDismiss = { reuploadDialog = null },
             title = "Informasi",
-            body = "Data jawaban tidak ditemukan di perangkat ini. Anda tidak bisa melakukan upload ulang jawaban dari perangkat ini.",
+            body = "Data jawaban tidak ditemukan di perangkat ini. anda tidak bisa melakukan upload ulang jawaban !!",
             primaryButtonText = "Tutup",
             onPrimaryClick = { reuploadDialog = null },
         )
@@ -185,36 +221,7 @@ fun AkmScreen(
     }
 }
 
-/**
- * Read-only: [strict] comes from the server's `exam_lock_mode` (`mobile/setting-akm`), not
- * something a student is allowed to switch off on-device.
- */
-@Composable
-private fun StrictModeChip(strict: Boolean) {
-    val scheme = MaterialTheme.colorScheme
-    Row(
-        modifier = Modifier
-            .padding(end = Spacing.sm)
-            .heightIn(min = 36.dp)
-            .background(scheme.surfaceContainerLowest, RoundedCornerShape(18.dp))
-            .border(1.5.dp, scheme.outlineVariant, RoundedCornerShape(18.dp))
-            .padding(horizontal = Spacing.md),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            if (strict) Icons.Rounded.Lock else Icons.Rounded.LockOpen,
-            contentDescription = null,
-            tint = scheme.primary,
-            modifier = Modifier.size(16.dp),
-        )
-        Text(
-            if (strict) "Mode ketat: aktif" else "Mode ketat: mati",
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
-            color = scheme.onSurface,
-            modifier = Modifier.padding(start = Spacing.xs),
-        )
-    }
-}
+private val pendingStates = setOf(AkmStatus.SiapDikerjakan, AkmStatus.ProsesUpload)
 
 @Composable
 private fun ScheduleTab(
@@ -224,6 +231,7 @@ private fun ScheduleTab(
     selectedDay: Int,
     onSelectDay: (Int) -> Unit,
     items: List<AkmItem>,
+    pending: List<AkmItem>,
     statusOf: (Int) -> AkmStatus,
     onOpen: (Int) -> Unit,
 ) {
@@ -251,7 +259,7 @@ private fun ScheduleTab(
             }
         }
 
-        if (items.isEmpty()) {
+        if (items.isEmpty() && pending.isEmpty()) {
             EmptyState(
                 title = "Belum terdapat ujian",
                 description = "Tidak ada jadwal asesmen pada tanggal ini.",
@@ -262,6 +270,27 @@ private fun ScheduleTab(
                 contentPadding = PaddingValues(start = ScreenHorizontalPadding, end = ScreenHorizontalPadding, top = Spacing.lg, bottom = Spacing.xxl),
                 verticalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
+                if (pending.isNotEmpty()) {
+                    item(key = "pending-header") {
+                        Text(
+                            "Perlu dikumpulkan",
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    items(pending, key = { "pending-${it.id}" }) { item ->
+                        ScheduleCard(item = item, status = statusOf(item.id), onOpen = { onOpen(item.id) })
+                    }
+                    if (items.isNotEmpty()) {
+                        item(key = "day-header") {
+                            Text(
+                                "Jadwal tanggal ini",
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+                }
                 items(items, key = { it.id }) { item ->
                     ScheduleCard(item = item, status = statusOf(item.id), onOpen = { onOpen(item.id) })
                 }
@@ -343,6 +372,9 @@ private fun ScheduleCard(item: AkmItem, status: AkmStatus, onOpen: () -> Unit) {
                     style = MaterialTheme.typography.labelSmall,
                     color = scheme.onSurfaceVariant,
                 )
+                if (item.watermark.enabled) {
+                    WatermarkLabel(item.watermark.label, modifier = Modifier.padding(top = Spacing.xs))
+                }
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
@@ -408,7 +440,7 @@ private fun ScoreTab(scores: List<AkmScoreItem>, onOpen: (Int) -> Unit, onReuplo
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         items(scores, key = { it.id }) { score ->
-            val canReupload = score.status == AkmStatus.SudahDikumpulkan || score.status == AkmStatus.MenungguPenilaian
+            val canReupload = AkmRules.canReupload(score.status, score.scoreStatus)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()

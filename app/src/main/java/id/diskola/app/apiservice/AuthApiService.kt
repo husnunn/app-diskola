@@ -1,7 +1,9 @@
 package id.diskola.app.apiservice
 
+import id.diskola.app.dataclass.ResponData.ActionMessageResponse
 import id.diskola.app.dataclass.ResponData.CheckAccountApiResponse
 import id.diskola.app.dataclass.ResponData.CheckAccountRequest
+import id.diskola.app.dataclass.ResponData.CurrentUserResponse
 import id.diskola.app.dataclass.ResponData.LoginAccountApiResponse
 import id.diskola.app.dataclass.ResponData.LoginAccountRequest
 import id.diskola.app.dataclass.ResponData.LoginSsoApiResponse
@@ -68,7 +70,7 @@ interface AuthApiService {
     suspend fun updateFcmToken(@Body request: SetupUserFcmRequest): Map<String, Any>
 
     @GET("/api/mobile/app/authentication/current-user")
-    suspend fun currentUser(): Map<String, Any>
+    suspend fun currentUser(): CurrentUserResponse
 
     @DELETE("sessions/others")
     suspend fun logoutOthers()
@@ -106,6 +108,7 @@ interface AuthApiService {
     @GET("mobile/gmail/verify/{google_token}")
     suspend fun verifyGoogle(@Path("google_token") googleToken: String): Map<String, Any>
 
+    /** Sends the verification mail to the account's e-mail. */
     @GET("mobile/email/verify")
-    suspend fun verifyEmail(): Map<String, Any>
+    suspend fun verifyEmail(): ActionMessageResponse
 }

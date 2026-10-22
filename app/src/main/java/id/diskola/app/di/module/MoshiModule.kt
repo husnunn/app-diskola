@@ -98,7 +98,11 @@ object MoshiModule {
             else
                 delegateAdapter.fromJson(reader)
 
-        override fun toJson(writer: JsonWriter, value: Any?) {}
+        // Writes the list itself (an empty body produced invalid JSON: the exam cache serialises `exams`).
+        @Suppress("UNCHECKED_CAST")
+        override fun toJson(writer: JsonWriter, value: Any?) {
+            delegateAdapter.toJson(writer, value as List<Any>?)
+        }
     }
 }
 

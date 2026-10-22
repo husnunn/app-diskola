@@ -21,7 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CheckBox
 import androidx.compose.material.icons.rounded.CheckBoxOutlineBlank
-import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Assignment
 import androidx.compose.material.icons.rounded.RadioButtonChecked
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.Timer
@@ -104,7 +104,7 @@ fun ExamModeHeader(
             }
         } else {
             Spacer(modifier = Modifier.width(Spacing.sm))
-            Icon(Icons.Rounded.Lock, contentDescription = null, tint = extended.onExamSurface, modifier = Modifier.size(20.dp))
+            Icon(Icons.Rounded.Assignment, contentDescription = null, tint = extended.onExamSurface, modifier = Modifier.size(20.dp))
             Spacer(modifier = Modifier.width(Spacing.md))
         }
         Column(modifier = Modifier.weight(1f)) {

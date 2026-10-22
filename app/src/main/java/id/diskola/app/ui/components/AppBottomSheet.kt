@@ -33,7 +33,9 @@ fun AppBottomSheet(
     title: String,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
-    sheetState: SheetState = rememberModalBottomSheetState(),
+    // Open at the content's own height. The Material default opens at half the screen, so any content taller than that was cut
+    // off at the screen edge and ran under the navigation bar until the user dragged the sheet up.
+    sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     content: @Composable () -> Unit,
 ) {
     ModalBottomSheet(

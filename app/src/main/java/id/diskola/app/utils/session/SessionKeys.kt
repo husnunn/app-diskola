@@ -35,6 +35,9 @@ object SessionKeys {
     const val IS_EMAIL_VERIFIED = "is_email_verified"
     const val IS_EMAIL_VERIFYING = "is_email_verifying"
     const val KLASPAY_ACTIVE = "klaspayActive"
+    const val IS_TOPPERS = "isToppers"
+    const val TOPPERS_STATUS = "toppersStatus"
+    const val KLASPAY_ID = "klaspay_id"
     const val DEFAULT_PASS = "default_pass"
     const val ONKLAS_LITE = "onklas_lite"
     const val ONKLAS_PRO = "onklas_pro"
@@ -43,6 +46,9 @@ object SessionKeys {
     const val FIREBASE_ID = "firebase_id"
     const val URL_API = "url_api"
     const val CHECK_VC = "check_vc"
+
+    /** A logout (FCM `"logout"`, a 401) arrived while exam answers were still unsent: it runs once they are. */
+    const val LOGOUT_DEFERRED = "logout_deferred"
 
     /** Kept for the legacy in-place-update migration story; not read anywhere in this app. */
     const val THEME_MODE = "theme_mode"

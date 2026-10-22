@@ -45,7 +45,11 @@ data class CheckAccountApiResponse(
     val time: String?,
     // Case-insensitive "Y" (doc 02 §4.1, gap 02a L4); falls back to `data.using_default_password`
     // when blank — legacy sometimes only populates the nested one.
-    @NullToEmptyString val using_default_password: String = ""
+    @NullToEmptyString val using_default_password: String = "",
+    /** The class in session right now (students) — the hub's "Kelas Berlangsung" card reads this, not `schedule`. */
+    val current_subject: CurrentSubjectData? = null,
+    /** Data-verification request state, drives the hub's "Verifikasi Data" button. */
+    val userProgress: UserProgressData? = null,
 )
 
 @JsonClass(generateAdapter = true)
@@ -78,7 +82,9 @@ data class SchoolDetail(
     val address: String?,
     val coordinate_latitude: Double?,
     val coordinate_longitude: Double?,
-    val coordinate_radius: String?
+    val coordinate_radius: String?,
+    // Not every endpoint sends it; without this field `toSession()` wiped the stored city on every check-account.
+    val city_name: String? = null,
 )
 
 @JsonClass(generateAdapter = true)

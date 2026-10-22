@@ -7,10 +7,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Error
-import androidx.compose.material.icons.rounded.PhoneDisabled
-import androidx.compose.material.icons.rounded.Warning
-import androidx.compose.material.icons.rounded.WifiOff
-import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -21,27 +17,29 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.CircularProgressIndicator
 import id.diskola.app.ui.components.AppDialog
 import id.diskola.app.ui.components.AppTextField
 import id.diskola.app.ui.theme.Spacing
-import id.diskola.app.ui.theme.extendedColors
+import id.diskola.app.utils.AkmSessionRules
 
-/** The gates a student passes through between tapping "Mulai" and the exam actually opening. */
-enum class AkmStartDialog { Password, Terms, Offline }
+/**
+ * The gates a student passes between tapping "Mulai" and the exam opening, in legacy order (`AkmSessionRules.Gate`): the password
+ * (when asked), the terms, and — for a strict exam only — the online check. The priming screen comes after these.
+ */
+enum class AkmStartDialog { Password, Terms, NeedInternet }
 
 @Composable
 fun AkmStartDialogs(
     dialog: AkmStartDialog?,
-    strictMode: Boolean,
     checking: Boolean,
     passwordError: String?,
+    /** Strict mode (screen pinning) applies: the terms say so and the exam cannot be started offline. */
+    strict: Boolean,
     onCheckPassword: (String) -> Unit,
     onDismiss: () -> Unit,
     onTermsAccepted: () -> Unit,
-    onSimulateOffline: () -> Unit,
 ) {
     when (dialog) {
         AkmStartDialog.Password -> PasswordDialog(
@@ -53,33 +51,18 @@ fun AkmStartDialogs(
 
         AkmStartDialog.Terms -> AppDialog(
             onDismiss = onDismiss,
-            title = "Ketentuan Mulai Asesmen",
-            body = if (strictMode) {
-                "Mode ketat aktif: layar akan dikunci selama ujian dan kamu wajib online saat memulai. Keluar dari aplikasi atau membuka aplikasi lain akan dikenai sanksi."
-            } else {
-                "Mode ketat mati: pengerjaan boleh offline dan layar tidak dikunci. Keluar dari aplikasi tetap dapat dikenai sanksi bila penalti aktif."
-            },
-            primaryButtonText = "Saya Mengerti, Mulai",
+            title = AkmSessionRules.TERMS_TITLE,
+            body = AkmSessionRules.termsBody(strict),
+            primaryButtonText = AkmSessionRules.TERMS_OK,
             onPrimaryClick = onTermsAccepted,
-            secondaryButtonText = "Simulasi mulai saat offline",
-            onSecondaryClick = onSimulateOffline,
-            content = {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    TermsRow(Icons.Rounded.Warning, "Keluar dari aplikasi atau berpindah aplikasi dikenai sanksi penalti.")
-                    TermsRow(Icons.Rounded.Wifi, "Pastikan koneksi internet stabil saat mengunggah jawaban.")
-                    TermsRow(Icons.Rounded.PhoneDisabled, "Jangan mengangkat telepon selama asesmen berlangsung.")
-                }
-            },
         )
 
-        AkmStartDialog.Offline -> AppDialog(
+        AkmStartDialog.NeedInternet -> AppDialog(
             onDismiss = onDismiss,
-            title = "Butuh Koneksi Internet",
-            body = "Mode ketat aktif, jadi asesmen wajib dimulai saat online. Sambungkan internet lalu coba lagi — setelah mulai, pengerjaan boleh offline.",
-            primaryButtonText = "Mengerti",
+            title = AkmSessionRules.OFFLINE_TITLE,
+            body = AkmSessionRules.OFFLINE_BODY,
+            primaryButtonText = AkmSessionRules.OFFLINE_OK,
             onPrimaryClick = onDismiss,
-            icon = Icons.Rounded.WifiOff,
-            dismissible = false,
         )
 
         null -> Unit
@@ -142,22 +125,4 @@ private fun PasswordDialog(
             }
         },
     )
-}
-
-@Composable
-private fun TermsRow(icon: ImageVector, text: String) {
-    Row(verticalAlignment = Alignment.Top) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = MaterialTheme.extendedColors.warning,
-            modifier = Modifier.size(18.dp),
-        )
-        Text(
-            text,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = Spacing.sm),
-        )
-    }
 }

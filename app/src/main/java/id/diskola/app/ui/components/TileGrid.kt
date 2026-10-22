@@ -3,9 +3,11 @@ package id.diskola.app.ui.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
@@ -37,7 +39,8 @@ fun <T> AdaptiveTileGrid(
         Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
             items.chunked(columns).forEach { rowItems ->
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    // every tile takes the height of the tallest one in its row (a two-line label next to a one-line one)
+                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
                     horizontalArrangement = Arrangement.spacedBy(spacing),
                 ) {
                     rowItems.forEach { item -> itemContent(item, Modifier.weight(1f)) }

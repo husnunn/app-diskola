@@ -35,7 +35,15 @@ data class AkmScheduleData(
     val requires_password: Boolean = false,
     val password_checked: Boolean = false,
     val has_explain: Boolean? = null,
+    /** v2.1.40 renamed `has_explain` to `has_explanation` (doc 06 §24); Moshi has no alias, so both are read and [hasExplanation] picks. */
+    val has_explanation: Boolean? = null,
     val isDone: Boolean = false,
+    /**
+     * "Dibatalkan" label/stamp (doc 06 §4.4, 2.1.41): a purely visual mark set by the server. Nullable on purpose — a response without
+     * the key (older server, `exam-schedules-scored`) must neither fail to parse nor switch a stored mark off (`AkmRules.watermark`).
+     */
+    val watermark_bool: Boolean? = null,
+    @NullToEmptyString val watermark_label: String = "",
     val isAssessed: Boolean = false,
     val isQueued: Boolean = false,
     val gov_schedule: Boolean = false,
@@ -52,7 +60,10 @@ data class AkmScheduleData(
     val score: List<AkmScoreData> = emptyList(),
     val exam_score: Double? = -1.0,
     @NullToEmptyString val type: String = "",
-)
+) {
+    /** Whether the student may open the explanation: either spelling of the flag, the newer one first. */
+    val hasExplanation: Boolean? get() = has_explanation ?: has_explain
+}
 
 /** Ported verbatim from the legacy `StudentExam` model — `id` is the exam session id, `student_id`
  * is unused here (legacy app doesn't read it either). */
@@ -93,11 +104,17 @@ data class AkmSettingResponse(val data: AkmSettingData? = null)
 @Keep
 @JsonClass(generateAdapter = true)
 data class AkmSettingData(
+    /** Penalty length in **seconds**; absent or ≤ 0 means 300 (`AkmRules.penaltySeconds`). */
     val penalty_times: Int = 0,
-    val penalty_applied: Boolean = false,
+    /** Missing key = off (legacy `penaltyResponse` default `false`); an explicit `null` reads as on (`AkmRules.penaltyAppliedRaw`). */
+    val penalty_applied: Boolean? = false,
     /** Null = key missing; Presensi treats that as "radius restricted" (the safe default). */
     val absence_setting: Boolean? = null,
-    val exam_lock_mode: Boolean? = true,
+    /**
+     * Null/missing = strict mode **off**: decision 2026-09-30 (`FLOW_QUESTIONS.md` §E #1) — the legacy model declares
+     * `exam_lock_mode: Boolean? = false`, so a server that does not send the key never locks the screen.
+     */
+    val exam_lock_mode: Boolean? = false,
 )
 
 @Keep

@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -23,6 +24,7 @@ import id.diskola.app.ui.components.AppTextField
 import id.diskola.app.ui.components.BannerError
 import id.diskola.app.ui.components.DetailScaffold
 import id.diskola.app.ui.components.LinkPreviewCard
+import id.diskola.app.ui.components.openLink
 import id.diskola.app.ui.components.SectionLabel
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
@@ -42,6 +44,7 @@ fun TugasScoringScreen(
     viewModel: TugasScoringViewModel = hiltViewModel(),
 ) {
     val scheme = MaterialTheme.colorScheme
+    val context = LocalContext.current
     val assignment by viewModel.assignment.collectAsStateWithLifecycle()
     val score by viewModel.score.collectAsStateWithLifecycle()
     val saveSuccess by viewModel.saveSuccess.collectAsStateWithLifecycle()
@@ -92,7 +95,7 @@ fun TugasScoringScreen(
                             Text(current.file_name, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurface)
                         }
                         current.uri_student?.link?.firstOrNull()?.let { link ->
-                            LinkPreviewCard(url = link, loading = false, data = null, onClick = {})
+                            LinkPreviewCard(url = link, loading = false, data = null, onClick = { openLink(context, link) })
                         }
                     }
                 }

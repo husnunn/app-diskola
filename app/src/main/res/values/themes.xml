@@ -19,11 +19,12 @@
         <item name="colorOnSecondary">@color/white</item>
 
         <!-- System bars -->
-        <item name="android:statusBarColor">@color/ref_primary</item>
-        <item name="android:navigationBarColor">@color/ref_surface</item>
-        <!-- status bar dark (primary), use light icons -->
-        <item name="android:windowLightStatusBar">false</item>
-        <!-- navigation bar light icons when surface is light -->
+        <!-- The app is edge-to-edge: MainActivity calls enableEdgeToEdge(), which makes both bars transparent at runtime.
+             These values only show before that runs (cold start), so they match it: transparent bars over the light
+             window background, dark icons. A coloured status bar here flashed green on launch. -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
 
         <!-- Window -->

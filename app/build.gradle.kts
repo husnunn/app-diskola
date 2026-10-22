@@ -78,6 +78,11 @@ android {
     }
 }
 
+// Room writes the schema of every version here (committed), so a migration can be compared with the DDL Room expects.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
 
     implementation(libs.androidx.core.ktx)

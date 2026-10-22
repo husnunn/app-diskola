@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.diskola.app.ui.components.AppBottomSheet
+import id.diskola.app.ui.components.FileViewerHost
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppDialog
 import id.diskola.app.ui.components.ButtonVariant
@@ -55,12 +56,7 @@ fun TugasNilaiDetailSheet(
     var permissionDialogFor by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     LaunchedEffect(tugasId) { viewModel.load(tugasId) }
-    LaunchedEffect(openFileIntent) {
-        openFileIntent?.let {
-            try { context.startActivity(it) } catch (_: Exception) {}
-            viewModel.consumeOpenFileIntent()
-        }
-    }
+    FileViewerHost(intent = openFileIntent, fileName = null, onConsumed = viewModel::consumeOpenFileIntent)
     LaunchedEffect(pdfPath) {
         pdfPath?.let { path ->
             onOpenPdf(path, item?.title.orEmpty())

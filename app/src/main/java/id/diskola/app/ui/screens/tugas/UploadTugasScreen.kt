@@ -57,6 +57,7 @@ import id.diskola.app.ui.components.ErrorText
 import id.diskola.app.ui.components.FieldLabel
 import id.diskola.app.ui.components.FormCard
 import id.diskola.app.ui.components.LinkPreviewCard
+import id.diskola.app.ui.components.openLink
 import id.diskola.app.ui.components.SectionLabel
 import id.diskola.app.ui.components.SimpleDropdown
 import id.diskola.app.ui.navigation.Route
@@ -309,7 +310,7 @@ fun UploadTugasScreen(
                     FieldLabel("Url Link", required = false)
                     AppTextField(value = link, onValueChange = { link = it }, placeholder = "Ketik url", enabled = route.editable)
                     if (link.isNotBlank()) {
-                        LinkPreviewCard(url = link, loading = linkPreviewLoading, data = linkPreview, onClick = {})
+                        LinkPreviewCard(url = link, loading = linkPreviewLoading, data = linkPreview, onClick = { openLink(context, link) })
                     }
                     if (selectedFileName != null || link.isNotBlank()) {
                         Row(

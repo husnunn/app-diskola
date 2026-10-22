@@ -1,16 +1,9 @@
 package id.diskola.app.worker
 
-import android.Manifest
-import android.annotation.SuppressLint
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.content.Context
-import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import androidx.core.content.ContextCompat
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
@@ -20,14 +13,18 @@ import dagger.assisted.AssistedInject
 import id.diskola.app.R
 import id.diskola.app.apiservice.AsesmenApiService
 import id.diskola.app.dataclass.ResponData.AkmQuestionData
+import id.diskola.app.dataclass.akm.AkmShuffle
 import id.diskola.app.dataclass.localDb.AkmDownloadStatus
 import id.diskola.app.dataclass.localDb.AkmSyncDao
 import id.diskola.app.dataclass.localDb.AkmSyncedExam
+import id.diskola.app.repository.AkmRepository
 import id.diskola.app.utils.AppErrorHandler
 import id.diskola.app.utils.FileUtils
 import id.diskola.app.utils.resolveAssetUrl
 import timber.log.Timber
 import java.io.File
+import kotlin.coroutines.cancellation.CancellationException
+import kotlin.random.Random
 
 /** Filter with `adb logcat -s AKM-DOWNLOAD` (or grep "AKM-DOWNLOAD") to see every download
  * attempt this worker makes — skips (already cached), successes, and failures/fallbacks — plus the
@@ -49,11 +46,19 @@ class AkmDownloadWorker @AssistedInject constructor(
     private val asesmenApiService: AsesmenApiService,
     private val fileUtils: FileUtils,
     private val akmSyncDao: AkmSyncDao,
+    private val akmRepository: AkmRepository,
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
         val akmId = inputData.getInt("id", 0)
         if (akmId < 1) return Result.failure()
+
+        // A package that is already on the device is never replaced: re-downloading reshuffles the questions and wipes the answers
+        // (legacy did both). The student may have answers stored against exactly this order.
+        if (akmSyncDao.get(akmId)?.downloadStatus == AkmDownloadStatus.DOWNLOADED) {
+            Timber.tag(LOG_TAG).i("akmId=%d: sudah terunduh, tidak diunduh ulang", akmId)
+            return Result.success()
+        }
 
         Timber.tag(LOG_TAG).i("Mulai sinkronisasi: akmId=%d", akmId)
 
@@ -94,18 +99,27 @@ class AkmDownloadWorker @AssistedInject constructor(
                 exam.copy(instructions = processedInstructions)
             }
 
-            NotificationManagerCompat.from(applicationContext).cancel(notificationId(akmId))
+            NotificationManagerCompat.from(applicationContext).cancel(AkmNotifications.downloadId(akmId))
+            // Randomised once, here: the order stored is the order the student sees from now on.
+            val stored = AkmShuffle.shuffleSchedule(schedule.copy(exams = processedExams, exam = null), Random.Default)
+            val endAt = akmRepository.endAtFor(akmId, stored)
             akmSyncDao.upsert(
                 akmSyncDao.get(akmId)!!.copy(
                     downloadStatus = AkmDownloadStatus.DOWNLOADED,
-                    schedule = schedule.copy(exams = processedExams, exam = null),
+                    schedule = stored,
+                    studentExamId = stored.studentExam?.id ?: 0,
+                    endAtMillis = endAt,
                 )
             )
+            // From now on the answers must reach the server even if the app is never opened again: schedule the deadline upload.
+            endAt?.let { AkmWork.scheduleDeadline(applicationContext, akmId, it) }
             Timber.tag(LOG_TAG).i(
                 "akmId=%d selesai: %d soal diproses, %d aset gagal diunduh (fallback ke remote/kosong)",
                 akmId, totalQuestions, failedAssets
             )
             Result.success()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Timber.tag(LOG_TAG).e(e, "akmId=%d: sinkronisasi gagal total", akmId)
             val message = AppErrorHandler.getMessage(e)
@@ -157,19 +171,7 @@ class AkmDownloadWorker @AssistedInject constructor(
         )
 
         var answers = question.answers
-        if (question.answerType == "PAIR") {
-            val originalSecondStatementById = answers.associate { it.id to it.secondStatement }
-            val originalSecondFilePathById = answers.associate { it.id to it.secondFilePath }
-            val shuffledIds = answers.map { it.id }.shuffled()
-            answers = answers.mapIndexed { index, answer ->
-                val selectedId = shuffledIds[index]
-                answer.copy(
-                    secondStatement = originalSecondStatementById[selectedId].orEmpty(),
-                    secondFilePath = originalSecondFilePathById[selectedId].orEmpty(),
-                    selected_id = selectedId,
-                )
-            }
-        }
+        if (question.answerType == "PAIR") answers = AkmShuffle.shufflePairRows(answers, Random.Default)
 
         val processedAnswers = answers.map { answerIn ->
             var answer = answerIn
@@ -254,51 +256,26 @@ class AkmDownloadWorker @AssistedInject constructor(
         host.contains("youtube.com") || host.contains("youtu.be")
     }.getOrDefault(false)
 
-    private fun notificationId(akmId: Int): Int = "akm_download_$akmId".hashCode()
-
-    private fun ensureChannel(): String {
-        val channelId = "${applicationContext.getString(R.string.app_name)}.silent"
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            if (manager.getNotificationChannel(channelId) == null) {
-                manager.createNotificationChannel(
-                    NotificationChannel(channelId, "Sinkronisasi Soal", NotificationManager.IMPORTANCE_MIN)
-                )
-            }
-        }
-        return channelId
-    }
-
-    @SuppressLint("MissingPermission")
-    private fun notifyIfAllowed(id: Int, notification: android.app.Notification) {
-        val allowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-            ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        if (allowed) NotificationManagerCompat.from(applicationContext).notify(id, notification)
-    }
-
     private fun showProgress(akmId: Int, total: Int, progress: Int) {
-        val channelId = ensureChannel()
-        val content = "Proses sinkronisasi soal ($progress/$total)"
-        val notification = NotificationCompat.Builder(applicationContext, channelId)
+        val notification = NotificationCompat.Builder(applicationContext, AkmNotifications.ensureChannel(applicationContext))
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("Sinkronisasi soal AKM")
-            .setContentText(content)
+            .setContentText("Proses sinkronisasi soal ($progress/$total)")
             .setProgress(total.coerceAtLeast(1), progress, false)
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setOngoing(true)
             .build()
-        notifyIfAllowed(notificationId(akmId), notification)
+        AkmNotifications.notifyIfAllowed(applicationContext, AkmNotifications.downloadId(akmId), notification)
     }
 
     private fun showDownloadFailed(akmId: Int, message: String) {
-        val channelId = ensureChannel()
-        val notification = NotificationCompat.Builder(applicationContext, channelId)
+        val notification = NotificationCompat.Builder(applicationContext, AkmNotifications.ensureChannel(applicationContext))
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("Gagal mengunduh soal")
             .setContentText("Sinkronisasi soal gagal: $message")
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .build()
-        notifyIfAllowed(notificationId(akmId), notification)
+        AkmNotifications.notifyIfAllowed(applicationContext, AkmNotifications.downloadId(akmId), notification)
     }
 }

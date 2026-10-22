@@ -2,6 +2,7 @@ package id.diskola.app.ui.screens.akm
 
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -36,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.foundation.ScrollState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -56,18 +59,25 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import id.diskola.app.utils.AkmRules
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import id.diskola.app.dataclass.akm.AkmMedia
 import id.diskola.app.dataclass.akm.AkmPairSlot
 import id.diskola.app.dataclass.akm.AkmPlayerAnswer
 import id.diskola.app.dataclass.akm.QuestionType
+import id.diskola.app.ui.components.AkmWatermarkOverlay
 import id.diskola.app.ui.components.AnswerOption
 import id.diskola.app.ui.components.AppBottomSheet
 import id.diskola.app.ui.components.AppButton
@@ -75,17 +85,18 @@ import id.diskola.app.ui.components.AppDialog
 import id.diskola.app.ui.components.AppTextField
 import id.diskola.app.ui.components.ButtonVariant
 import id.diskola.app.ui.components.EmptyState
+import id.diskola.app.ui.components.LoadingState
 import id.diskola.app.ui.components.ExamModeHeader
 import id.diskola.app.ui.components.MathHtmlText
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
 import id.diskola.app.ui.theme.extendedColors
-import id.diskola.app.viewmodel.AkmViewModel
+import id.diskola.app.utils.AkmPenaltyRules
+import id.diskola.app.viewmodel.AkmQuestionViewModel
 import kotlinx.coroutines.delay
 
 private val OPTION_LETTERS = listOf("A", "B", "C", "D", "E", "F")
-private const val PENALTY_LABEL = "00:24"
 
 /** Coil's default String->Uri mapping doesn't reliably resolve a bare absolute filesystem path
  * (no `file://` scheme) — `AkmDownloadWorker` stores local cache paths that way, so wrap them in a
@@ -93,33 +104,63 @@ private const val PENALTY_LABEL = "00:24"
 private fun imageModel(pathOrLocalFile: String): Any =
     if (pathOrLocalFile.startsWith("/")) java.io.File(pathOrLocalFile) else pathOrLocalFile
 
-/** The question player. Renders the instruction opened via `AkmViewModel.openInstruction`. */
+/** The question player for the instruction in the route: every tap is written to Room at once (essay text after a short pause). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AkmQuestionScreen(
+    examId: Int,
     onBack: () -> Unit,
     onTimeUp: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: AkmViewModel = hiltViewModel(),
+    viewModel: AkmQuestionViewModel = hiltViewModel(),
 ) {
-    val index by viewModel.questionIndex.collectAsStateWithLifecycle()
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val index by viewModel.index.collectAsStateWithLifecycle()
     val answers by viewModel.answers.collectAsStateWithLifecycle()
-    val questions by viewModel.currentQuestions.collectAsStateWithLifecycle()
-    val penaltyActive by viewModel.penaltyActive.collectAsStateWithLifecycle()
-    val timeUpEvent by viewModel.timeUpEvent.collectAsStateWithLifecycle()
+    val timeUp by viewModel.timeUp.collectAsStateWithLifecycle()
+    val watermark by viewModel.watermark.collectAsStateWithLifecycle()
     var gridVisible by rememberSaveable { mutableStateOf(false) }
 
+    val questions = state.questions
     val question = questions.getOrNull(index)
     val answeredCount = questions.count { answers.containsKey(it.id) }
 
-    Column(modifier = modifier.fillMaxSize()) {
+    // An essay still waiting for its 200 ms pause is written when the app goes to the background or this screen is left.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_PAUSE) viewModel.flush() }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    // While the session runs the hardware back key does nothing (legacy `shouldDisableBackButton`); the arrow in the header returns to the lobby.
+    val session = LocalExamSession.current
+    val sessionState by session.state.collectAsStateWithLifecycle()
+    val sessionRunning = sessionState.active && sessionState.examId == examId && !state.locked
+    EndSessionWhenHandedIn(examId = examId, handedIn = state.locked)
+    val penalty = sessionState.penalty?.takeIf { sessionRunning }
+    BackHandler {
+        if (!sessionRunning) {
+            viewModel.flush()
+            onBack()
+        }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize()) {
         ExamModeHeader(
-            title = if (questions.isEmpty()) "Soal" else "Soal ${index + 1} dari ${questions.size}",
+            title = when {
+                penalty != null -> AkmPenaltyRules.QUESTION_TITLE
+                questions.isEmpty() -> "Soal"
+                else -> "Soal ${index + 1} dari ${questions.size}"
+            },
             subtitle = "",
-            onBack = onBack,
-            penaltyLabel = PENALTY_LABEL.takeIf { penaltyActive },
+            penaltyLabel = penalty?.let { AkmPenaltyRules.pillLabel(it.remainingMillis) },
+            onBack = {
+                viewModel.flush()
+                onBack()
+            },
             trailing = {
-                if (questions.isNotEmpty()) {
+                if (questions.isNotEmpty() && penalty == null) {
                     Row(
                         modifier = Modifier
                             .clickable { gridVisible = true }
@@ -138,155 +179,182 @@ fun AkmQuestionScreen(
         )
 
         if (question == null) {
-            EmptyState(
-                title = "Soal tidak ditemukan",
-                description = "Instruksi ini belum memiliki soal, atau belum diunduh ke perangkat.",
-                icon = Icons.Rounded.ReportProblem,
-                modifier = Modifier.weight(1f),
-            )
+            if (!state.loaded) {
+                LoadingState(modifier = Modifier.weight(1f))
+            } else {
+                EmptyState(
+                    title = "Soal tidak ditemukan",
+                    description = "Instruksi ini belum memiliki soal, atau belum diunduh ke perangkat.",
+                    icon = Icons.Rounded.ReportProblem,
+                    modifier = Modifier.weight(1f),
+                )
+            }
             return
         }
 
-        val answer = answers[question.id]
-        val scrollState = rememberScrollState()
+        if (penalty != null) {
+            // Legacy hides the question and "Berikutnya" while the penalty runs; the dialog above says why.
+            Spacer(modifier = Modifier.weight(1f))
+        } else {
+            val answer = answers[question.id]
+            val scrollState = rememberScrollState()
 
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(scrollState)
-                .padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-        ) {
-            AkmChip(question.type.label)
-
-            // Legacy layout order confirmed from `akm_question_multiple_item.xml`: question image
-            // (hidden entirely when blank, not a placeholder), then question text, then media.
-            if (question.imageUrl.isNotBlank()) {
-                AsyncImage(
-                    model = imageModel(question.imageUrl),
-                    contentDescription = null,
-                    contentScale = ContentScale.FillWidth,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(16f / 9f)
-                        .background(MaterialTheme.colorScheme.surfaceContainerLow, DiskolaExtraShapes.card),
-                )
-            }
-
-            MathHtmlText(
-                question.text,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-
-            if (question.media.isNotEmpty()) {
-                QuestionMediaList(media = question.media)
-            }
-
-            when (question.type) {
-                QuestionType.PilihanGanda, QuestionType.BenarSalah -> {
-                    val selected = (answer as? AkmPlayerAnswer.Choice)?.index
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                        question.options.forEachIndexed { optionIndex, option ->
-                            AnswerOption(
-                                label = option.text,
-                                selected = selected == optionIndex,
-                                multiSelect = false,
-                                letter = if (question.type == QuestionType.PilihanGanda) OPTION_LETTERS.getOrNull(optionIndex) else null,
-                                onClick = { viewModel.selectChoice(question.id, optionIndex) },
-                            )
-                        }
-                    }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                AkmChip(question.type.label)
+                if (state.locked) {
+                    InfoBanner(icon = Icons.Rounded.ReportProblem, text = "Jawaban sudah dikumpulkan dan tidak dapat diubah lagi.")
                 }
 
-                QuestionType.MultiJawaban -> {
-                    val selected = (answer as? AkmPlayerAnswer.MultiChoice)?.indices.orEmpty()
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                        question.options.forEachIndexed { optionIndex, option ->
-                            AnswerOption(
-                                label = option.text,
-                                selected = optionIndex in selected,
-                                multiSelect = true,
-                                onClick = { viewModel.toggleMultiChoice(question.id, optionIndex) },
-                            )
-                        }
-                    }
-                }
-
-                QuestionType.EsaiSingkat -> {
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        AppTextField(
-                            value = (answer as? AkmPlayerAnswer.Essay)?.text.orEmpty(),
-                            onValueChange = { viewModel.setEssay(question.id, it) },
-                            label = "Jawaban",
-                            placeholder = when (question.rawAnswerType) {
-                                "SHORT_ESSAY_WORD" -> "Satu kata, tanpa spasi"
-                                "SHORT_ESSAY_NUM" -> "Jawaban berupa angka"
-                                else -> "Ketikkan jawabanmu . . ."
-                            },
-                            keyboardType = if (question.rawAnswerType == "SHORT_ESSAY_NUM") KeyboardType.Number else KeyboardType.Text,
-                        )
-                        if (question.rawAnswerType == "SHORT_ESSAY_WORD") {
-                            Text(
-                                "Spasi otomatis dihapus — jawaban ini tidak boleh mengandung spasi.",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-
-                QuestionType.TabelPernyataan -> {
-                    val rows = (answer as? AkmPlayerAnswer.TableAnswer)?.rows.orEmpty()
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        question.options.forEach { row ->
-                            StatementRow(
-                                imageUrl = row.imageUrl,
-                                text = row.text,
-                                value = rows[row.id],
-                                onSelect = { isTrue -> viewModel.selectTableRow(question.id, row.id, isTrue) },
-                            )
-                        }
-                    }
-                }
-
-                QuestionType.Menjodohkan -> {
-                    val slots = viewModel.pairSlotsFor(question)
-                    MenjodohkanPairs(
-                        slots = slots,
-                        isImage = question.pairIsImage,
-                        scrollState = scrollState,
-                        onSwap = { a, b -> viewModel.swapPair(question.id, slots, a, b) },
+                // Legacy layout order confirmed from `akm_question_multiple_item.xml`: question image
+                // (hidden entirely when blank, not a placeholder), then question text, then media.
+                if (question.imageUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = imageModel(question.imageUrl),
+                        contentDescription = null,
+                        contentScale = ContentScale.FillWidth,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(16f / 9f)
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow, DiskolaExtraShapes.card),
                     )
                 }
 
-                QuestionType.TidakDidukung -> InfoBanner(
-                    icon = Icons.Rounded.ReportProblem,
-                    text = "Tipe soal ini belum didukung di aplikasi. Hubungi guru atau lewati ke soal lain.",
+                MathHtmlText(
+                    question.text,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+
+                if (question.media.isNotEmpty()) {
+                    QuestionMediaList(media = question.media)
+                }
+
+                when (question.type) {
+                    QuestionType.PilihanGanda -> {
+                        val selected = (answer as? AkmPlayerAnswer.Choice)?.answerId
+                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                            question.options.forEachIndexed { optionIndex, option ->
+                                AnswerOption(
+                                    label = option.text,
+                                    selected = selected == option.id,
+                                    multiSelect = false,
+                                    letter = OPTION_LETTERS.getOrNull(optionIndex),
+                                    onClick = { viewModel.selectChoice(question, option.id) },
+                                )
+                            }
+                        }
+                    }
+
+                    // Both options share the single statement row's id, so the pick is "Benar" (first) or "Salah" (second).
+                    QuestionType.BenarSalah -> {
+                        val picked = (answer as? AkmPlayerAnswer.TrueFalse)?.isTrue
+                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                            question.options.forEachIndexed { optionIndex, option ->
+                                val isBenar = optionIndex == 0
+                                AnswerOption(
+                                    label = option.text,
+                                    selected = picked == isBenar,
+                                    multiSelect = false,
+                                    onClick = { viewModel.selectTrueFalse(question, isBenar) },
+                                )
+                            }
+                        }
+                    }
+
+                    QuestionType.MultiJawaban -> {
+                        val selected = (answer as? AkmPlayerAnswer.MultiChoice)?.answerIds.orEmpty()
+                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                            question.options.forEach { option ->
+                                AnswerOption(
+                                    label = option.text,
+                                    selected = option.id in selected,
+                                    multiSelect = true,
+                                    onClick = { viewModel.toggleMultiChoice(question, option.id) },
+                                )
+                            }
+                        }
+                    }
+
+                    QuestionType.EsaiSingkat -> {
+                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                            AppTextField(
+                                value = (answer as? AkmPlayerAnswer.Essay)?.text.orEmpty(),
+                                onValueChange = { viewModel.setEssay(question, it) },
+                                // 8 lines at least; "Selesai" instead of Enter (an answer never holds a line break); the caret line stays in view.
+                                minLines = AkmRules.ESSAY_MIN_LINES,
+                                imeAction = if (AkmRules.usesDoneAction(question.rawAnswerType)) ImeAction.Done else ImeAction.Default,
+                                followCursor = true,
+                                label = "Jawaban",
+                                placeholder = when (question.rawAnswerType) {
+                                    "SHORT_ESSAY_WORD" -> "Satu kata, tanpa spasi"
+                                    "SHORT_ESSAY_NUM" -> "Jawaban berupa angka"
+                                    else -> "Ketikkan jawabanmu . . ."
+                                },
+                                keyboardType = if (question.rawAnswerType == "SHORT_ESSAY_NUM") KeyboardType.Number else KeyboardType.Text,
+                            )
+                            if (question.rawAnswerType == "SHORT_ESSAY_WORD") {
+                                Text(
+                                    "Spasi otomatis dihapus — jawaban ini tidak boleh mengandung spasi.",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+
+                    QuestionType.TabelPernyataan -> {
+                        val rows = (answer as? AkmPlayerAnswer.TableAnswer)?.rows.orEmpty()
+                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                            question.options.forEach { row ->
+                                StatementRow(
+                                    imageUrl = row.imageUrl,
+                                    text = row.text,
+                                    value = rows[row.id],
+                                    onSelect = { isTrue -> viewModel.selectTableRow(question, row.id, isTrue) },
+                                )
+                            }
+                        }
+                    }
+
+                    QuestionType.Menjodohkan -> {
+                        val slots = viewModel.pairSlotsFor(question)
+                        MenjodohkanPairs(
+                            slots = slots,
+                            isImage = question.pairIsImage,
+                            scrollState = scrollState,
+                            onSwap = { a, b -> viewModel.swapPair(question, a, b) },
+                        )
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                    .padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                AppButton(
+                    text = "Sebelumnya",
+                    onClick = { if (session.checkpoint("snap_soal")) viewModel.previousQuestion() },
+                    variant = ButtonVariant.Outlined,
+                    enabled = index > 0,
+                    modifier = Modifier.weight(1f),
+                )
+                AppButton(
+                    text = "Berikutnya",
+                    onClick = { if (session.checkpoint("next_soal")) viewModel.nextQuestion() },
+                    enabled = index < questions.lastIndex,
+                    modifier = Modifier.weight(1f),
                 )
             }
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-                .padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            AppButton(
-                text = "Sebelumnya",
-                onClick = viewModel::previousQuestion,
-                variant = ButtonVariant.Outlined,
-                enabled = index > 0,
-                modifier = Modifier.weight(1f),
-            )
-            AppButton(
-                text = "Berikutnya",
-                onClick = viewModel::nextQuestion,
-                enabled = index < questions.lastIndex,
-                modifier = Modifier.weight(1f),
-            )
         }
 
         if (gridVisible) {
@@ -297,11 +365,14 @@ fun AkmQuestionScreen(
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    // The grid's natural height grows with the number of questions; cap it so the sheet (and its legend)
+                    // never outgrows the screen — the grid itself scrolls beyond the cap.
+                    val gridMaxHeight = (LocalConfiguration.current.screenHeightDp * 0.5f).dp
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(5),
                         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                        modifier = Modifier.height(((questions.size + 4) / 5 * 60).dp),
+                        modifier = Modifier.height(minOf(((questions.size + 4) / 5 * 60).dp, gridMaxHeight)),
                     ) {
                         itemsIndexed(questions) { questionIndex, item ->
                             QuestionGridCell(
@@ -309,7 +380,7 @@ fun AkmQuestionScreen(
                                 current = questionIndex == index,
                                 answered = answers.containsKey(item.id),
                                 onClick = {
-                                    viewModel.goToQuestion(questionIndex)
+                                    if (session.checkpoint("pilih_soal")) viewModel.goToQuestion(questionIndex)
                                     gridVisible = false
                                 },
                             )
@@ -325,17 +396,18 @@ fun AkmQuestionScreen(
         }
     }
 
-    if (timeUpEvent != null) {
+    // The "Dibatalkan" mark as a diagonal watermark: a plain overlay, so touches reach the question underneath (doc 06 §4.4).
+    if (watermark.enabled) AkmWatermarkOverlay(watermark.label)
+    }
+
+    if (timeUp) {
         AppDialog(
             onDismiss = {},
-            title = "Waktu Habis",
-            body = "Waktu habis, Asesmen telah dikumpulkan.",
-            primaryButtonText = "Tutup",
-            onPrimaryClick = {
-                viewModel.consumeTimeUpEvent()
-                onTimeUp()
-            },
             dismissible = false,
+            title = "Perhatian",
+            body = "Waktu ujian telah berakhir, jawaban akan dikumpulkan",
+            primaryButtonText = "OK",
+            onPrimaryClick = onTimeUp,
         )
     }
 }

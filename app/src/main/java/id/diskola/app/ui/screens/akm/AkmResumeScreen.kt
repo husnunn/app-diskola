@@ -1,11 +1,13 @@
 package id.diskola.app.ui.screens.akm
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -18,15 +20,17 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
+import androidx.compose.material.icons.rounded.ReportProblem
 import androidx.compose.material.icons.rounded.TaskAlt
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -39,126 +43,190 @@ import id.diskola.app.dataclass.akm.AkmExam
 import id.diskola.app.dataclass.akm.AkmInstruction
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppDialog
+import id.diskola.app.ui.components.AppLoadingDialog
+import id.diskola.app.ui.components.EmptyState
+import id.diskola.app.ui.components.LoadingState
 import id.diskola.app.ui.components.ExamModeHeader
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
-import id.diskola.app.viewmodel.AkmViewModel
-
-private const val PENALTY_LABEL = "00:24"
+import id.diskola.app.utils.AkmPenaltyRules
+import id.diskola.app.utils.AkmSessionRules
+import id.diskola.app.viewmodel.AkmResumeViewModel
+import id.diskola.app.viewmodel.SubmitUi
 
 /**
- * Exam lobby: the instruction tree the student works through. There is deliberately no back
- * affordance here — leaving mid-exam is what triggers a penalty.
+ * Exam lobby: the instruction tree the student works through, and "Kumpulkan". Leaving never loses an answer (every one is already in
+ * Room), but while the session runs it is not free: in strict mode it is refused, otherwise the student is warned and the exit is
+ * recorded as leaving without handing in (doc 06 §12.1).
+ *
+ * Texts are legacy's (doc 06 §5.5): loading "Sedang memproses jawaban", alert "Berhasil" / "Jawaban sedang dikumpulkan, silahkan
+ * tunggu sampai jawabanmu dinilai" / "Baik", alert "Gagal" / "Terdapat kesalahan dalam pengunggahan jawaban" / "Coba lagi", and at the
+ * end of the exam "Waktu ujian telah berakhir, jawaban akan dikumpulkan" with a single "OK".
  */
 @Composable
 fun AkmResumeScreen(
-    akmId: Int,
-    onOpenInstruction: (Int) -> Unit,
+    examId: Int,
+    onBack: () -> Unit,
+    onOpenInstruction: (instructionId: Int) -> Unit,
     onSubmitted: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: AkmViewModel = hiltViewModel(),
+    viewModel: AkmResumeViewModel = hiltViewModel(),
 ) {
-    val items by viewModel.items.collectAsStateWithLifecycle()
-    val item = items.find { it.id == akmId } ?: return
-    val answers by viewModel.answers.collectAsStateWithLifecycle()
-    val penaltyActive by viewModel.penaltyActive.collectAsStateWithLifecycle()
-    val timeUpEvent by viewModel.timeUpEvent.collectAsStateWithLifecycle()
-    // Not read directly — collecting it forces recomposition once `observeSyncState` finishes
-    // hydrating the ViewModel's schedule cache, even if nothing else on this screen changes at
-    // that moment (this was the actual cause of "soal tidak muncul, cuma instruksi/perintah saja").
-    @Suppress("UNUSED_VARIABLE") val rawSchedulesVersion by viewModel.rawSchedulesVersion.collectAsStateWithLifecycle()
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val submit by viewModel.submit.collectAsStateWithLifecycle()
+    val timeUp by viewModel.timeUp.collectAsStateWithLifecycle()
+    val watermark by viewModel.watermark.collectAsStateWithLifecycle()
     var expandedExam by rememberSaveable { mutableIntStateOf(-1) }
 
-    LaunchedEffect(akmId) {
-        viewModel.observeSyncState(akmId)
-        viewModel.watchDeadline(akmId)
-    }
+    val session = LocalExamSession.current
+    val sessionState by session.state.collectAsStateWithLifecycle()
+    val sessionRunning = sessionState.active && sessionState.examId == examId && !state.locked
+    var leaveAlert by remember { mutableStateOf(false) }
+    // A session that is not running (handed in, found closed) leaves freely; a running one asks first.
+    val requestLeave: () -> Unit = { if (sessionRunning) leaveAlert = true else onBack() }
 
-    // Recomputed on every `answers`/`rawSchedulesVersion` change since it's read straight off the
-    // ViewModel's cache.
-    val exams = viewModel.examsFor(akmId)
-    val allDone = viewModel.allAnswered(akmId)
-    val totalQuestions = exams.sumOf { it.instructions.sumOf { i -> i.total } }
-    val totalAnswered = exams.sumOf { it.instructions.sumOf { i -> i.answered } }
+    EndSessionWhenHandedIn(examId = examId, handedIn = state.locked)
+    val penalty = sessionState.penalty?.takeIf { sessionRunning }
+    BackHandler(enabled = submit != SubmitUi.Processing) { requestLeave() }
 
     Column(modifier = modifier.fillMaxSize()) {
+        // While the screen is pinned there is no way out to offer, so the arrow is not drawn (legacy `applyLockdownChrome`).
         ExamModeHeader(
-            title = "Mode ujian aktif",
-            subtitle = "Layar dikunci · keluar aplikasi dikenai sanksi",
-            penaltyLabel = PENALTY_LABEL.takeIf { penaltyActive },
+            title = if (penalty != null) AkmPenaltyRules.RESUME_TITLE else "Kerjakan Asesmen",
+            subtitle = "",
+            onBack = if (sessionRunning && (sessionState.strict || penalty != null)) null else requestLeave,
+            penaltyLabel = penalty?.let { AkmPenaltyRules.pillLabel(it.remainingMillis) },
         )
 
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-        ) {
-            Text(
-                item.name,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
-                color = MaterialTheme.colorScheme.onSurface,
+        when {
+            // Legacy hides the list and "Kumpulkan" while the penalty runs; the dialog above says why.
+            penalty != null -> Spacer(modifier = Modifier.weight(1f))
+            !state.loaded -> LoadingState(modifier = Modifier.weight(1f))
+            state.exams.isEmpty() -> EmptyState(
+                title = "Soal belum diunduh",
+                description = "Paket soal asesmen ini belum ada di perangkat. Kembali ke detail lalu sinkronkan soal.",
+                icon = Icons.Rounded.ReportProblem,
+                modifier = Modifier.weight(1f),
+                actionLabel = "Kembali",
+                onAction = onBack,
             )
-            Text(
-                "$totalAnswered dari $totalQuestions soal terjawab",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            else -> {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.lg),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+                ) {
+                    // Not in the legacy app (doc 06 §4.4 lists it as a gap); shown on purpose, decided 2026-10-16. It only informs.
+                    if (watermark.enabled) {
+                        InfoBanner(
+                            icon = Icons.Rounded.ReportProblem,
+                            text = "Jadwal ini ditandai \"${watermark.label}\" oleh sekolah. Kamu tetap dapat mengerjakan dan mengumpulkan jawaban.",
+                        )
+                    }
+                    Text(
+                        state.name,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        "${state.answered} dari ${state.total} soal terjawab",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
 
-            exams.forEach { exam ->
-                ExamGroupCard(
-                    exam = exam,
-                    expanded = expandedExam == exam.id,
-                    onToggle = { expandedExam = if (expandedExam == exam.id) -1 else exam.id },
-                    onOpenInstruction = { instructionId ->
-                        viewModel.openInstruction(akmId, instructionId)
-                        onOpenInstruction(instructionId)
-                    },
-                )
+                    state.exams.forEach { exam ->
+                        ExamGroupCard(
+                            exam = exam,
+                            expanded = expandedExam == exam.id,
+                            onToggle = { expandedExam = if (expandedExam == exam.id) -1 else exam.id },
+                            onOpenInstruction = { instructionId ->
+                                if (session.checkpoint("buka_instruksi")) onOpenInstruction(instructionId)
+                            },
+                        )
+                    }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                        .padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    Text(
+                        when {
+                            state.locked -> "Jawaban sudah dikumpulkan dan tidak dapat diubah lagi."
+                            state.allAnswered -> "Semua soal terjawab. Pastikan koneksi stabil saat mengunggah."
+                            else -> "Kumpulkan aktif setelah semua soal terjawab."
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    AppButton(
+                        text = "Kumpulkan",
+                        onClick = { if (session.checkpoint("kumpulkan")) viewModel.submit() },
+                        enabled = state.allAnswered && !state.locked && submit != SubmitUi.Processing,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-                .padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            Text(
-                if (allDone) {
-                    "Semua instruksi selesai. Pastikan koneksi stabil saat mengunggah."
-                } else {
-                    "Kumpulkan aktif setelah semua instruksi terjawab penuh."
-                },
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            AppButton(
-                text = "Kumpulkan",
-                onClick = {
-                    viewModel.submitExam(item.id)
-                    onSubmitted()
-                },
-                enabled = allDone,
-                modifier = Modifier.fillMaxWidth(),
-            )
         }
     }
 
-    if (timeUpEvent == akmId) {
-        AppDialog(
+    if (leaveAlert) {
+        ExamLeaveDialog(
+            action = AkmSessionRules.backAction(strict = sessionState.strict, penaltyOn = viewModel.penaltyApplied),
+            onDismiss = { leaveAlert = false },
+            onLeave = {
+                leaveAlert = false
+                session.abort(examId)
+                onBack()
+            },
+        )
+    }
+
+    when (val result = submit) {
+        SubmitUi.Idle -> Unit
+        SubmitUi.Processing -> AppLoadingDialog(message = "Sedang memproses jawaban")
+        SubmitUi.Done -> AppDialog(
             onDismiss = {},
-            title = "Waktu Habis",
-            body = "Waktu habis, Asesmen telah dikumpulkan.",
-            primaryButtonText = "Tutup",
+            dismissible = false,
+            title = "Berhasil",
+            body = "Jawaban sedang dikumpulkan, silahkan tunggu sampai jawabanmu dinilai",
+            primaryButtonText = "Baik",
             onPrimaryClick = {
-                viewModel.consumeTimeUpEvent()
+                viewModel.dismissSubmitResult()
                 onSubmitted()
             },
+        )
+        is SubmitUi.Failed -> AppDialog(
+            onDismiss = viewModel::dismissSubmitResult,
+            title = "Gagal",
+            body = result.message,
+            primaryButtonText = "Coba lagi",
+            onPrimaryClick = {
+                viewModel.dismissSubmitResult()
+                viewModel.submit()
+            },
+            secondaryButtonText = "Tutup",
+            onSecondaryClick = viewModel::dismissSubmitResult,
+        )
+    }
+
+    if (timeUp) {
+        AppDialog(
+            onDismiss = {},
             dismissible = false,
+            title = "Perhatian",
+            body = "Waktu ujian telah berakhir, jawaban akan dikumpulkan",
+            primaryButtonText = "OK",
+            onPrimaryClick = {
+                viewModel.acknowledgeTimeUp()
+                onSubmitted()
+            },
         )
     }
 }

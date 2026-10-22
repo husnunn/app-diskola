@@ -18,8 +18,18 @@ import id.diskola.app.dataclass.ResponData.PresensiRekapTable
 import id.diskola.app.dataclass.ResponData.StaffAgendaDayTable
 import id.diskola.app.dataclass.ResponData.StaffAgendaItemTable
 import id.diskola.app.dataclass.localDb.AgendaDao
+import id.diskola.app.dataclass.localDb.AkmAnswerDao
+import id.diskola.app.dataclass.localDb.AkmAnswerEntity
+import id.diskola.app.dataclass.localDb.AkmProblemReportDao
+import id.diskola.app.dataclass.localDb.AkmProblemReportEntity
+import id.diskola.app.dataclass.localDb.AkmScheduleCacheDao
+import id.diskola.app.dataclass.localDb.AkmScheduleCacheEntity
+import id.diskola.app.dataclass.localDb.AkmSubmissionDao
+import id.diskola.app.dataclass.localDb.AkmSubmissionEntity
 import id.diskola.app.dataclass.localDb.AkmSyncDao
 import id.diskola.app.dataclass.localDb.AkmSyncedExam
+import id.diskola.app.dataclass.localDb.AkmViolationDao
+import id.diskola.app.dataclass.localDb.AkmViolationEntity
 import id.diskola.app.dataclass.localDb.HomeworkDao
 import id.diskola.app.dataclass.localDb.MapelDao
 import id.diskola.app.dataclass.localDb.MateriDao
@@ -32,11 +42,16 @@ import id.diskola.app.dataclass.localDb.User
 import id.diskola.app.dataclass.localDb.UserDao
 
 @Database(
-    version = 7,
-    exportSchema = false,
+    version = 9,
+    exportSchema = true,
     entities = [
         User::class,
         AkmSyncedExam::class,
+        AkmAnswerEntity::class,
+        AkmSubmissionEntity::class,
+        AkmScheduleCacheEntity::class,
+        AkmViolationEntity::class,
+        AkmProblemReportEntity::class,
         SchoolEntity::class,
         MapelTable::class,
         MateriTable::class,
@@ -60,6 +75,11 @@ import id.diskola.app.dataclass.localDb.UserDao
 abstract class LocalDatabase : RoomDatabase() {
     abstract fun userDao(): UserDao
     abstract fun akmSyncDao(): AkmSyncDao
+    abstract fun akmAnswerDao(): AkmAnswerDao
+    abstract fun akmSubmissionDao(): AkmSubmissionDao
+    abstract fun akmScheduleCacheDao(): AkmScheduleCacheDao
+    abstract fun akmViolationDao(): AkmViolationDao
+    abstract fun akmProblemReportDao(): AkmProblemReportDao
     abstract fun schoolDao(): SchoolDao
     abstract fun mapelDao(): MapelDao
     abstract fun materiDao(): MateriDao

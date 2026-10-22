@@ -1,6 +1,12 @@
 package id.diskola.app.apiservice
 
 import com.squareup.moshi.JsonClass
+import id.diskola.app.dataclass.ResponData.ActionMessageResponse
+import id.diskola.app.dataclass.ResponData.KlaspayWalletResponse
+import id.diskola.app.dataclass.ResponData.ResetPinRequest
+import id.diskola.app.dataclass.ResponData.ResetPinResponse
+import id.diskola.app.dataclass.ResponData.SetPinRequest
+import okhttp3.ResponseBody
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -13,21 +19,22 @@ import retrofit2.http.Query
 @JsonClass(generateAdapter = true)
 data class ActivateKlaspayRequest(val pin: String, val password: String = "")
 
-@JsonClass(generateAdapter = true)
-data class ActivateKlaspayApiResponse(val data: Map<String, Any>? = null)
-
-/** Placeholder scaffolding: request/response shapes not yet defined, no UI consumer yet. */
+/**
+ * Typed so far (phase P1): activation, wallet and PIN reset. The remaining endpoints are untyped placeholders that each payment
+ * sub-phase (P2 SPP … P6 partisipasi) replaces with real request/response models as it builds the screen that calls them.
+ */
 interface KlaspayApiService {
 
     // --- Aktivasi & wallet ---
+    /** 2xx = the account may activate; a 4xx whose `errors` keys include `email` / `password` says what is missing. */
     @POST("mobile/app/payment/check")
-    suspend fun checkPaymentStatus(@Body request: Map<String, Any>): Map<String, Any>
+    suspend fun checkPaymentStatus(): ActionMessageResponse
 
     @POST("mobile/app/payment/activate")
-    suspend fun activateKlaspay(@Body request: ActivateKlaspayRequest): ActivateKlaspayApiResponse
+    suspend fun activateKlaspay(@Body request: ActivateKlaspayRequest): ActionMessageResponse
 
     @GET("payment/wallet")
-    suspend fun getWallet(): Map<String, Any>
+    suspend fun getWallet(): KlaspayWalletResponse
 
     @POST("payment/toppers/register")
     suspend fun registerToppers(@Body request: Map<String, Any>): Map<String, Any>
@@ -36,10 +43,18 @@ interface KlaspayApiService {
     suspend fun unregisterToppers(@Body request: Map<String, Any>): Map<String, Any>
 
     @POST("payment/reset-pin")
-    suspend fun resetPin(@Body request: Map<String, Any>): Map<String, Any>
+    suspend fun resetPin(@Body request: ResetPinRequest): ResetPinResponse
 
     @POST("payment/reset-pin/setpin")
-    suspend fun setNewPin(@Body request: Map<String, Any>): Map<String, Any>
+    suspend fun setNewPin(@Body request: SetPinRequest): ActionMessageResponse
+
+    /**
+     * The reset link from the e-mail (`…/api/payment/reset-pin/token/<token>`): a 2xx only means the token is still valid. Called on
+     * this build's own API base (legacy fetched whatever host the link carried), so a crafted link can never make the app send
+     * its credentials elsewhere.
+     */
+    @GET("payment/reset-pin/token/{token}")
+    suspend fun validateResetPinToken(@Path("token") token: String): ResponseBody
 
     @GET("payment/user/campaign/point")
     suspend fun campaignPoints(): Map<String, Any>

@@ -13,9 +13,9 @@ import kotlinx.coroutines.flow.asStateFlow
 enum class TopUpMethod { VIRTUAL_ACCOUNT, AGEN_KLASPAY }
 
 /**
- * UI-only for now — Klaspay/Pembayaran has no backend yet (see `ref/fase2`). All balances,
- * bills, and transactions below are [MockPembayaran] seed data; swap the StateFlow sources for
- * real repository calls once the payment API exists.
+ * Dummy data ([MockPembayaran]) behind the payment screens that are kept only as UI references. Nothing navigates to them any more —
+ * the Pembayaran hub runs on [PaymentHubViewModel] — and each payment sub-phase replaces its screens with real ones; whatever is
+ * left is deleted together with [MockPembayaran] in the last sub-phase (P6).
  */
 @HiltViewModel
 class PembayaranViewModel @Inject constructor() : ViewModel() {

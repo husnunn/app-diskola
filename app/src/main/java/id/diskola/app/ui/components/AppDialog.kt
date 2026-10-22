@@ -4,8 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -13,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -37,6 +41,7 @@ fun AppDialog(
     onSecondaryClick: (() -> Unit)? = null,
     dismissible: Boolean = true,
     primaryLoading: Boolean = false,
+    primaryEnabled: Boolean = true,
     content: (@Composable () -> Unit)? = null,
 ) {
     Dialog(
@@ -46,6 +51,8 @@ fun AppDialog(
             dismissOnClickOutside = dismissible,
         ),
     ) {
+        // A long title/body (a server message, say) scrolls inside the dialog instead of pushing the buttons off screen.
+        val maxContentHeight = (LocalConfiguration.current.screenHeightDp * 0.8f).dp
         Box(
             modifier = modifier
                 .fillMaxWidth()
@@ -53,6 +60,7 @@ fun AppDialog(
                 .padding(Spacing.xxl),
         ) {
             Column(
+                modifier = Modifier.heightIn(max = maxContentHeight),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Spacing.md),
             ) {
@@ -71,23 +79,30 @@ fun AppDialog(
                         )
                     }
                 }
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center,
-                )
-                Text(
-                    text = body,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-                content?.invoke()
+                Column(
+                    modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Spacing.md),
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                    )
+                    Text(
+                        text = body,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                    content?.invoke()
+                }
                 AppButton(
                     text = primaryButtonText,
                     onClick = onPrimaryClick,
                     loading = primaryLoading,
+                    enabled = primaryEnabled,
                     variant = ButtonVariant.Filled,
                     modifier = Modifier.fillMaxWidth(),
                 )

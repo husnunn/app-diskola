@@ -1,9 +1,7 @@
 package id.diskola.app.viewmodel
 
 import dagger.hilt.android.lifecycle.HiltViewModel
-import id.diskola.app.apiservice.ActivateKlaspayRequest
-import id.diskola.app.apiservice.KlaspayApiService
-import id.diskola.app.utils.session.SessionStore
+import id.diskola.app.repository.KlaspayRepository
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,17 +12,17 @@ import kotlinx.coroutines.flow.asStateFlow
  * the legacy nav graph, so it's not ported here either. */
 @HiltViewModel
 class KlaspayActivationViewModel @Inject constructor(
-    private val klaspayApiService: KlaspayApiService,
-    private val sessionStore: SessionStore,
+    private val klaspay: KlaspayRepository,
 ) : BaseViewModel() {
 
     private val _activated = MutableStateFlow(false)
     val activated: StateFlow<Boolean> = _activated.asStateFlow()
 
+    /** `payment/activate` with the confirmed PIN; a failure leaves the user on the confirmation step with the reason as a toast. */
     fun activate(pin: String, isSso: Boolean) {
+        if (loading.value) return
         launchWithHandling {
-            klaspayApiService.activateKlaspay(ActivateKlaspayRequest(pin = pin))
-            sessionStore.markKlaspayActivated(fromSso = isSso)
+            klaspay.activate(pin, fromSso = isSso)
             _activated.value = true
         }
     }

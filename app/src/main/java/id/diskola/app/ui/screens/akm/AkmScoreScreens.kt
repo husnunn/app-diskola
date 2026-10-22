@@ -22,6 +22,7 @@ import androidx.compose.material.icons.rounded.QuestionAnswer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -42,10 +43,11 @@ import id.diskola.app.ui.components.LoadingState
 import id.diskola.app.ui.components.ProgressTrack
 import id.diskola.app.ui.components.ScoreRing
 import id.diskola.app.ui.components.SectionLabel
+import id.diskola.app.ui.components.StampedIf
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
-import id.diskola.app.viewmodel.AkmViewModel
+import id.diskola.app.viewmodel.AkmListViewModel
 
 /** Scored result for one assessment, broken down per subtest. */
 @Composable
@@ -54,7 +56,7 @@ fun AkmScoreScreen(
     onBack: () -> Unit,
     onOpenExplanation: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: AkmViewModel = hiltViewModel(),
+    viewModel: AkmListViewModel = hiltViewModel(),
 ) {
     val scores by viewModel.scores.collectAsStateWithLifecycle()
     val score = scores.find { it.id == scoreId }
@@ -66,10 +68,14 @@ fun AkmScoreScreen(
             return@DetailScaffold
         }
         val subtests = viewModel.subtestScoresFor(scoreId)
+        val participantRows = remember(score) {
+            akmParticipantRows(viewModel.sessionStore, score.id, score.category, score.period, score.watermark)
+        }
 
+        // Same "Dibatalkan" stamp and "Status" row as the detail screen (doc 06 §4.4, §14).
+        StampedIf(score.watermark, Modifier.padding(padding).fillMaxSize()) {
         Column(
             modifier = Modifier
-                .padding(padding)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = ScreenHorizontalPadding)
@@ -92,6 +98,11 @@ fun AkmScoreScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = scheme.onSurfaceVariant,
                 )
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                SectionLabel("INFORMASI PESERTA")
+                AkmParticipantCard(participantRows)
             }
 
             if (subtests.isNotEmpty()) {
@@ -136,6 +147,7 @@ fun AkmScoreScreen(
                 )
             }
         }
+        }
     }
 }
 
@@ -150,7 +162,7 @@ fun AkmExplainScreen(
     scoreId: Int,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: AkmViewModel = hiltViewModel(),
+    viewModel: AkmListViewModel = hiltViewModel(),
 ) {
     val loading by viewModel.explanationLoading.collectAsStateWithLifecycle()
     val error by viewModel.explanationError.collectAsStateWithLifecycle()

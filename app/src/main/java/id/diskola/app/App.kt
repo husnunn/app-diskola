@@ -10,7 +10,15 @@ import androidx.work.Configuration
 import com.google.firebase.installations.FirebaseInstallations
 import com.google.firebase.messaging.FirebaseMessaging
 import dagger.hilt.android.HiltAndroidApp
+import id.diskola.app.repository.AkmProblemReportQueue
+import id.diskola.app.repository.AkmRepository
+import id.diskola.app.repository.AkmViolationQueue
+import id.diskola.app.worker.AkmWork
 import id.diskola.app.utils.PreferenceClass
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -21,6 +29,12 @@ class  App : MultiDexApplication(), Application.ActivityLifecycleCallbacks, Conf
     lateinit var preference: PreferenceClass
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
+    @Inject
+    lateinit var akmRepository: AkmRepository
+    @Inject
+    lateinit var violationQueue: AkmViolationQueue
+    @Inject
+    lateinit var problemReportQueue: AkmProblemReportQueue
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
@@ -29,9 +43,19 @@ class  App : MultiDexApplication(), Application.ActivityLifecycleCallbacks, Conf
         super.onCreate()
         registerActivityLifecycleCallbacks(this)
 
-//        if (BuildConfig.BUILD_TYPE != "release") {
-        Timber.plant(Timber.DebugTree())
-//        }
+        // Release builds log nothing: request bodies and exceptions can carry PINs and tokens (doc 08 Q14).
+        if (BuildConfig.DEBUG) Timber.plant(Timber.DebugTree())
+
+        // Exam answers still unsent (WorkManager keeps its jobs across restarts, but a job that was never created — a download from before
+        // this build, a deadline whose work was pruned — is re-created here; KEEP makes repeating this harmless).
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            runCatching { akmRepository.scheduleDeadlines() }.onFailure { Timber.e(it, "Gagal menjadwalkan ulang pengiriman jawaban ujian") }
+            // Violations recorded before the process died (a session left by a kill, a crash): their periodic sender is put back.
+            runCatching { violationQueue.examIdsWithRows().forEach { AkmWork.enqueueViolationUploader(this@App, it) } }
+                .onFailure { Timber.e(it, "Gagal menjadwalkan ulang pengiriman pelanggaran ujian") }
+            runCatching { if (problemReportQueue.countUnsent() > 0) AkmWork.enqueueProblemReportUpload(this@App) }
+                .onFailure { Timber.e(it, "Gagal menjadwalkan ulang pengiriman laporan masalah") }
+        }
 
         // Apply saved theme mode at startup (follow system by default)
         try {

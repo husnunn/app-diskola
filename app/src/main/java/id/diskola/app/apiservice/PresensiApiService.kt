@@ -1,6 +1,7 @@
 package id.diskola.app.apiservice
 
 import id.diskola.app.dataclass.ResponData.FeatureAvailabilityResponse
+import id.diskola.app.dataclass.ResponData.TodaySettingResponse
 import id.diskola.app.dataclass.ResponData.LeaveRequestListResponse
 import id.diskola.app.dataclass.ResponData.LeaveRequestSubmitResponse
 import id.diskola.app.dataclass.ResponData.LeaveRequestTodayResponse
@@ -90,6 +91,12 @@ interface PresensiApiService {
         @Part("note") note: RequestBody,
         @Part file: MultipartBody.Part,
     ): LeaveRequestSubmitResponse
+
+    // ---- Hub banner ----
+
+    /** What kind of day today is for the signed-in staff member (legacy `attendanceSettingMeToday`). */
+    @GET("mobile/attendance/setting/me/today")
+    suspend fun settingToday(): TodaySettingResponse
 
     // ---- Feature gate ----
 

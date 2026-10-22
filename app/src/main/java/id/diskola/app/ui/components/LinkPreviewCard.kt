@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
-import androidx.compose.material.icons.rounded.BrokenImage
+import androidx.compose.material.icons.rounded.ImageNotSupported
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -47,21 +47,26 @@ fun LinkPreviewCard(
             .border(1.dp, scheme.outlineVariant, DiskolaExtraShapes.card)
             .clickable(onClick = onClick),
     ) {
+        val hasImage = !data?.imageUrl.isNullOrBlank()
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(104.dp)
+                // a missing image needs only enough room for its caption
+                .height(if (loading || hasImage) 104.dp else 72.dp)
                 .background(scheme.surfaceContainerLow),
             contentAlignment = Alignment.Center,
         ) {
             when {
                 loading -> CircularProgressIndicator(modifier = Modifier.padding(Spacing.lg))
-                !data?.imageUrl.isNullOrBlank() -> AsyncImage(
+                hasImage -> AsyncImage(
                     model = data?.imageUrl,
                     contentDescription = null,
                     modifier = Modifier.fillMaxWidth().height(104.dp),
                 )
-                else -> Icon(Icons.Rounded.BrokenImage, contentDescription = null, tint = scheme.onSurfaceVariant)
+                else -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                    Icon(Icons.Rounded.ImageNotSupported, contentDescription = null, tint = scheme.onSurfaceVariant)
+                    Text("Tidak ada gambar pratinjau", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
+                }
             }
         }
         Row(

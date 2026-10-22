@@ -2,48 +2,94 @@ package id.diskola.app.viewmodel
 
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import id.diskola.app.dataclass.ResponData.CheckAccountApiResponse
+import id.diskola.app.dataclass.ResponData.CurrentSubjectData
 import id.diskola.app.dataclass.ResponData.SchoolItem
 import id.diskola.app.repository.AgendaRepository
 import id.diskola.app.repository.AuthRepository
 import id.diskola.app.repository.FeatureGateRepository
-import id.diskola.app.repository.JurnalRepository
-import id.diskola.app.utils.JurnalRow
-import id.diskola.app.utils.JurnalRules
+import id.diskola.app.repository.HubNotificationRepository
+import id.diskola.app.repository.PresensiRepository
+import id.diskola.app.utils.AppErrorHandler
+import id.diskola.app.utils.DeviceIdProvider
+import id.diskola.app.utils.HubRules
 import id.diskola.app.utils.session.SessionManager
 import id.diskola.app.utils.session.SessionStore
-import java.time.LocalTime
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import timber.log.Timber
+
+/** Who is signed in and what the hub header shows — always read back from [SessionStore] after a check-account lands. */
+data class HomeProfile(
+    val schoolName: String,
+    val schoolLogo: String,
+    val userName: String,
+    val userAvatar: String,
+    /** Under the name: the e-mail for a teacher, the class for everyone else (legacy `title_class`). */
+    val classLine: String,
+    val isStudent: Boolean,
+    val isTeacher: Boolean,
+    val isGuest: Boolean,
+    val isHavingClass: Boolean,
+    val klaspayActive: Boolean,
+)
+
+data class HomeUiState(
+    val profile: HomeProfile,
+    val verify: HubRules.VerifyState,
+    /** `check-account.current_subject` of the latest successful check-account (students' "Kelas Berlangsung"). */
+    val currentSubject: CurrentSubjectData? = null,
+    /** Teachers' attendance banner; null until `setting/me/today` + `check` answered. */
+    val banner: HubRules.AttendanceBanner? = null,
+    val bellCount: Int = 0,
+    val agendaMissing: Int = 0,
+    val loading: Boolean = false,
+)
+
+data class FeatureUnavailable(val name: String, val message: String)
 
 /**
- * `PembelajaranPage` hub (doc `05-pembelajaran-materi-tugas.md` §1). Scope for this pass (agreed
- * with user): menu grid correctness, guest popup, the real "Kelas Berlangsung" card, and the
- * inactive-account check, and the teacher "Agenda Mingguan" missing-count badge. The notification
- * badge's `payment/wallet`→`notification/summary` chain needs endpoints that don't exist anywhere
- * in this app yet (confirmed by a full-repo search) and is deferred — see doc `05a`.
+ * Pembelajaran hub (legacy `PembelajaranPage`). One load, in the legacy order: `check-account` (profile, role, class, verify
+ * progress, `current_subject`), then in parallel the session guard (`current-user`), the bell badge (`payment/wallet` →
+ * `notification/summary`), the teacher's agenda badge and — for teachers whose content shows — the attendance banner
+ * (`setting/me/today` + `staff/check`).
+ *
+ * It runs on every return to the screen and on the refresh icon, like legacy, but never overlaps itself (the flag is set before
+ * `launch`) and a return within [MIN_RELOAD_MS] of the last successful load is skipped. The refresh icon always loads.
  */
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val jurnalRepository: JurnalRepository,
     private val agendaRepository: AgendaRepository,
+    private val presensiRepository: PresensiRepository,
+    private val notificationRepository: HubNotificationRepository,
     private val featureGate: FeatureGateRepository,
     private val sessionManager: SessionManager,
-    val sessionStore: SessionStore,
+    private val deviceIdProvider: DeviceIdProvider,
+    private val sessionStore: SessionStore,
 ) : BaseViewModel() {
 
-    /** The class session whose hour is running right now (Hub "Kelas Berlangsung"), student-aware via [JurnalRules]. */
-    private val _ongoingClass = MutableStateFlow<JurnalRow?>(null)
-    val ongoingClass: StateFlow<JurnalRow?> = _ongoingClass.asStateFlow()
-
-    private val _scheduleLoaded = MutableStateFlow(false)
-    val scheduleLoaded: StateFlow<Boolean> = _scheduleLoaded.asStateFlow()
+    private val _state = MutableStateFlow(initialState())
+    val state: StateFlow<HomeUiState> = _state.asStateFlow()
 
     private val _accountInactive = MutableStateFlow(false)
     val accountInactive: StateFlow<Boolean> = _accountInactive.asStateFlow()
+
+    private val _deviceConflict = MutableStateFlow(false)
+    val deviceConflict: StateFlow<Boolean> = _deviceConflict.asStateFlow()
+
+    private val _guestPopup = MutableStateFlow(false)
+    val guestPopup: StateFlow<Boolean> = _guestPopup.asStateFlow()
+
+    private val _logoutBlocked = MutableStateFlow(false)
+    val logoutBlocked: StateFlow<Boolean> = _logoutBlocked.asStateFlow()
 
     private val _featureChecking = MutableStateFlow(false)
     val featureChecking: StateFlow<Boolean> = _featureChecking.asStateFlow()
@@ -51,59 +97,128 @@ class HomeViewModel @Inject constructor(
     private val _featureUnavailable = MutableStateFlow<FeatureUnavailable?>(null)
     val featureUnavailable: StateFlow<FeatureUnavailable?> = _featureUnavailable.asStateFlow()
 
-    /** Teacher hub badge: today's `summary.missing` sessions (0 when agendas are off or the call fails). */
-    private val _agendaMissing = MutableStateFlow(0)
-    val agendaMissing: StateFlow<Int> = _agendaMissing.asStateFlow()
+    private var inFlight = false
+    private var lastLoadedAt = 0L
+    private var guestPopupShown = false
 
-    /** `sessionStore` is a plain SharedPreferences reader, not an observable — bumping this after
-     * `writeCheckAccount` lands is what tells the Composable to recompose and re-read
-     * `isHavingClass`/`isStudent`/etc. Reading it (even unused) in the UI is what wires that up. */
-    private val _sessionVersion = MutableStateFlow(0)
-    val sessionVersion: StateFlow<Int> = _sessionVersion.asStateFlow()
+    // ---- Triggers ----
 
-    /** Re-run on every landing on Home and every foreground resume (doc §1.4) — `check-account`
-     * refreshes `is_active`/class/school display data, the schedule call finds "Kelas Berlangsung". */
-    fun refresh() {
-        refreshProfile()
-        loadSchedule()
-        if (sessionStore.isTeacher) loadAgendaBadge()
-    }
+    /** Every time the hub comes back to the foreground. */
+    fun onResumed() = load(force = false)
 
-    private fun loadAgendaBadge() {
-        launchWithHandling(showLoading = false, showError = false) {
-            _agendaMissing.value = agendaRepository.missingToday()
+    /** The refresh icon. */
+    fun refresh() = load(force = true)
+
+    private fun load(force: Boolean) {
+        if (inFlight) return
+        if (!force && lastLoadedAt != 0L && System.currentTimeMillis() - lastLoadedAt < MIN_RELOAD_MS) return
+        inFlight = true
+        _state.update { it.copy(loading = true) }
+        viewModelScope.launch {
+            try {
+                loadAll()
+            } finally {
+                inFlight = false
+                _state.update { it.copy(loading = false) }
+            }
         }
     }
 
-    private fun refreshProfile() {
+    private suspend fun loadAll() = coroutineScope {
+        val response = refreshProfile()
+        if (response != null) lastLoadedAt = System.currentTimeMillis()
+
+        val profile = readProfile()
+        _state.update { current ->
+            if (response == null) {
+                current.copy(profile = profile)
+            } else {
+                current.copy(
+                    profile = profile,
+                    verify = HubRules.verifyState(response.userProgress, profile.isStudent, profile.isHavingClass),
+                    currentSubject = response.current_subject,
+                )
+            }
+        }
+        if (!sessionStore.isActive) _accountInactive.value = true
+        if (!guestPopupShown && profile.isGuest) {
+            guestPopupShown = true
+            _guestPopup.value = true
+        }
+
+        launch { guardSession() }
+        launch { loadBell(profile) }
+        if (profile.isTeacher) launch { loadAgendaBadge() }
+        // Legacy shows the banner wherever a non-student's content card would have been (`layoutCurrentClass` visible).
+        if (!profile.isStudent && _state.value.verify == HubRules.VerifyState.ShowContent) {
+            launch { loadBanner() }
+        }
+    }
+
+    /** `check-account`; null when it could not run or failed (the stored profile keeps being used, like legacy). */
+    private suspend fun refreshProfile(): CheckAccountApiResponse? {
         val school = sessionStore.school
         val nisn = sessionStore.student?.nis?.takeIf { it.isNotBlank() } ?: sessionStore.user.nisNik
-        if (school.uuid.isBlank() || nisn.isBlank()) return
-        launchWithHandling(showLoading = false, showError = false) {
+        if (school.uuid.isBlank() || nisn.isBlank()) return null
+        return try {
             val response = authRepository.checkAccount(nisn, school.uuid)
             sessionStore.writeCheckAccount(response, SchoolItem(id = school.id, uuid = school.uuid, name = school.name))
-            if (!sessionStore.isActive) _accountInactive.value = true
-            _sessionVersion.value += 1
+            response
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.e(e)
+            emitError(AppErrorHandler.getMessage(e))
+            null
         }
     }
 
-    private fun loadSchedule() {
-        launchWithHandling(showLoading = false, showError = false) {
-            val now = LocalTime.now()
-            val rows = JurnalRules.buildRows(jurnalRepository.schedule(), sessionStore.isStudent, now)
-            _ongoingClass.value = JurnalRules.currentRow(rows, now)
-            _scheduleLoaded.value = true
+    /** Single-device check; a 401 reaches the central "Sesi Berakhir" handler on its own. */
+    private suspend fun guardSession() {
+        try {
+            if (HubRules.deviceMismatch(authRepository.currentUser(), deviceIdProvider.get())) _deviceConflict.value = true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.e(e)
         }
+    }
+
+    private suspend fun loadBell(profile: HomeProfile) {
+        if (!profile.klaspayActive) return
+        notificationRepository.unreadCount()?.let { count -> _state.update { it.copy(bellCount = count) } }
+    }
+
+    /** Teacher badge: today's missing sessions (0 when agendas are off or the call fails). */
+    private suspend fun loadAgendaBadge() {
+        val missing = agendaRepository.missingToday()
+        _state.update { it.copy(agendaMissing = missing) }
     }
 
     /**
-     * Server-side feature switch (`check-feature-availability`) in front of Presensi/Jurnal. Checked
-     * once per tap (legacy checked again in the Activity's onCreate); an error counts as available.
+     * `setting/me/today` and `check` in parallel. If today's setting cannot be read the banner stays as it was (legacy would
+     * claim "Jadwal absensi belum diatur"); a missing `check` is the legacy "Di luar jam absensi".
+     */
+    private suspend fun loadBanner() = coroutineScope {
+        val today = async { attempt { presensiRepository.settingToday() } }
+        val check = async { attempt { presensiRepository.check() } }
+        val todayResult = today.await()
+        val checkResult = check.await()
+        if (todayResult.isFailure) return@coroutineScope
+        val banner = HubRules.attendanceBanner(todayResult.getOrNull(), checkResult.getOrNull())
+        _state.update { it.copy(banner = banner) }
+    }
+
+    // ---- Feature gate (Presensi / Jurnal tiles, banner CTA) ----
+
+    /**
+     * Server-side feature switch (`check-feature-availability`) in front of Presensi/Jurnal. Checked once per tap;
+     * an error counts as available.
      */
     fun openFeature(name: String, onAvailable: () -> Unit) {
         if (_featureChecking.value) return
+        _featureChecking.value = true
         viewModelScope.launch {
-            _featureChecking.value = true
             val result = featureGate.check(name)
             _featureChecking.value = false
             if (result.available) onAvailable() else _featureUnavailable.value = FeatureUnavailable(name, result.message.orEmpty())
@@ -114,17 +229,62 @@ class HomeViewModel @Inject constructor(
         _featureUnavailable.value = null
     }
 
-    /** "Baik" on the inactive-account alert (doc §1.4) — logs out then hands control back to the
-     * caller to navigate to Login, mirroring `AkunViewModel.logout`'s split. */
-    fun confirmInactiveLogout(onComplete: () -> Unit) {
+    // ---- Dialog results ----
+
+    fun dismissGuestPopup() {
+        _guestPopup.value = false
+    }
+
+    fun consumeLogoutBlocked() {
+        _logoutBlocked.value = false
+    }
+
+    /** "Baik" on the inactive-account alert and "Mengerti" on the other-device alert: log out, unless an exam is pending. */
+    fun confirmLogout(onComplete: () -> Unit) {
         viewModelScope.launch {
-            sessionManager.logout()
-            onComplete()
+            when (sessionManager.logout()) {
+                is SessionManager.LogoutResult.Success -> onComplete()
+                is SessionManager.LogoutResult.BlockedByPendingExam -> _logoutBlocked.value = true
+            }
         }
     }
+
+    // ---- State from the session ----
+
+    private fun initialState(): HomeUiState {
+        val profile = readProfile()
+        return HomeUiState(profile = profile, verify = HubRules.verifyState(null, profile.isStudent, profile.isHavingClass))
+    }
+
+    private fun readProfile(): HomeProfile {
+        val school = sessionStore.school
+        val user = sessionStore.user
+        return HomeProfile(
+            schoolName = school.name,
+            schoolLogo = school.image,
+            userName = user.name,
+            userAvatar = user.avatar,
+            classLine = HubRules.classLine(sessionStore.isTeacher, user.email, sessionStore.student?.className.orEmpty()),
+            isStudent = sessionStore.isStudent,
+            isTeacher = sessionStore.isTeacher,
+            isGuest = sessionStore.isGuest,
+            isHavingClass = sessionStore.isHavingClass,
+            klaspayActive = sessionStore.klaspayActive,
+        )
+    }
+
+    /** `runCatching` without swallowing cancellation. */
+    private inline fun <T> attempt(block: () -> T): Result<T> = try {
+        Result.success(block())
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Timber.e(e)
+        Result.failure(e)
+    }
+
+    private companion object {
+        /** A return to the hub sooner than this after a successful load does not fetch again. */
+        const val MIN_RELOAD_MS = 30_000L
+    }
 }
-
-data class FeatureUnavailable(val name: String, val message: String)
-
-/** "07:30:00" / "07:30" → "07.30", matching the legacy hub's clock display convention. */
-fun formatScheduleClock(raw: String?): String = raw.orEmpty().split(":").take(2).joinToString(".")

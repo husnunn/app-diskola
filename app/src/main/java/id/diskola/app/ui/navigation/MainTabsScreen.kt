@@ -1,6 +1,12 @@
 package id.diskola.app.ui.navigation
 
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -60,7 +66,11 @@ import id.diskola.app.ui.screens.akun.AkunSettingScreen
 import id.diskola.app.ui.screens.akun.readAkunSession
 import id.diskola.app.ui.screens.home.HomeScreen
 import id.diskola.app.ui.screens.akm.AkmDetailScreen
+import id.diskola.app.exam.ExamSessionEvent
 import id.diskola.app.ui.screens.akm.AkmExplainScreen
+import id.diskola.app.ui.screens.akm.AkmPrimingScreen
+import id.diskola.app.ui.screens.akm.ExamSessionOverlays
+import id.diskola.app.ui.screens.akm.LocalExamSession
 import id.diskola.app.ui.screens.akm.AkmQuestionScreen
 import id.diskola.app.ui.screens.akm.AkmResumeScreen
 import id.diskola.app.ui.screens.akm.AkmScoreScreen
@@ -88,7 +98,10 @@ import id.diskola.app.ui.screens.tugas.TugasTerkumpulScreen
 import id.diskola.app.ui.screens.tugas.UploadTugasScreen
 import id.diskola.app.ui.screens.pembayaran.CheckoutScreen
 import id.diskola.app.ui.screens.pembayaran.PaymentSuccessScreen
+import id.diskola.app.ui.screens.pembayaran.ConfirmPinScreen
 import id.diskola.app.ui.screens.pembayaran.PembayaranScreen
+import id.diskola.app.ui.components.rememberActivationGate
+import id.diskola.app.utils.PaymentRules
 import id.diskola.app.ui.screens.pembayaran.PinScreen
 import id.diskola.app.ui.screens.pembayaran.QrScreen
 import id.diskola.app.ui.screens.pembayaran.RiwayatScreen
@@ -99,7 +112,7 @@ import id.diskola.app.ui.screens.pembayaran.TransferScreen
 import id.diskola.app.ui.theme.LocalWindowWidth
 import id.diskola.app.ui.theme.WindowWidth
 import id.diskola.app.ui.theme.contentContainer
-import id.diskola.app.viewmodel.AkmViewModel
+import id.diskola.app.viewmodel.AkmListViewModel
 import id.diskola.app.viewmodel.AkunViewModel
 import id.diskola.app.viewmodel.MateriGuruViewModel
 import id.diskola.app.viewmodel.NotifikasiViewModel
@@ -121,6 +134,12 @@ private val tabs = listOf(
 )
 
 /**
+ * Payment destinations that run on real data. Each payment sub-phase adds its screens here (and to [Route.PembayaranSub]); until then
+ * the hub answers "Fitur dalam pengembangan" instead of opening the dummy screens kept for reference.
+ */
+private val availablePaymentDestinations: Set<PaymentRules.PaymentDestination> = emptySet()
+
+/**
  * Bottom-nav shell for Pembelajaran/Pembayaran/Akun (Fase 2 redesign — replaces the old
  * Dashboard/Materi/Absensi/Profile 4-tab shell). Materi, Absensi, Notifikasi, and every
  * Akun/Pembayaran subscreen are pushed routes reachable from their tab, not tabs themselves;
@@ -128,8 +147,29 @@ private val tabs = listOf(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainTabsScreen(onLoggedOut: () -> Unit, modifier: Modifier = Modifier) {
+fun MainTabsScreen(
+    onLoggedOut: () -> Unit,
+    onOpenKlaspayActivation: () -> Unit,
+    onOpenSetPin: (token: String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val navController = rememberNavController()
+    val examSession = LocalExamSession.current
+    // "Keluar dari ujian" on the recovery dialog (offered after three failed tries to re-pin): leave without handing in, like "Ya, keluar".
+    LaunchedEffect(examSession, navController) {
+        examSession.events.collect { event ->
+            when (event) {
+                ExamSessionEvent.LeaveRequested -> {
+                    val examId = examSession.state.value.examId
+                    if (examId != 0) examSession.abort(examId)
+                    navController.leaveExam()
+                }
+            }
+        }
+    }
+    ExamSessionOverlays(examSession)
+    // One activation gate for the whole shell: the Pembayaran hub and the Home bell share its dialogs and checks (doc 08 Q19).
+    val activationGate = rememberActivationGate(onOpenActivation = onOpenKlaspayActivation)
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination
     val showNav = tabs.any { tab -> currentRoute?.hierarchy?.any(tab.isSelected) == true }
@@ -147,6 +187,8 @@ fun MainTabsScreen(onLoggedOut: () -> Unit, modifier: Modifier = Modifier) {
 
     Scaffold(
         modifier = modifier,
+        // system bars + display cutout (a cutout is not part of `systemBars`; matters when the portrait lock is ignored on large screens)
+        contentWindowInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout),
         bottomBar = {
             if (showNav && !useRail) {
                 NavigationBar {
@@ -162,7 +204,11 @@ fun MainTabsScreen(onLoggedOut: () -> Unit, modifier: Modifier = Modifier) {
             }
         },
     ) { padding ->
-        Row(modifier = Modifier.fillMaxSize().padding(padding)) {
+        // consumeWindowInsets: this Scaffold already padded for the status/navigation bars, so the Scaffold + TopAppBar
+        // inside every pushed screen (DetailScaffold) must not add them a second time — that doubled the top gap.
+        // imePadding() comes after consumeWindowInsets(): it only adds what the keyboard needs beyond the bars already padded for, so a
+        // sticky bottomBar rises above the keyboard and the content area shrinks instead of being covered.
+        Row(modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
             if (showNav && useRail) {
                 NavigationRail {
                     tabs.forEach { tab ->
@@ -190,13 +236,16 @@ fun MainTabsScreen(onLoggedOut: () -> Unit, modifier: Modifier = Modifier) {
                             navController.navigate(if (isTeacher) Route.TugasGuru else Route.TugasSiswa)
                         },
                         onNavigateToPresensi = { navController.navigate(Route.Presensi) },
-                        onOpenJurnal = { action, attendanceId, plotId -> navController.navigate(Route.Jurnal(action, attendanceId, plotId)) },
+                        onOpenJurnal = { navController.navigate(Route.Jurnal) },
+                        onOpenVerifikasiJurnal = { attendanceId, title -> navController.navigate(Route.VerifikasiJurnal(attendanceId, title)) },
+                        onOpenJurnalForm = { plotId, label -> navController.navigate(Route.JurnalForm(plotId, label)) },
                         onNavigateToAgenda = { navController.navigate(Route.AgendaMingguan) },
                         onNavigateToPoin = {
                             navController.navigate(if (isTeacher) Route.PoinGuru else Route.PoinSiswa)
                         },
                         onNavigateToAsesmen = { navController.navigate(Route.Akm.List) },
                         onNavigateToNotifikasi = { navController.navigate(Route.Notifikasi) },
+                        onOpenKlaspayActivation = activationGate.start,
                         onLoggedOut = onLoggedOut,
                     )
                 }
@@ -208,14 +257,10 @@ fun MainTabsScreen(onLoggedOut: () -> Unit, modifier: Modifier = Modifier) {
                     )
                 }
                 composable<Route.MainTab.Pembayaran> {
-                    val viewModel: PembayaranViewModel = hiltViewModel()
                     PembayaranScreen(
-                        viewModel = viewModel,
-                        onTopUp = { navController.navigate(Route.PembayaranSub.TopUp) },
-                        onTransfer = { navController.navigate(Route.PembayaranSub.Transfer) },
-                        onQr = { navController.navigate(Route.PembayaranSub.Qr) },
-                        onRiwayat = { navController.navigate(Route.PembayaranSub.Riwayat) },
-                        onSpp = { navController.navigate(Route.PembayaranSub.Spp) },
+                        gate = activationGate,
+                        available = availablePaymentDestinations,
+                        onNavigate = { /* nothing is built yet: see availablePaymentDestinations */ },
                     )
                 }
     
@@ -298,12 +343,8 @@ fun MainTabsScreen(onLoggedOut: () -> Unit, modifier: Modifier = Modifier) {
                         },
                     )
                 }
-                composable<Route.Jurnal> { backStackEntry ->
-                    val route = backStackEntry.toRoute<Route.Jurnal>()
+                composable<Route.Jurnal> {
                     JurnalScreen(
-                        initialAction = route.action,
-                        initialAttendanceId = route.attendanceId,
-                        initialPlotId = route.plotId,
                         onBack = { navController.popBackStack() },
                         onOpenVerifikasi = { id, title -> navController.navigate(Route.VerifikasiJurnal(id, title)) },
                         onOpenForm = { plotId, label -> navController.navigate(Route.JurnalForm(plotId, label)) },
@@ -556,7 +597,7 @@ fun MainTabsScreen(onLoggedOut: () -> Unit, modifier: Modifier = Modifier) {
                 composable<Route.Akm.List> { backStackEntry ->
                     // This destination IS the shared-ViewModel anchor — scope to its own entry
                     // directly instead of looking it up again (see note below on why re-lookup crashes).
-                    val vm: AkmViewModel = hiltViewModel(backStackEntry)
+                    val vm: AkmListViewModel = hiltViewModel(backStackEntry)
                     AkmScreen(
                         onBack = { navController.popBackStack() },
                         onOpenDetail = { navController.navigate(Route.Akm.Detail(it)) },
@@ -571,41 +612,51 @@ fun MainTabsScreen(onLoggedOut: () -> Unit, modifier: Modifier = Modifier) {
                     // resolving it fresh on every recomposition can crash mid pop-transition, once
                     // the user has already backed out past Route.Akm.List and it leaves the back stack.
                     val listEntry = remember(backStackEntry) { navController.getBackStackEntry(Route.Akm.List) }
-                    val vm: AkmViewModel = hiltViewModel(listEntry)
+                    val vm: AkmListViewModel = hiltViewModel(listEntry)
                     AkmDetailScreen(
                         akmId = route.id,
                         onBack = { navController.popBackStack() },
-                        onStart = { navController.navigate(Route.Akm.Resume(route.id)) },
+                        onStart = { navController.navigate(Route.Akm.Priming(route.id)) },
                         onViewScore = { navController.navigate(Route.Akm.Score(route.id)) },
                         viewModel = vm,
                     )
                 }
+                // Resume and Question read everything from Room (`AkmRepository`) and take their arguments from the route, so they
+                // need no shared ViewModel: each is scoped to its own entry and restores itself after the process was killed.
+                composable<Route.Akm.Priming> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.Akm.Priming>()
+                    AkmPrimingScreen(
+                        onBack = { navController.popBackStack() },
+                        onStart = {
+                            // The session opens here (marker, window flags, screen pinning for a strict exam), then the lobby replaces this screen.
+                            examSession.begin(route.id)
+                            navController.navigate(Route.Akm.Resume(route.id)) { popUpTo<Route.Akm.Priming> { inclusive = true } }
+                        },
+                    )
+                }
                 composable<Route.Akm.Resume> { backStackEntry ->
                     val route = backStackEntry.toRoute<Route.Akm.Resume>()
-                    val listEntry = remember(backStackEntry) { navController.getBackStackEntry(Route.Akm.List) }
-                    val vm: AkmViewModel = hiltViewModel(listEntry)
+                    ExamScreenGuard(route.id, navController)
                     AkmResumeScreen(
-                        akmId = route.id,
-                        onOpenInstruction = { navController.navigate(Route.Akm.Question(route.id)) },
-                        // Pop back to the existing list rather than navigating to a fresh one:
-                        // recreating it would drop the shared AkmViewModel and re-fire the clock gate.
-                        onSubmitted = { navController.popBackStack(Route.Akm.List, inclusive = false) },
-                        viewModel = vm,
+                        examId = route.id,
+                        onBack = { navController.popBackStack() },
+                        onOpenInstruction = { instructionId -> navController.navigate(Route.Akm.Question(id = route.id, instructionId = instructionId)) },
+                        onSubmitted = { navController.leaveExam() },
                     )
                 }
                 composable<Route.Akm.Question> { backStackEntry ->
-                    val listEntry = remember(backStackEntry) { navController.getBackStackEntry(Route.Akm.List) }
-                    val vm: AkmViewModel = hiltViewModel(listEntry)
+                    val route = backStackEntry.toRoute<Route.Akm.Question>()
+                    ExamScreenGuard(route.id, navController)
                     AkmQuestionScreen(
+                        examId = route.id,
                         onBack = { navController.popBackStack() },
-                        onTimeUp = { navController.popBackStack(Route.Akm.List, inclusive = false) },
-                        viewModel = vm,
+                        onTimeUp = { navController.leaveExam() },
                     )
                 }
                 composable<Route.Akm.Score> { backStackEntry ->
                     val route = backStackEntry.toRoute<Route.Akm.Score>()
                     val listEntry = remember(backStackEntry) { navController.getBackStackEntry(Route.Akm.List) }
-                    val vm: AkmViewModel = hiltViewModel(listEntry)
+                    val vm: AkmListViewModel = hiltViewModel(listEntry)
                     AkmScoreScreen(
                         scoreId = route.id,
                         onBack = { navController.popBackStack() },
@@ -616,7 +667,7 @@ fun MainTabsScreen(onLoggedOut: () -> Unit, modifier: Modifier = Modifier) {
                 composable<Route.Akm.Explain> { backStackEntry ->
                     val route = backStackEntry.toRoute<Route.Akm.Explain>()
                     val listEntry = remember(backStackEntry) { navController.getBackStackEntry(Route.Akm.List) }
-                    val vm: AkmViewModel = hiltViewModel(listEntry)
+                    val vm: AkmListViewModel = hiltViewModel(listEntry)
                     AkmExplainScreen(
                         scoreId = route.id,
                         onBack = { navController.popBackStack() },
@@ -664,6 +715,20 @@ fun MainTabsScreen(onLoggedOut: () -> Unit, modifier: Modifier = Modifier) {
                     AkunAboutScreen(onBack = { navController.popBackStack() })
                 }
     
+                // The PIN prompt (doc 08 §2.3). Its callers arrive with the payment sub-phases; the PIN goes back through PinResultChannel.
+                composable<Route.PembayaranSub.ConfirmPin> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.PembayaranSub.ConfirmPin>()
+                    ConfirmPinScreen(
+                        requestKey = route.requestKey,
+                        channelName = route.channelName,
+                        forPayment = route.forPayment,
+                        onBack = { navController.popBackStack() },
+                        onConfirmed = { navController.popBackStack() },
+                        onNeedEmailSetting = activationGate.startEmailSetting,
+                        onOpenSetPin = onOpenSetPin,
+                    )
+                }
+
                 // Pembayaran subscreens — share ONE PembayaranViewModel (scoped to the Pembayaran
                 // tab's own back-stack entry) so selections made on one screen (e.g. bills picked on
                 // Spp) are still there on the next (e.g. Checkout).
@@ -741,3 +806,23 @@ fun MainTabsScreen(onLoggedOut: () -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * A lobby or question screen only makes sense inside a running session. Finding one without — the process was killed and Navigation
+ * restored the back stack — means the password is asked again (`password_checked = 0`, legacy `process_restored`), a pin that outlived
+ * the process is let go, and the student lands on the exam detail to start over.
+ */
+@Composable
+private fun ExamScreenGuard(examId: Int, navController: NavHostController) {
+    val session = LocalExamSession.current
+    LaunchedEffect(examId) {
+        if (!session.isActiveFor(examId)) {
+            session.onStaleExamScreen(examId)
+            navController.leaveExam()
+        }
+    }
+}
+
+/** After an exam was submitted or ended: back to its detail (where the status now reads "Proses upload jawaban"), else the list. */
+private fun NavHostController.leaveExam() {
+    if (!popBackStack<Route.Akm.Detail>(inclusive = false)) popBackStack<Route.Akm.List>(inclusive = false)
+}

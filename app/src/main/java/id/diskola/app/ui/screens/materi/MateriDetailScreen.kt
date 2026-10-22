@@ -15,7 +15,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Download
-import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +37,10 @@ import id.diskola.app.ui.components.AppDialog
 import id.diskola.app.ui.components.BannerError
 import id.diskola.app.ui.components.ButtonVariant
 import id.diskola.app.ui.components.DetailScaffold
+import id.diskola.app.ui.components.FileViewerHost
+import id.diskola.app.ui.components.displayNameOf
+import id.diskola.app.ui.components.fileIcon
+import id.diskola.app.ui.components.openLink
 import id.diskola.app.ui.components.LinkPreviewCard
 import id.diskola.app.ui.components.SectionLabel
 import id.diskola.app.ui.theme.DiskolaExtraShapes
@@ -92,15 +95,7 @@ fun MateriDetailScreen(
 
     LaunchedEffect(materiId, subjectId, isTeacher) { viewModel.load(materiId, subjectId, isTeacher) }
 
-    LaunchedEffect(openFileIntent) {
-        openFileIntent?.let {
-            try {
-                context.startActivity(it)
-            } catch (_: Exception) {
-            }
-            viewModel.consumeOpenFileIntent()
-        }
-    }
+    FileViewerHost(intent = openFileIntent, fileName = materi?.file_name, onConsumed = viewModel::consumeOpenFileIntent)
     LaunchedEffect(pdfPath) {
         pdfPath?.let { path ->
             onOpenPdf(path, materi?.name.orEmpty())
@@ -185,7 +180,7 @@ fun MateriDetailScreen(
                             url = item.link,
                             loading = linkPreviewLoading,
                             data = linkPreview,
-                            onClick = { openUrlInBrowser(context, item.link) },
+                            onClick = { openLink(context, item.link) },
                         )
                     }
                 }
@@ -201,8 +196,8 @@ fun MateriDetailScreen(
                             fileName = item.explanation_file_path,
                             fileSize = null,
                             loading = fileLoading,
-                            onOpen = { permissionDialogFor = item.explanation_file_path to item.file_name },
-                            onDownload = { viewModel.downloadFile(item.explanation_file_path, item.file_name) },
+                            onOpen = { permissionDialogFor = item.explanation_file_path to displayNameOf(item.explanation_file_path) },
+                            onDownload = { viewModel.downloadFile(item.explanation_file_path, displayNameOf(item.explanation_file_path)) },
                         )
                     }
                 }
@@ -237,13 +232,6 @@ fun MateriDetailScreen(
     }
 }
 
-private fun openUrlInBrowser(context: Context, url: String) {
-    try {
-        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
-    } catch (_: Exception) {
-    }
-}
-
 @Composable
 private fun FileCard(
     title: String?,
@@ -265,10 +253,10 @@ private fun FileCard(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
-                    modifier = Modifier.size(44.dp).background(scheme.errorContainer, DiskolaExtraShapes.iconBox),
+                    modifier = Modifier.size(44.dp).background(scheme.primaryContainer, DiskolaExtraShapes.iconBox),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Rounded.PictureAsPdf, contentDescription = null, tint = scheme.onErrorContainer)
+                    Icon(fileIcon(fileName), contentDescription = null, tint = scheme.onPrimaryContainer)
                 }
                 Column(modifier = Modifier.padding(start = Spacing.md)) {
                     Text(

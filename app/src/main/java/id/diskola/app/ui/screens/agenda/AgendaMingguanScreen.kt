@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.diskola.app.dataclass.ResponData.AgendaCheckMode
 import id.diskola.app.dataclass.ResponData.AgendaUiStatus
 import id.diskola.app.dataclass.ResponData.StaffAgendaItem
+import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppDialog
 import id.diskola.app.ui.components.BadgeTone
 import id.diskola.app.ui.components.BannerError
@@ -54,6 +55,7 @@ import id.diskola.app.ui.components.StatusBadge
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
+import id.diskola.app.ui.theme.extendedColors
 import id.diskola.app.viewmodel.AgendaMingguanViewModel
 import id.diskola.app.viewmodel.AgendaTapAction
 import java.time.YearMonth
@@ -146,14 +148,16 @@ fun AgendaMingguanScreen(
                             EmptyState(title = "Tidak ada agenda pada tanggal ini", description = "", icon = Icons.Rounded.EventNote, modifier = Modifier.fillParentMaxHeight(0.6f))
                         }
                         else -> items(current.agendas, key = { it.agenda_id }) { item ->
-                            AgendaItemCard(item = item, onClick = {
-                                when (val action = viewModel.resolveTap(item, current)) {
+                            val action = viewModel.resolveTap(item, current)
+                            val run = {
+                                when (action) {
                                     is AgendaTapAction.Detail -> onOpenDetail(selected.toString(), action.item.agenda_id)
                                     is AgendaTapAction.CheckIn -> onOpenCheck(selected.toString(), action.item.agenda_id, AgendaCheckMode.CHECK_IN)
                                     is AgendaTapAction.CheckOut -> onOpenCheck(selected.toString(), action.item.agenda_id, AgendaCheckMode.CHECK_OUT)
                                     AgendaTapAction.NeedPresensi -> gateAlert = true
                                 }
-                            })
+                            }
+                            AgendaItemCard(item = item, action = action, onClick = run)
                         }
                     }
                 }
@@ -189,7 +193,7 @@ fun AgendaMingguanScreen(
 }
 
 @Composable
-private fun AgendaItemCard(item: StaffAgendaItem, onClick: () -> Unit) {
+private fun AgendaItemCard(item: StaffAgendaItem, action: AgendaTapAction, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     Column(
         modifier = Modifier
@@ -223,6 +227,69 @@ private fun AgendaItemCard(item: StaffAgendaItem, onClick: () -> Unit) {
                 Text(item.endAt.ifBlank { "-" }, style = MaterialTheme.typography.labelLarge, color = scheme.onSurface)
             }
         }
+
+        // What has been reported so far, so "Pulang" is visible (or explained) before and after check-in.
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xl)) {
+            AttendanceFact(label = "Hadir", fact = hadirFact(item))
+            AttendanceFact(label = "Pulang", fact = pulangFact(item))
+        }
+
+        // One explicit action when this agenda can be reported right now (today, agenda active).
+        val actionLabel = when (action) {
+            is AgendaTapAction.CheckIn, AgendaTapAction.NeedPresensi -> "Absen Hadir"
+            is AgendaTapAction.CheckOut -> "Absen Pulang"
+            is AgendaTapAction.Detail -> null
+        }
+        if (actionLabel != null) {
+            AppButton(text = actionLabel, onClick = onClick, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+private enum class FactTone { Done, Pending, Muted }
+
+private data class Fact(val text: String, val tone: FactTone)
+
+@Composable
+private fun AttendanceFact(label: String, fact: Fact) {
+    val scheme = MaterialTheme.colorScheme
+    Column {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
+        Text(
+            fact.text,
+            style = MaterialTheme.typography.labelLarge,
+            color = when (fact.tone) {
+                FactTone.Done -> MaterialTheme.extendedColors.success
+                FactTone.Pending -> MaterialTheme.extendedColors.warning
+                FactTone.Muted -> scheme.onSurfaceVariant
+            },
+        )
+    }
+}
+
+private val CLOCK = Regex("""\d{1,2}:\d{2}""")
+
+/** `HH:mm` out of "2026-10-07 15:06:10" or "15:06:10"; the raw text when it holds no clock. */
+private fun clockOf(raw: String): String = CLOCK.find(raw)?.value ?: raw
+
+private fun hadirFact(item: StaffAgendaItem): Fact {
+    val event = item.event ?: return Fact("Belum", FactTone.Muted)
+    val time = clockOf(event.time).ifBlank { "-" }
+    return Fact(if (event.status.isBlank()) time else "$time · ${event.status}", FactTone.Done)
+}
+
+private fun pulangFact(item: StaffAgendaItem): Fact {
+    val event = item.event
+    val out = event?.checkout_time?.takeIf { it.isNotBlank() }
+    return when {
+        out != null -> {
+            val status = event.checkout_status?.takeIf { it.isNotBlank() }
+            Fact(if (status == null) clockOf(out) else "${clockOf(out)} · $status", FactTone.Done)
+        }
+        item.policy == null -> Fact("-", FactTone.Muted)
+        // required and already checked in → it is the thing left to do; required but not yet in → still ahead
+        item.policy.checkoutRequired -> Fact(if (event != null) "Belum" else "Wajib", if (event != null) FactTone.Pending else FactTone.Muted)
+        else -> Fact("Tidak diperlukan", FactTone.Muted)
     }
 }
 

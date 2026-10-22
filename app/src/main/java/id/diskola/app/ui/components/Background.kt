@@ -19,9 +19,9 @@ import androidx.compose.ui.unit.dp
 import id.diskola.app.ui.theme.extendedColors
 
 /**
- * Pola A — Ambient Gradient Wash. Mounted ONCE around the Auth NavHost (`AuthScaffold`), never
- * per-screen, per the README's anti-pattern #6. Approximated with layered radial/linear
- * gradients rather than PNGs, per anti-pattern #3.
+ * Pola A — Ambient Gradient Wash. Used as the root of each auth screen, inside `SystemBarsFrame`
+ * (so it fills the safe area, not the strips under the system bars). Approximated with layered
+ * radial/linear gradients rather than PNGs, per anti-pattern #3.
  */
 @Composable
 fun AmbientGradientBackground(

@@ -15,6 +15,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudDownload
+import androidx.compose.material.icons.rounded.CloudUpload
+import androidx.compose.material.icons.rounded.EventBusy
 import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.TaskAlt
 import androidx.compose.material3.CircularProgressIndicator
@@ -29,6 +31,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -39,13 +43,16 @@ import id.diskola.app.dataclass.akm.AkmItem
 import id.diskola.app.dataclass.akm.AkmStatus
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.DetailScaffold
+import id.diskola.app.ui.components.EmptyState
 import id.diskola.app.ui.components.LoadingState
 import id.diskola.app.ui.components.SectionLabel
+import id.diskola.app.ui.components.StampedIf
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
 import id.diskola.app.ui.theme.extendedColors
-import id.diskola.app.viewmodel.AkmViewModel
+import id.diskola.app.utils.AkmSessionRules
+import id.diskola.app.viewmodel.AkmListViewModel
 
 /**
  * Pre-exam briefing. The bottom bar is the whole point of this screen: it reflects exactly one of
@@ -58,31 +65,52 @@ fun AkmDetailScreen(
     onStart: () -> Unit,
     onViewScore: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: AkmViewModel = hiltViewModel(),
+    viewModel: AkmListViewModel = hiltViewModel(),
 ) {
     val items by viewModel.items.collectAsStateWithLifecycle()
+    val loading by viewModel.loading.collectAsStateWithLifecycle()
     val item = items.find { it.id == akmId }
     val statuses by viewModel.statuses.collectAsStateWithLifecycle()
-    val strictMode by viewModel.strictMode.collectAsStateWithLifecycle()
     val syncProgress by viewModel.syncProgress.collectAsStateWithLifecycle()
+    val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
 
     var dialog by rememberSaveable { mutableStateOf<AkmStartDialog?>(null) }
+    var strict by rememberSaveable { mutableStateOf(false) }
+    var preparing by remember { mutableStateOf(false) }
     var passwordError by remember { mutableStateOf<String?>(null) }
     var checkingPassword by remember { mutableStateOf(false) }
 
     if (item == null) {
         DetailScaffold(title = "Detail Asesmen", onBack = onBack, modifier = modifier) { padding ->
-            LoadingState(modifier = Modifier.padding(padding))
+            if (loading) {
+                LoadingState(modifier = Modifier.padding(padding))
+            } else {
+                // The list loaded (or failed) and does not contain this exam: say so instead of an endless spinner.
+                EmptyState(
+                    title = "Asesmen tidak ditemukan",
+                    description = "Asesmen ini tidak ada di daftar. Kembali ke daftar lalu muat ulang.",
+                    icon = Icons.Rounded.EventBusy,
+                    modifier = Modifier.padding(padding),
+                    actionLabel = "Muat ulang",
+                    onAction = viewModel::refresh,
+                )
+            }
         }
         return
     }
 
-    val participantRows = remember(item) { readAkmParticipant(viewModel.sessionStore, item) }
+    val participantRows = remember(item) {
+        akmParticipantRows(viewModel.sessionStore, item.id, item.category, item.period, item.watermark)
+    }
     val status = statuses[item.id] ?: AkmStatus.BelumSinkron
 
-    // Re-hydrates status/progress from Room on every screen open — so a process restart mid-sync
-    // (or after a full app kill) picks up already-downloaded data instead of forcing a re-sync.
-    LaunchedEffect(item.id) { viewModel.observeSyncState(item.id) }
+    val context = LocalContext.current
+    LaunchedEffect(errorMessage) {
+        if (errorMessage.isNotBlank()) {
+            Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+            viewModel.clearError()
+        }
+    }
 
     DetailScaffold(
         title = "Detail Asesmen",
@@ -93,18 +121,29 @@ fun AkmDetailScreen(
                 status = status,
                 started = item.hasStarted(),
                 syncProgress = syncProgress[item.id],
+                preparing = preparing,
                 onSync = { viewModel.syncQuestions(item.id) },
                 onStart = {
                     passwordError = null
-                    dialog = if (item.needsPassword) AkmStartDialog.Password else AkmStartDialog.Terms
+                    if (viewModel.passwordRequired(item)) {
+                        dialog = AkmStartDialog.Password
+                    } else {
+                        preparing = true
+                        viewModel.prepareTerms { isStrict ->
+                            preparing = false
+                            strict = isStrict
+                            dialog = AkmStartDialog.Terms
+                        }
+                    }
                 },
                 onViewScore = onViewScore,
             )
         },
     ) { padding ->
+        // The big "Dibatalkan" stamp sits behind the content when the schedule carries the mark (doc 06 §4.4); it takes no touches.
+        StampedIf(item.watermark, Modifier.padding(padding).fillMaxSize()) {
         Column(
             modifier = Modifier
-                .padding(padding)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = ScreenHorizontalPadding)
@@ -137,33 +176,7 @@ fun AkmDetailScreen(
 
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 SectionLabel("INFORMASI PESERTA")
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceContainerLowest, DiskolaExtraShapes.card)
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, DiskolaExtraShapes.card)
-                        .padding(horizontal = Spacing.lg),
-                ) {
-                    participantRows.forEachIndexed { index, (label, value) ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                label,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Text(
-                                value,
-                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                        if (index != participantRows.lastIndex) HorizontalDivider()
-                    }
-                }
+                AkmParticipantCard(participantRows)
             }
 
             if (status == AkmStatus.MengunduhSoal) {
@@ -183,7 +196,7 @@ fun AkmDetailScreen(
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         Text(
-                            "Jangan tutup aplikasi sampai unduhan selesai.",
+                            "Unduhan berjalan di latar belakang dan dilanjutkan bila terputus.",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -191,13 +204,14 @@ fun AkmDetailScreen(
                 }
             }
         }
+        }
     }
 
     AkmStartDialogs(
         dialog = dialog,
-        strictMode = strictMode,
         checking = checkingPassword,
         passwordError = passwordError,
+        strict = strict,
         onCheckPassword = { password ->
             checkingPassword = true
             passwordError = null
@@ -207,7 +221,13 @@ fun AkmDetailScreen(
                     .onSuccess { checked ->
                         if (checked) {
                             passwordError = null
-                            dialog = AkmStartDialog.Terms
+                            dialog = null
+                            preparing = true
+                            viewModel.prepareTerms { isStrict ->
+                                preparing = false
+                                strict = isStrict
+                                dialog = AkmStartDialog.Terms
+                            }
                         } else {
                             passwordError = "Password ujian tidak sesuai."
                         }
@@ -217,28 +237,14 @@ fun AkmDetailScreen(
         },
         onDismiss = { dialog = null },
         onTermsAccepted = {
-            dialog = null
-            onStart()
+            // A strict exam starts online only: no real internet (a captive portal included) means the start is refused here, not later.
+            if (AkmSessionRules.mayStart(strict, viewModel.isOnlineValidated())) {
+                dialog = null
+                onStart()
+            } else {
+                dialog = AkmStartDialog.NeedInternet
+            }
         },
-        onSimulateOffline = { dialog = AkmStartDialog.Offline },
-    )
-}
-
-/**
- * The seven rows and their sources are specified in
- * `docs/repo lama/asesmen/asesmen-akm-daftar-detail-nilai.md:220-226`: Nama/NIS/Kelas/Sekolah are
- * never part of the Asesmen API response — they come from the session saved at login — while
- * ID Ujian is the schedule's own id and Kategori/Periode are derived from `exams[]`.
- */
-private fun readAkmParticipant(sessionStore: id.diskola.app.utils.session.SessionStore, item: AkmItem): List<Pair<String, String>> {
-    return listOf(
-        "ID Ujian" to item.id.toString(),
-        "Nama" to sessionStore.user.name.ifBlank { "-" },
-        "NIS" to sessionStore.user.nisNik.ifBlank { sessionStore.student?.nis.orEmpty() }.ifBlank { "-" },
-        "Kelas" to (sessionStore.student?.className.orEmpty()).ifBlank { "-" },
-        "Kategori" to item.category.ifBlank { "-" },
-        "Periode" to item.period.ifBlank { "-" },
-        "Sekolah" to sessionStore.school.name.ifBlank { "-" },
     )
 }
 
@@ -247,6 +253,7 @@ private fun AkmDetailActionBar(
     status: AkmStatus,
     started: Boolean,
     syncProgress: Pair<Int, Int>?,
+    preparing: Boolean,
     onSync: () -> Unit,
     onStart: () -> Unit,
     onViewScore: () -> Unit,
@@ -274,8 +281,9 @@ private fun AkmDetailActionBar(
             )
 
             status == AkmStatus.SiapDikerjakan && started -> AppButton(
-                text = "Mulai Asesmen",
+                text = if (preparing) "Menyiapkan…" else "Mulai Asesmen",
                 onClick = onStart,
+                enabled = !preparing,
                 modifier = Modifier.fillMaxWidth(),
             )
 
@@ -289,6 +297,20 @@ private fun AkmDetailActionBar(
                 text = "Lihat Nilai",
                 onClick = onViewScore,
                 modifier = Modifier.fillMaxWidth(),
+            )
+
+            status == AkmStatus.ProsesUpload -> StaticBar(
+                text = "Proses upload jawaban",
+                background = scheme.secondaryContainer,
+                foreground = scheme.onSecondaryContainer,
+                icon = Icons.Rounded.CloudUpload,
+            )
+
+            // The server's own verdicts for an exam this student never took — not "dikumpulkan".
+            status == AkmStatus.TidakMengerjakan || status == AkmStatus.SesiTerlewat -> StaticBar(
+                text = status.label,
+                background = scheme.surfaceContainerLow,
+                foreground = scheme.onSurfaceVariant,
             )
 
             else -> StaticBar(

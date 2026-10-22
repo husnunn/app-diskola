@@ -8,8 +8,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import id.diskola.app.BuildConfig
 import id.diskola.app.apiservice.AuthApiService
 import id.diskola.app.database.LocalDatabase
-import id.diskola.app.dataclass.localDb.AkmSyncDao
+import id.diskola.app.repository.AkmRepository
 import id.diskola.app.ui.MainActivity
+import id.diskola.app.utils.AkmExamState
 import id.diskola.app.utils.PreferenceClass
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,7 +35,9 @@ class SessionManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val localDatabase: LocalDatabase,
     private val preference: PreferenceClass,
-    private val akmSyncDao: AkmSyncDao,
+    private val akmRepository: AkmRepository,
+    private val akmExamState: AkmExamState,
+    private val sessionEvents: SessionEvents,
     private val fcmTopicManager: FcmTopicManager,
     private val authApiService: Provider<AuthApiService>,
 ) {
@@ -45,10 +48,12 @@ class SessionManager @Inject constructor(
         data object BlockedByPendingExam : LogoutResult
     }
 
-    /** DOWNLOADED-but-not-yet-`SUBMITTED` rows in `akm_synced_exam` — doc §10.1's "ujian belum
-     * dikumpulkan", extended per `docs/FLOW_QUESTIONS.md` bagian E#2 to also cover exams whose
-     * answers finished but aren't confirmed uploaded yet. */
-    suspend fun hasPendingExam(): Boolean = akmSyncDao.countPendingSubmission() > 0
+    /**
+     * Whether any exam's answers may still be on their way: a downloaded exam whose answers the server has not confirmed (doc §10.1's
+     * "ujian belum dikumpulkan"), including answers already queued for upload (`FLOW_QUESTIONS.md` bagian E#2, "jangan logout").
+     * One predicate for every logout path — [AkmRepository.hasPending] / `AkmRules.isPending`.
+     */
+    suspend fun hasPendingExam(): Boolean = akmRepository.hasPending()
 
     suspend fun logout(navigateToLogin: Boolean = true): LogoutResult {
         if (hasPendingExam()) return LogoutResult.BlockedByPendingExam
@@ -82,6 +87,7 @@ class SessionManager @Inject constructor(
         // commit(), not apply() — the caller is about to restart the whole Activity stack, so this
         // must be durable on disk before that happens (matches legacy `edit(true)`; fixes gap 02a's
         // "second edit{} block wipes onboard/url_api" bug, which used two overlapping edits).
+        akmExamState.clearAll()
         preference.edit().clear().commit()
         preference.edit()
             .putString(SessionKeys.URL_API, BuildConfig.API_URL)
@@ -95,9 +101,30 @@ class SessionManager @Inject constructor(
         return LogoutResult.Success
     }
 
-    /** Fire-and-forget variant for callers that aren't in a coroutine (e.g. `NotifService`). */
+    /**
+     * Fire-and-forget variant for callers that aren't in a coroutine (e.g. `NotifService`). A logout held back by unsent exam answers
+     * is not dropped: it is remembered and carried out by [runDeferredLogoutIfNoPendingExam] once the answers are sent, and the
+     * student is told why nothing happened ([SessionEvent.LogoutBlockedByPendingExam]).
+     */
     fun logoutInBackground(navigateToLogin: Boolean = true) {
-        scope.launch { logout(navigateToLogin) }
+        scope.launch {
+            if (logout(navigateToLogin) is LogoutResult.BlockedByPendingExam) {
+                deferLogout()
+                sessionEvents.emit(SessionEvent.LogoutBlockedByPendingExam)
+            }
+        }
+    }
+
+    /** A logout that has to wait for exam answers to be sent. */
+    fun deferLogout() {
+        preference.putBoolean(SessionKeys.LOGOUT_DEFERRED, true)
+    }
+
+    /** Called when answers were sent (or finally refused): if a logout was waiting for that and nothing else is pending, run it now. */
+    suspend fun runDeferredLogoutIfNoPendingExam() {
+        if (!preference.getBoolean(SessionKeys.LOGOUT_DEFERRED)) return
+        if (hasPendingExam()) return
+        logout()
     }
 
     /**

@@ -3,6 +3,7 @@ package id.diskola.app.repository
 import id.diskola.app.apiservice.AuthApiService
 import id.diskola.app.dataclass.ResponData.CheckAccountApiResponse
 import id.diskola.app.dataclass.ResponData.CheckAccountRequest
+import id.diskola.app.dataclass.ResponData.CurrentUserResponse
 import id.diskola.app.dataclass.ResponData.LoginAccountApiResponse
 import id.diskola.app.dataclass.ResponData.LoginAccountRequest
 import id.diskola.app.dataclass.ResponData.LoginSsoApiResponse
@@ -26,6 +27,9 @@ class AuthRepository @Inject constructor(
 ) {
     suspend fun checkAccount(nisNik: String, schoolUuid: String): CheckAccountApiResponse =
         authApiService.checkAccount(CheckAccountRequest(school_id = schoolUuid, nisn_nik = nisNik))
+
+    /** Session guard (legacy `verifyCurrentUserSession`): the server's view of this token's device. */
+    suspend fun currentUser(): CurrentUserResponse = authApiService.currentUser()
 
     suspend fun loginAccount(uuid: String, password: String): LoginAccountApiResponse =
         authApiService.loginAccount(

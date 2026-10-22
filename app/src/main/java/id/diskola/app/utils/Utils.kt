@@ -22,6 +22,18 @@ class Utils @Inject constructor(@ApplicationContext private val context: Context
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
+    /**
+     * Real internet, not just a network: `VALIDATED` is what the system sets after it reached the internet, so a captive portal
+     * (hotel/school Wi-Fi asking for a login) reads as offline. A strict exam may only start in this state (doc 06 §5.3).
+     */
+    fun isInternetValidated(): Boolean {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }
+
     fun logFile(msg: String = "") {
         try {
             val currentDate: String =

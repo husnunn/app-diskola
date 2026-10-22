@@ -5,6 +5,7 @@ import id.diskola.app.dataclass.ResponData.AkmScheduleDetailResponse
 import id.diskola.app.dataclass.ResponData.AkmScheduleResponse
 import id.diskola.app.dataclass.ResponData.AkmSettingResponse
 import id.diskola.app.dataclass.ResponData.ExamPasswordCheckResponse
+import okhttp3.ResponseBody
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
@@ -57,7 +58,26 @@ interface AsesmenApiService {
         @Header("X-Device-Fingerprint") deviceFingerprint: String,
         @Query("gov_schedule") govSchedule: Int = 0,
         @Body request: List<Map<String, Any?>>
-    ): Map<String, Any>
+    ): ResponseBody
+
+    /**
+     * One chunk of the violations recorded during the session (doc 06 §10.3): a JSON array `[{type, detectedAt, metadata?}]`, at most
+     * 50 items, oldest first. Declared with `Any` values for the same reason as [submitExamSchoolAnswer].
+     */
+    @POST("mobile/app/learning/akm/student/exam-school/{akm_id}/violations/{student_exam_id}")
+    suspend fun reportExamViolations(
+        @Path("akm_id") akmId: Int,
+        @Path("student_exam_id") studentExamId: Int,
+        @Body body: List<Map<String, Any?>>,
+    ): ResponseBody
+
+    /** A "Laporkan Masalah" report (doc 06 §13): one object `{appVersion, androidVersion, deviceName, logcat}`. */
+    @POST("mobile/app/learning/akm/student/exam-school/{akm_id}/error-reports/{student_exam_id}")
+    suspend fun reportExamProblem(
+        @Path("akm_id") akmId: Int,
+        @Path("student_exam_id") studentExamId: Int,
+        @Body body: Map<String, Any?>,
+    ): ResponseBody
 
     @GET("mobile/app/learning/akm/exam-schedules-scored/{id}/explains")
     suspend fun examExplanations(

@@ -20,8 +20,9 @@
         <item name="colorOnSecondary">@color/black</item>
 
         <!-- System bars tuned for dark mode -->
-        <item name="android:statusBarColor">@color/ref_surface_container_highest</item>
-        <item name="android:navigationBarColor">@color/ref_surface_container_low</item>
+        <!-- transparent over the dark window background, like the runtime edge-to-edge style (see values/themes.xml) -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
         <!-- dark background -> light icons -->
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>

@@ -1,5 +1,6 @@
 package id.diskola.app.apiservice
 
+import id.diskola.app.dataclass.ResponData.NotificationSummaryResponse
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
@@ -20,6 +21,7 @@ interface NotifikasiApiService {
     @POST("mobile/notification/{id}")
     suspend fun markNotificationRead(@Path("id") id: Int): Map<String, Any>
 
+    /** [walletId] is the Klaspay wallet's `user_id` (legacy `getsummaryNotifications(walletId)`). */
     @GET("mobile/notification/summary")
-    suspend fun getNotificationSummary(): Map<String, Any>
+    suspend fun getNotificationSummary(@Query("wallet_id") walletId: String): NotificationSummaryResponse
 }

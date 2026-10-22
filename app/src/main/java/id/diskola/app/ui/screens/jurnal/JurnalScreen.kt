@@ -24,12 +24,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,7 +41,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import id.diskola.app.ui.components.AppBottomSheet
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppCard
 import id.diskola.app.ui.components.AppDialog
@@ -70,15 +67,11 @@ import kotlinx.coroutines.launch
 
 /**
  * Jurnal KBM list (doc `07` §7.1): today's hours and class sessions. Students get "Hadiri kelas" (manual or QR) and
- * "Isi Jurnal"; teachers get "Mulai kelas", "Detail" and "Isi Jurnal". [initialAction] carries a Hub-card shortcut
- * ("hadiri"/"isi") that is replayed once the list has loaded.
+ * "Isi Jurnal"; teachers get "Mulai kelas", "Detail" and "Isi Jurnal".
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun JurnalScreen(
-    initialAction: String,
-    initialAttendanceId: Int,
-    initialPlotId: Int,
     onBack: () -> Unit,
     onOpenVerifikasi: (attendanceId: Int, title: String) -> Unit,
     onOpenForm: (plotId: Int, plotLabel: String) -> Unit,
@@ -98,7 +91,6 @@ fun JurnalScreen(
 
     var methodRow by remember { mutableStateOf<JurnalRow?>(null) }
     var startRow by remember { mutableStateOf<JurnalRow?>(null) }
-    var shortcutHandled by rememberSaveable { mutableStateOf(false) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -107,20 +99,6 @@ fun JurnalScreen(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    // Hub shortcut: replayed once, after the first load.
-    LaunchedEffect(loaded) {
-        if (!loaded || shortcutHandled || initialAction.isBlank()) return@LaunchedEffect
-        shortcutHandled = true
-        val row = rows.firstOrNull { it.attendanceId != null && it.attendanceId == initialAttendanceId }
-        when (initialAction) {
-            "hadiri" -> if (row != null && JurnalRules.studentUi(row).action == JurnalRules.StudentAction.HADIRI) methodRow = row
-            "isi" -> {
-                val target = row ?: rows.firstOrNull { it.plotId == initialPlotId }
-                if (target != null) onOpenForm(target.plotId, target.timeLabel)
-            }
-        }
     }
 
     AutoTimeGate(
@@ -190,52 +168,28 @@ fun JurnalScreen(
 
     methodRow?.let { row ->
         val options = JurnalRules.methodOptions(row, LocalTime.now())
-        AppBottomSheet(title = "Pilih Metode Presensi", onDismiss = { methodRow = null }) {
-            Column(
-                modifier = Modifier.padding(horizontal = ScreenHorizontalPadding).padding(bottom = Spacing.xl),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                Text(
-                    "Silakan pilih metode yang ingin digunakan untuk presensi.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = Spacing.sm),
-                )
-                if (options.manual) {
-                    AppButton(
-                        text = "Verifikasi Jurnal",
-                        onClick = {
-                            methodRow = null
-                            onOpenVerifikasi(row.attendanceId ?: 0, "${row.subjectName} · ${row.className}".trimEnd(' ', '·'))
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+        JurnalMethodSheet(
+            onDismiss = { methodRow = null },
+            onVerifikasi = {
+                methodRow = null
+                onOpenVerifikasi(row.attendanceId ?: 0, "${row.subjectName} · ${row.className}".trimEnd(' ', '\u00b7'))
+            },
+            onQr = if (options.qr) {
+                {
+                    methodRow = null
+                    scope.launch {
+                        when (val result = QrScanner.scan(context)) {
+                            is QrScanner.Result.Scanned -> viewModel.submitQr(result.raw)
+                            QrScanner.Result.Cancelled -> Toast.makeText(context, "QR Code dibatalkan", Toast.LENGTH_SHORT).show()
+                            is QrScanner.Result.Failed -> Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                        }
+                    }
                 }
-                if (options.qr) {
-                    AppButton(
-                        text = "Scan QR",
-                        variant = ButtonVariant.Outlined,
-                        onClick = {
-                            methodRow = null
-                            scope.launch {
-                                when (val result = QrScanner.scan(context)) {
-                                    is QrScanner.Result.Scanned -> viewModel.submitQr(result.raw)
-                                    QrScanner.Result.Cancelled -> Toast.makeText(context, "QR Code dibatalkan", Toast.LENGTH_SHORT).show()
-                                    is QrScanner.Result.Failed -> Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
-                                }
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                } else {
-                    Text(
-                        "Scan QR hanya tersedia saat jam pelajaran ini berlangsung.",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
+            } else {
+                null
+            },
+            qrHint = !options.qr,
+        )
     }
 
     startRow?.let { row ->

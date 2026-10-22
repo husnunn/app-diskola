@@ -8,6 +8,7 @@ import id.diskola.app.dataclass.ResponData.PresensiCheckData
 import id.diskola.app.dataclass.ResponData.PresensiDayItem
 import id.diskola.app.dataclass.ResponData.PresensiDayTable
 import id.diskola.app.dataclass.ResponData.PresensiRekapTable
+import id.diskola.app.dataclass.ResponData.TodaySettingData
 import id.diskola.app.dataclass.localDb.PresensiDao
 import id.diskola.app.utils.PreferenceClass
 import id.diskola.app.utils.PresensiRules
@@ -101,6 +102,9 @@ class PresensiRepository @Inject constructor(
     // ---- Masuk / Pulang sekolah ----
 
     suspend fun check(): PresensiCheckData? = api.check(role).data
+
+    /** `setting/me/today` for the hub's attendance banner; any failure is "no answer" (the banner then hides). */
+    suspend fun settingToday(): TodaySettingData? = api.settingToday().data
 
     suspend fun checkIn(lat: Double, lng: Double) = api.checkIn(role, coords(lat, lng))
 

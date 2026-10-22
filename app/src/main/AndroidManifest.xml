@@ -3,6 +3,13 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Exam session (doc 06 §9.4): lets the window hide other apps' overlay windows over the exam (API 31+, normal permission). -->
+    <uses-permission android:name="android.permission.HIDE_OVERLAY_WINDOWS" />
+    <!-- Violation reporting runs as a `dataSync` foreground service while an exam session is open (doc 06 §10.4) and reports screenshots (API 34+). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.DETECT_SCREEN_CAPTURE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -44,13 +51,34 @@
             android:exported="true"
             android:label="@string/app_name"
             android:screenOrientation="portrait"
-            android:theme="@style/Theme.MVVM">
+            android:theme="@style/Theme.MVVM"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- The reset-PIN link mailed by `payment/reset-pin` (doc 08 §4.3): opens "Atur Pin Baru". `autoVerify` only takes
+                 effect on a release-signed build once the server publishes assetlinks.json for these hosts. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="https" />
+                <data android:host="api.diskola.id" />
+                <data android:host="dev.api.diskola.id" />
+                <data android:pathPrefix="/api/payment/reset-pin/token" />
+            </intent-filter>
         </activity>
+
+        <!-- Sends the violations recorded during an exam while the session is open; started only from the foreground UI and not sticky. -->
+        <service
+            android:name=".exam.AkmViolationReportingService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <!-- Was missing entirely (gap `02a`/audit finding): without this, FCM data messages —
              including the "logout" push (doc `02-auth-login-sesi.md` §10, decision Q8) — are never

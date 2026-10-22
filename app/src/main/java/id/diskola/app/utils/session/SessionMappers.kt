@@ -27,6 +27,7 @@ fun SchoolDetail.toSession() = SessionSchool(
     name = name.orEmpty(),
     image = image.orEmpty(),
     address = address.orEmpty(),
+    cityName = city_name.orEmpty(),
     coordinateRadius = coordinate_radius ?: "50",
     coordinateLatitude = coordinate_latitude ?: 0.0,
     coordinateLongitude = coordinate_longitude ?: 0.0,

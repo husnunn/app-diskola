@@ -11,6 +11,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 
 /** Shared back-button + title app bar shell used by the many detail/subscreens across the app. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -28,7 +29,8 @@ fun DetailScaffold(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text(title) },
+                // One line: a long title (e.g. a task name) must not grow the bar over the status bar.
+                title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
