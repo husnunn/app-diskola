@@ -12,6 +12,14 @@ Magang hanya disinggung sebatas titik masuknya dari hub — perilakunya didokume
 > Semua Activity di dokumen ini turunan `Privatepage` (`@/pages/Privatepage.kt:3`). Tidak ada Worker di `@/worker/` yang
 > terkait fitur-fitur ini (isinya AKM, chat, ujian, log) — semua unduh/unggah berjalan di coroutine layar.
 
+> **Pembaruan 2026-10-22 (Tugas Guru + hub):** form buat/edit tugas guru kini mengikuti kontrak backend baru (cabang
+> `teacher-data-scope`, payload canonical, penanganan error per field), ditambah perbaikan sisi siswa/penilaian dan satu crash
+> hub. Bagian yang berubah: §1.4, §1.8, §5.5 (Kirim), §6.1, §6.4–§6.7, §12, §13 (Q10–Q11 diberi status; Q16–Q20 baru), §14, §15.
+> Rujukan baris untuk berkas yang disentuh (`CreateHomeworkPage.kt`, `CreateHomeworkVm.kt`, `HomeworkTeacherPage.kt`,
+> `HomeWorkViewModel.kt`, `PembelajaranPage.kt`, `ApiService.kt`) **hanya** pada bagian yang ditulis ulang yang sudah
+> menyesuaikan kode terbaru; rujukan lain di dokumen ini bisa bergeser. Berkas baru: `@/pages/homework/teacher/AssignmentForm.kt`,
+> `@/pages/homework/AssignmentErrors.kt`, `@/api/ApiErrorParser.kt`. Keputusan & asumsi: `FLOW_QUESTIONS.md` (2026-10-22).
+
 ## Daftar isi
 1. [Hub Pembelajaran (`PembelajaranPage`)](#1-hub-pembelajaran-pembelajaranpage)
 2. [Materi — Siswa](#2-materi--siswa)
@@ -62,7 +70,11 @@ membuka modul-modul pembelajaran. Syarat akses menu dibaca dari `PreferenceClass
   1. `fetchUnreadNotificationsCount()` hanya jika `klaspayActive`: `GET payment/wallet` → `wallet.user_id` →
      `GET mobile/notification/summary?wallet_id=` → `count_unread` (`PembelajaranVm.kt:49-75`). Badge tampil jika >0,
      teks `"99+"` jika ≥100 (`PembelajaranPage.kt:85-93`).
-  2. `sosmedViewModel.checkUser()` + `verifyCurrentUserSession()` (`:112-113`).
+  2. `sosmedViewModel.checkUser()` + `verifyCurrentUserSession()` (`:112-113`). Setelah keduanya **`if (view == null)` menghentikan
+     `loadData()`** dan mengembalikan `loadingAbsensi=false` (`:115-118`, guard 2026-10-22): kedua pemanggilan itu mengembalikan hasil
+     biasa walau scope dibatalkan, sehingga pindah tab saat request berjalan membuat kode di bawahnya menyentuh
+     `viewLifecycleOwner` (blok badge Agenda Mingguan, `:259`) setelah view hancur → `IllegalStateException` (crash; direproduksi di
+     Infinix X1102 dengan pindah tab cepat, hilang setelah guard).
   3. Popup tamu (sekali per instance fragment) bila `role_label` = `Guest`: judul **"Anda Masuk sebagai Tamu"**, pesan
      **"Beberapa fitur mungkin terbatas. Lakukan verifikasi data Jika Anda ingin menjadi guru atau siswa, untuk medapatkan akses penuh"**,
      tombol **"Oke, Terimakasi"** (typo dipertahankan) (`:116-127`).
@@ -141,6 +153,8 @@ Tidak menulis pref/Room di layar ini (di luar ViewModel presensi/sosmed).
   `PoinStudentPage`, "Poin" membuka `MagangPage`, "Magang" → dialog coming soon (`PembelajaranPage.kt:233-247,651-696`).
 - `loadData()` terpanggil tiap onResume dan memanggil 2–4 request; pertahankan (badge harus segar), tetapi gabungkan dalam
   satu `refresh()` VM.
+- Jangan menyentuh binding/`viewLifecycleOwner` setelah *suspend call* di `refresh()` tanpa memeriksa view/lifecycle masih hidup —
+  app lama crash karena ini (§1.4 poin 2).
 
 ---
 
@@ -545,8 +559,10 @@ judul tugas tanpa ekstensi).
   - Tanpa syarat (downloded=0 & uploaded=0) → kartu syarat GONE, tombol aktif; siswa tetap bisa "Kirim Tugas" (menandai `checked=1`).
 - **Kirim** (`:384-392`, `HomeWorkViewModel.kt:410-464`): loading **"sedang mengumpulkan tugas"**. Validasi per file:
   ekstensi ∉ {jpeg,jpg,png,pdf,doc,docx,xls,xlsx,ppt,pptx} → **"Format file tidak didukung: <nama>"**; ukuran > 12 288 KB → **"Ukuran maksimal 12 MB per file: <nama>"**.
-  Multipart `checked=1`, `uploaded` = `1` jika ada file/link else `0`, `link`, parts `file[]`. Sukses → simpan file jawaban + pref
-  `hw_sa_<id>`, kosongkan pilihan, **hapus baris tugas dari Room**, `finish()` (tanpa result). Error → toast `localizedMessage`.
+  Multipart `checked=1`, `uploaded` = `1` jika ada file/link else `0`, `link` (**hanya dikirim bila tidak kosong**, 2026-10-22), parts `file[]`. Sukses → simpan file jawaban + pref
+  `hw_sa_<id>`, kosongkan pilihan, **hapus baris tugas dari Room**, `finish()` (tanpa result). Error (`AssignmentErrors.classify`, 2026-10-22): 422 `errors` `file.N` → toast
+  **"File ke-<N+1>: <pesan>"**; 403 (siswa disuspend / menunggak SPP; body `{message, trace_id}`) → alert **"Akses diblokir"** + `ID: <trace_id>`
+  (`HomeWorkViewModel.accessBlocked`, `HomeworkDetailPage`); lainnya (termasuk 400 "Anda telah menyelesaikan tugas sebelumnya.") → toast pesan server.
 
 ### 5.6 Kontrak API (tugas siswa)
 | Method | Path (`ApiService.kt`) | Param/Body | Field dipakai | Kapan |
@@ -582,8 +598,8 @@ SAF multi-file; unduh "baca" ke `filesDir`; DownloadManager. Upload multi-file d
 ## 6. Tugas — Guru
 
 ### 6.1 Ringkasan
-Guru (non-siswa) melihat **"List Tugas"** buatannya (filter Kelas & Mapel), membuat/mengedit/menghapus tugas (terikat jadwal
-kelas-hari-mapel), melihat **"Penilaian"** (rekap kiriman per tugas), membuka daftar jawaban siswa, dan memberi nilai 0–100.
+Guru (non-siswa) melihat **"List Tugas"** buatannya (filter Kelas & Mapel), membuat/mengedit/menghapus tugas (form bercabang `teacher-data-scope`: terikat jadwal
+kelas-hari-mapel, atau mode bebas kelas + mapel), melihat **"Penilaian"** (rekap kiriman per tugas), membuka daftar jawaban siswa, dan memberi nilai 0–100.
 
 ### 6.2 Titik masuk
 Hub pos 1 (non-siswa) → `HomeworkTeacherPage`. Tidak ada notifikasi khusus guru.
@@ -618,16 +634,20 @@ flowchart TD
 
 **`HomeworkTeacherPage`**: toolbar **"Tugas"**; tab **"List Tugas"** (default aktif) / **"Penilaian"**; label **"Kelas"** & **"Mata Pelajaran"**
 + dropdown (VISIBLE default; disembunyikan di tab Penilaian) (`HomeworkTeacherPage.kt:77-108`); FAB `fab_create` → `CreateHomeworkPage` for result;
-RESULT_OK → `fetchHomeworkTodo()` (endpoint guru backlog, ber-guard) (`:39-41,114-120`). `initMapelAndClass()`: kelas "Semua" + Room/`teachers/class`,
+RESULT_OK → `prefTeacher = -1` lalu `fetchHomeworkTeacher()` — query yang sama dengan List Tugas, Room urut `id desc` sehingga tugas baru langsung
+tampil di atas (`HomeworkTeacherPage.kt:39-41,114-121`; **dulu** `fetchHomeworkTodo()` yang bukan query list guru dan ber-guard `prefBelum` →
+daftar tidak ter-refresh setelah create). `initMapelAndClass()`: kelas "Semua" + Room/`teachers/class`,
 mapel "Semua" + Room/`theories/teachers/subjects`; teks awal = item pertama "Semua" (`HomeWorkViewModel.kt:56-79`, `HomeworkTeacherPage.kt:46-72`).
 Dropdown terikat two-way ke `viewmodel.classId`/`viewmodel.mapel` (`homework_teacher_page.xml:150,179`). Back → finish. Error → toast.
 
 **`HomeworkTeacherListPage`**
 - `refresh()` saat dibuat **dan** tiap `classId`/`mapel` berubah (3× fetch saat buka) (`HomeworkTeacherListPage.kt:57-61,90-101`).
 - Room: `teacherId` + opsional `subjectId`/`classRoomId` (nilai 0 = semua) (`HomeWorkViewModel.kt:208-231`); API
-  `GET .../teachers/backlog` QueryMap: `take=10, skip, filter[0][0]=teacher_id, filter[0][1]==, filter[0][2]=<teacher.id>`, jika `classId` non-null
-  `filter[1]=and, filter[2][0]=school_classes_id, filter[2][1]==, filter[2][2]=<id>`, jika `mapel` non-null `filter[3]=and, filter[4][0]=school_subject_id, ...`
-  (`:235-277`). Karena "Semua" = 0 (bukan null), filter bernilai `0` tetap dikirim (perilaku server belum terverifikasi).
+  `GET .../teachers/backlog` QueryMap: `take=10, skip, filter[0][0]=teacher_id, filter[0][1]==, filter[0][2]=<teacher.id>`, jika `classId` > 0
+  `filter[1]=and, filter[2][0]=school_classes_id, filter[2][1]==, filter[2][2]=<id>`, jika `mapel` > 0 `filter[n]=and, filter[n+1][0]=school_subject_id, ...`
+  (indeks berurutan) (`HomeWorkViewModel.kt:235-270`). **Sejak 2026-10-22** "Semua" (0) = filter **tidak dikirim**; sebelumnya literal `0` tetap
+  dikirim (perilaku server atas `0` tak pernah terverifikasi). Request tanpa filter kelas/mapel terverifikasi 200 + data di dev (Infinix X1102,
+  2026-10-21); nama kolom filter tetap `school_classes_id` (bukan nama canonical form).
 - Empty **"Belum terdapat tugas\nSilahkan buat tugas untuk siswa"** (`:60`).
 - Item: avatar guru, ⋮ (jika `pref.user_id == teacher.sosmed_user_id`), judul, `information_label` (HTML), mapel, guru, **"Upload: "** + `upload_at_label`.
 - Tap → `CreateHomeworkPage` (`homeworkId`, `editable=false`). ⋮ → **"Edit Tugas"** (→ `CreateHomeworkPage` `homeworkId`) / **"Hapus Tugas"** →
@@ -658,50 +678,103 @@ ulang Tugas Terkumpul & tutup (`:118-132`, `@/utils/ApiWrapper.kt:381-384`).
 | Buat | – | **"Buat Tugas"** | editable | – |
 | Detail | `homeworkId`, `editable=false` | **"Detail Tugas"** | disabled, tombol post GONE | **"Edit Tugas"** (→ mode edit di tempat, judul **"Edit Tugas"**) / **"Hapus Tugas"** (konfirmasi sama; loading **"menghapus tugas"** → finish) (`:76-117`) |
 | Edit | `homeworkId` | **"Edit Tugas"** | editable | – |
-Urutan form (`create_homework_page.xml`) & dependensi:
-1. **"Kelas"** hint **"Pilih Kelas"** (Room/`teachers/class`, `"grade - name"`). Pilih → reset hari, mapel, jadwal; mapel disabled (`:399-414`).
-2. **"Hari Mata Pelajaran"** hint **"Pilih Hari Mata Pelajaran"** — disabled sampai kelas dipilih; item = `key` dari `GET .../teachers/schedule-day` (`:189-203`).
-   Pilih → reset jadwal/mapel (`:426-435`).
-3. **"Mata Pelajaran"** hint **"Pilih Mata Pelajaran"** — disabled (latar `ltgray`) sampai hari dipilih; item `"[start - end] <mapel>"` dari
-   `GET .../teachers/schedule?school_class_id=&day=`; memilih mengisi `scheduleId` & `mapel` (`:157-172,205-224,447-454`, `CreateHomeworkVm.kt:159-181`).
-4. **"Waktu berakhir"** — tap → DatePicker (min hari ini) lalu TimePicker 24 jam, keduanya judul **"Batas pengumpulan"**; format **`dd-MM-yyyy HH:mm:ss`**
-   (Locale id); default = saat layar dibuka (`:264-289`, `CreateHomeworkVm.kt:65,76`).
-5. **"TUGAS"**: judul hint **"Ketik Judul tugas"** max 500 + counter `"n/500"`; deskripsi hint **"Ketik deskripsi tugas"**.
-6. Checkbox **"Upload Soal"** → menampilkan **"File dalam format pdf"**, kartu **"Lampirkan File"** (picker SAF **satu** file, tanpa batas ukuran di client),
-   **"Url Link"** hint **"Ketik url"** + preview (debounce 1 s; gagal → **"gagal menampilkan preview url"**) (`:247-257,329-365`).
-7. Checkbox **"Siswa wajib membaca materi"** (VISIBLE hanya bila ada file/link) → `downloded`; **"Siswa wajib mengumpulkan jawaban"** → `uploaded` (`:238-245`).
+Urutan form (`create_homework_page.xml`) & dependensi — **bercabang pada `teacher-data-scope`** (2026-10-22):
+0. Saat dibuka `CreateHomeworkVm.init` (`:348`) memanggil `GET mobile/attendance/teacher-data-scope` (`loadScope`, `:290`) → **`data.restricted`**
+   (satu-satunya penentu; `scope` hanya informasi). `restricted == false` → mode **bebas**; `true`, field hilang, atau panggilan gagal → mode
+   **assigned** (fail-closed; gagal → toast **"Gagal memuat pengaturan akses guru, form memakai mode jadwal"**). Respons **tidak di-cache** (beda dari
+   `PresensiViewModel`, yang menyimpannya di pref dan default ke ALL). Model: `TeacherDataScopeData.restricted/label/isRestrictedForForm`
+   (`PresensiModel.kt:287`). Mode ditentukan scope aktif, **bukan** bentuk tugas yang diedit.
+
+| | Mode **assigned** (`restricted != false`) | Mode **bebas** (`restricted == false`) |
+|---|---|---|
+| Siapa | guru berperan tunggal di sekolah ber-scope `assigned`; juga fallback bila scope gagal dimuat | guru berperan tambahan atau sekolah ber-scope `all` (diamati di dev: `scope:"assigned"` + `restricted:false` ada) |
+| Field | Kelas → **Hari** → Mata Pelajaran (jadwal) | Kelas + Mata Pelajaran (**tanpa Hari**; mapel langsung aktif) |
+| Kelas | `GET .../teachers/class` → kelas dari jadwal guru + kelas wali (1 kelas di akun uji) | idem → semua kelas kecuali ALUMNI (banyak kelas di akun uji) |
+| Mapel | `GET .../teachers/schedule?school_class_id=&day=` → `"[start - end] <mapel>"` | `GET .../teachers/subject?take=100&skip=n` (berhalaman sampai halaman pendek, urut nama) |
+| Dikirim | `school_subject_schedule_id` saja | `school_class_id` + `school_subject_id` (**tanpa** `school_subject_schedule_id`) |
+
+1. **"Kelas"** hint **"Pilih Kelas"** — selalu dari jaringan (`loadClasses`, `:302`; Room hanya cadangan saat gagal; daftar yang bergantung scope **tidak**
+   ditulis ke Room/singleton), urut grade lalu nama, `"grade - name"`. Mode assigned: pilih → reset hari, jadwal, mapel; mode bebas: tidak mereset mapel
+   (`CreateHomeworkVm.selectClass`).
+2. **"Hari Mata Pelajaran"** (**hanya mode assigned**; disembunyikan di mode bebas) hint **"Pilih Hari Mata Pelajaran"** — disabled sampai kelas dipilih;
+   item = `key` dari `GET .../teachers/schedule-day` (`SENIN`…`MINGGU`; label di field `lable`). Pilih → reset jadwal/mapel (`fetchSchedule`, `:200`; job
+   lama dibatalkan). `loadDays` (`:317`) **kini try/catch** (dulu tanpa try/catch → crash saat jaringan gagal).
+3. **"Mata Pelajaran"** hint **"Pilih Mata Pelajaran"** — assigned: disabled (latar `ltgray`) sampai hari dipilih, item jadwal; memilih mengisi
+   `scheduleId` & `mapel`. Bebas: aktif tanpa syarat, item mapel (`loadSubjects`, `:328`; adapter di `bindMapelAdapter`, `CreateHomeworkPage.kt:498`).
+4. **"Waktu berakhir"** hint **"Pilih waktu berakhir"** — **tanpa default** (dulu default "sekarang"); tap → DatePicker (min hari ini) lalu TimePicker 24 jam,
+   judul **"Batas pengumpulan"** (`CreateHomeworkPage.kt:272`); tampil `dd-MM-yyyy HH:mm:ss`, **dikirim `yyyy-MM-dd HH:mm:ss`** (`AssignmentDates`, Locale.US).
+5. **"TUGAS"**: judul hint **"Ketik Judul tugas"** max 500 + counter `"n/500"`; deskripsi hint **"Ketik deskripsi tugas"** — **wajib** (dulu opsional;
+   spek backend: "ya di UI").
+6. Checkbox **"Upload Soal"** → **"File dalam format pdf"**, kartu **"Lampirkan File"** (picker SAF **satu** file; **maks 12 MB dicek saat memilih**, toast
+   **"Ukuran file maksimal 12 MB"**, `CreateHomeworkPage.kt:64-85`), **"Url Link"** hint **"Ketik url"** + preview (debounce 1 s; gagal → toast
+   **"gagal menampilkan preview url"**; hasil preview **tidak lagi menentukan** tombol Posting).
+7. Checkbox **"Siswa wajib membaca materi"** (VISIBLE hanya bila ada file/link) → `downloaded`; **"Siswa wajib mengumpulkan jawaban"** → `uploaded`.
 8. Tombol **"Posting Tugas"** (VISIBLE saat editable).
-- Validasi (error TextInputLayout, muncul setelah field disentuh atau saat Posting): **"Kelas wajib dipilih"**, **"Hari Mata Pelajaran wajib dipilih"**,
-  **"Mata Pelajaran wajib dipilih"** (`:464-484`). Tombol aktif jika judul && mapel>0 && kelas>0 && hari && jadwal>0 && (Upload Soal off || file || link) (`:486-497`).
-- Posting: loading **"sedang membuat tugas"** (juga saat edit) → create/update → sukses `RESULT_OK` + finish; error toast (`:367-380`).
-- Payload multipart (`CreateHomeworkVm.kt:183-231`): `title, description, teacher_id, school_id, school_subject_id, school_classes_id,
-  school_subject_schedules_id, grade` (grade kelas terpilih), `end_at`, `checked=1`, `downloded`, `uploaded` (1/0), `link`; part `file` opsional.
-- Edit/detail prefill dari **Room** (`setHomework`, `:90-120`): `end_at` diisi `end_at_label` (label server, bukan format `dd-MM-yyyy HH:mm:ss`) ❓.
-- `init` VM: `listDay` diambil tanpa try/catch → gagal jaringan = crash (`CreateHomeworkVm.kt:248`).
+- Validasi = `AssignmentPayload.validate` (`AssignmentForm.kt:49`; murni, diuji JVM): scope termuat · kelas>0 · (assigned: hari terisi & jadwal>0 | bebas:
+  mapel>0) · judul · **deskripsi** · waktu berakhir · (Upload Soal aktif → file **atau** link; file lama di server dihitung saat edit) · file ≤ 12 MB. Pesan
+  inline kelas/hari/mapel tetap **"Kelas wajib dipilih"**, **"Hari Mata Pelajaran wajib dipilih"**, **"Mata Pelajaran wajib dipilih"**
+  (`validateRequiredSelections`, `CreateHomeworkPage.kt:461`); tambahan: **"Judul tugas wajib diisi"**, **"Deskripsi tugas wajib diisi"**,
+  **"Waktu berakhir wajib dipilih"**, **"Lampirkan file atau tempel link"**, **"Ukuran file maksimal 12 MB"**.
+- Posting: loading **"sedang membuat tugas"** (**"sedang menyimpan tugas"** saat edit) → `CreateHomeworkVm.submit()` (`:231`) → `handleSubmitResult`
+  (`CreateHomeworkPage.kt:542`), pemetaan error di `AssignmentErrors.classify` (`AssignmentErrors.kt:26`, memakai `ApiException.fieldErrors/traceId` dari
+  `ApiErrorParser`, dan `HttpException` 401/403):
+
+| Hasil Posting | Perilaku |
+|---|---|
+| 200 `{"message":"Berhasil membuat Tugas"}` / `{"message":"Berhasil update Tugas"}` | `RESULT_OK` + finish → list guru refresh (lihat `HomeworkTeacherPage` di atas) |
+| 422 | pesan `errors` per field: kelas/hari/mapel/waktu → error inline `TextInputLayout`; judul/deskripsi/link → error `EditText`; **semua** pesan juga di dialog **"Periksa kembali isian"**; draft **dipertahankan** (`showFieldErrors`, `:579`) |
+| 404 (update) | toast **"Tugas tidak ditemukan, mungkin sudah dihapus"**, baris Room dihapus, `RESULT_OK`, finish |
+| 401 | dialog **"Sesi Berakhir"** → logout ke Login (`showSessionExpired`, `:615`) |
+| 403 | dialog **"Akses diblokir"** + `ID: <trace_id>` |
+| 413 | **"Ukuran file terlalu besar. Maksimal 12 MB"** |
+| 400 / lain | dialog **"Gagal menyimpan tugas"** + pesan server |
+
+- Payload multipart (`AssignmentPayload.fields`, `AssignmentForm.kt:30`) — **kontrak canonical**: `title`, `description`, `end_at`, `checked=1`, `downloaded`
+  (1/0; alias API untuk kolom legacy `downloded`), `uploaded` (1/0) + (assigned) `school_subject_schedule_id` **atau** (bebas) `school_class_id` +
+  `school_subject_id`; `link` hanya bila Upload Soal aktif **dan** tidak kosong; part `file` opsional (hanya file baru). **Tidak dikirim lagi:**
+  `teacher_id`, `school_id`, `grade`, `downloded`, alias lama `school_classes_id`/`school_subject_schedules_id`, string literal `"null"`. Server menurunkan
+  kelas/mapel/grade dari jadwal (assigned) atau grade dari kelas (bebas); canonical + alias bernilai beda → 422.
+- Edit/detail prefill dari **Room** (`setHomework`, `:153`): baris tidak ditemukan → toast **"Tugas tidak ditemukan, silakan muat ulang daftar tugas"** + tutup
+  (**dulu** `homeworkId` tetap 0 sehingga Posting membuat tugas **baru**); kelas=`classRoomId`; mapel=`subjectId` (bukan relasi mapel, yang kosong untuk mapel di
+  luar cache); **`end_at` diurai dari `end_at_label`** (`AssignmentDates.parseEndAtLabel`, `AssignmentForm.kt:106`; format `d M Y H:i` dengan/tanpa koma, bulan
+  Indonesia/Inggris) — gagal urai → kolom kosong + toast **"Waktu berakhir tidak terbaca, silakan pilih ulang"** (Posting nonaktif sampai dipilih); assigned:
+  hari/jadwal diprefill bila `scheduleId>0`. Terverifikasi di device: tugas yang dibuat dengan `2026-10-24 13:17:00` terisi kembali `24-10-2026 13:17:00`.
+  Mode Detail → menu **"Edit Tugas"** mengaktifkan ulang dropdown Hari/Mapel.
 
 ### 6.5 Kontrak API (tugas guru)
+Nomor baris = baris `suspend fun` di `ApiService.kt` per 2026-10-22 (+6 untuk fungsi setelah `assignmentSubject`).
 | Method | Path (`ApiService.kt`) | Param/Body | Kapan |
 |---|---|---|---|
-| GET | `.../assignment/teachers/backlog` (`:408-412`, `:470-473`) | `take,skip` / QueryMap filter | list tugas |
-| GET | `.../teachers/class` (`:440-441`) | – | dropdown kelas |
-| GET | `.../teachers/schedule-day` (`:443-444`) | – | `data[].key,lable` |
-| GET | `.../teachers/schedule` (`:446-450`) | `school_class_id`, `day` | jadwal: `id, day, class_room, time_plot{start_at,end_at}, subject{id,name}` |
-| POST multipart | `.../teachers/create` (`:452-457`) | lihat payload | buat |
-| POST multipart | `.../teachers/update/{id}` (`:459-465`) | idem | edit |
-| DELETE | `.../teachers/delete/{id}` (`:467-468`) | – | hapus |
-| GET | `.../teachers/scored` (`:475-479`) | `take,skip` | Penilaian: `id,title,upload_at_label,end_at_label,count_*,message_label` |
-| GET | `.../teachers/scored/{id}` (`:488-489`) | – | `data{count_*, upload_at_label, end_at_label, class.name, subject.name, assignments[]{id,upload_at,score,scored,student{name,nisn,class,user.avatar},subject_assignment{subject,teacher,school},uri_student,files[]}}` |
-| POST | `.../teachers/scored/{colledtedId}/student-assignment/{assignmentId}` (`:481-486`) | JSON `{"score": Int}` | simpan nilai |
+| GET | `mobile/attendance/teacher-data-scope` (`:506`) | – | **baru dipakai form tugas** (2026-10-22): `data{scope,label,restricted}`; service presensi; penentu mode form |
+| GET | `.../assignment/teachers/backlog` (`:409`, `:477`) | `take,skip` / QueryMap filter | list tugas |
+| GET | `.../teachers/class` (`:441`) | – | dropdown kelas; **ikut `restricted`**: assigned = kelas jadwal guru + wali, bebas = semua kelas kecuali ALUMNI |
+| GET | `.../teachers/subject` (`:444`) | `take`, `skip` | **baru 2026-10-22** — mapel mode bebas: `data[]{id,name,icon_image}` |
+| GET | `.../teachers/schedule-day` (`:450`) | – | `data[].key,lable` (`key` huruf kapital, mis. `SENIN`) |
+| GET | `.../teachers/schedule` (`:453`) | `school_class_id`, `day` | jadwal: `id, day, class_room, time_plot{start_at,end_at}, subject{id,name}`; `restricted=true` → hanya jadwal guru login |
+| POST multipart | `.../teachers/create` (`:460`) | payload canonical (§6.4) | buat; sukses `{"message":"Berhasil membuat Tugas"}` |
+| POST multipart | `.../teachers/update/{id}` (`:467`) | idem | edit; sukses `{"message":"Berhasil update Tugas"}`; 404 bila bukan milik guru/tidak ada |
+| DELETE | `.../teachers/delete/{id}` (`:474`) | – | hapus |
+| GET | `.../teachers/scored` (`:482`) | `take,skip` | Penilaian: `id,title,upload_at_label,end_at_label,count_*,message_label` |
+| GET | `.../teachers/scored/{id}` (`:495`) | – | `data{count_*, upload_at_label, end_at_label, class.name, subject.name, assignments[]{id,upload_at,score,scored,student{name,nisn,class,user.avatar},subject_assignment{subject,teacher,school},uri_student,files[]}}`; `assignments[].id`/`score` bisa `null` → diparse `0` (`@NullToZeroInt`) |
+| POST | `.../teachers/scored/{colledtedId}/student-assignment/{assignmentId}` (`:488`) | JSON `{"score": Int}` | simpan nilai; id pengumpulan ≤ 0 → tidak memanggil API (toast "Data pengumpulan siswa tidak tersedia", `HomeworkSubmittedPage.kt:179`, `HomeworkScoringPage.kt:119`) |
+
+Error umum: `422 {"message":"Data yang diberikan tidak valid.","errors":{"<field>":["…"]},"error":"<pesan pertama>","trace_id":"…"}`. Catatan dev: sebelum
+backend baru aktif (2026-10-20) dev menolak payload canonical dengan 422 yang meminta `school_classes_id`, `school_subject_id`, `school_subject_schedules_id`,
+`grade`, dan `teachers/subject` masih 404; sejak itu create/update terverifikasi 200 (assigned 2026-10-20, bebas 2026-10-21).
 
 ### 6.6 Data lokal
 `homework`, `homework_link`, `homework_collected` (`HomeWorkModels.kt:203-219`), `classroom`, `mapel`. Singleton converter
-`CreateHomeworkBindConverter.listClass` & `UploadMateriBindConverter.listSubject/listSchedule` (di-`addAll` tiap buka tanpa clear → duplikat).
+`CreateHomeworkBindConverter.listClass` & `UploadMateriBindConverter.listSubject/listSchedule` (di-`addAll` tiap buka tanpa clear → duplikat). **Form guru tidak lagi menulis ke singleton/Room itu** (2026-10-22: kelas/mapel yang bergantung scope
+hanya hidup di state `CreateHomeworkVm`); `HomeWorkViewModel` & filter list masih memakainya.
 
 ### 6.7 Catatan migrasi Compose
 - Route: `HomeworkTeacherRoute`, `CreateHomeworkRoute(homeworkId: Int = 0, editable: Boolean = true)`, `HomeworkSubmittedRoute(id: Int)`;
   scoring = `ModalBottomSheet`/dialog fullscreen. Date+time → `DatePickerDialog` + `TimePicker` M3 (24 jam, minDate hari ini).
-- Hapus fetch ganda (observer `classId`/`mapel` + refresh awal). Kirim filter hanya bila ≠ 0? ❓ (ubah kontrak).
+- Hapus fetch ganda (observer `classId`/`mapel` + refresh awal). Filter kelas/mapel: app lama kini mengirim hanya bila > 0 (§6.4); untuk app baru lihat ❓ Q10/Q19.
 - Tampilkan skor/validasi sama persis (0..100, tombol disabled saat kosong).
+- **Form guru wajib mengikuti kontrak baru** (cabang `teacher-data-scope`, payload canonical, `teachers/subject`, error 422/404/401/403, refresh list setelah
+  create): lihat §6.4 dan `05c-gap-tugas.md` §4. Logika murni (`AssignmentPayload`, `AssignmentDates`, `AssignmentErrors`) sengaja dipisah dari UI agar bisa diuji
+  JVM — pola yang sama dianjurkan untuk `UploadTugasViewModel` (`rules-global.md` §5.2).
 
 ---
 
@@ -1028,7 +1101,7 @@ Semua intent FCM memakai `NEW_TASK | CLEAR_TOP | SINGLE_TOP`. Tidak ada notifika
 | Konteks | Format / aturan | Rujukan |
 |---|---|---|
 | Label tanggal materi/tugas/rekap | string server apa adanya (`created_at_label`, `end_at_label`, `upload_at_label`, `information_label`, `upload_at`) | layout item |
-| Deadline tugas (kirim) | `dd-MM-yyyy HH:mm:ss`, Locale id, default "sekarang", min tanggal hari ini | `CreateHomeworkVm.kt:65,76`, `CreateHomeworkPage.kt:264-289` |
+| Deadline tugas (kirim) | tampil `dd-MM-yyyy HH:mm:ss` (Locale id); **dikirim `yyyy-MM-dd HH:mm:ss`** (Locale.US); tanpa default (guru wajib memilih), min tanggal hari ini | `AssignmentForm.kt:73-124`, `CreateHomeworkPage.kt:272` |
 | Jadwal pemanggilan | `yyyy-MM-dd` + `HH:mm:ss` digabung spasi | `PoinViewModel.kt:56-57`, `PoinHandlingPage.kt:85-87,136` |
 | Agenda | kunci `yyyy-MM-dd`; bulan `MMMM yyyy` (id); hari `dd`/`EEE` (id); waktu lapor `dd MMM yyyy · HH.mm` (id-ID) | `AgendaMingguanPage.kt:26-29`, `AgendaMingguanCheckPage.kt:80-82` |
 | Perpus tanggal kembali | parse `dd MMM yyyy` (US) → `dd MMMM yyyy` (id) | `OnKlasDbUtil.kt:656-667` |
@@ -1036,7 +1109,8 @@ Semua intent FCM memakai `NEW_TASK | CLEAR_TOP | SINGLE_TOP`. Tidak ada notifika
 | Ukuran file | `0.00 Kb` (<1 MB), `0.00 Mb`, `0.00 Gb` (basis 1024) | `FileUtils.kt:120-133` |
 | Upload materi | 1 file, ≤ 12 MB, MIME picker pdf/gambar/office | `UploadMateriViewmodel.kt:155`, `IntentUtil.kt:657-688` |
 | Jawaban tugas | multi file, tiap ≤ 12 MB (12 288 KB), ekstensi jpeg/jpg/png/pdf/doc/docx/xls/xlsx/ppt/pptx | `HomeWorkViewModel.kt:412-426` |
-| Soal tugas (guru) | 1 file, tanpa batas client | `CreateHomeworkPage.kt:329-336` |
+| Soal tugas (guru) | 1 file, **≤ 12 MB** (dicek saat memilih file & saat Posting; dulu tanpa batas client) | `CreateHomeworkPage.kt:64-85`, `AssignmentForm.kt:28,67` |
+| Label tanggal tugas (prefill edit guru) | diurai `d M Y H:i` (koma opsional; bulan ID/EN) → epoch; gagal → kosong | `AssignmentForm.kt:106` |
 | Foto poin | JPEG dikompres ≤ 1 MB, opsional | `PoinViolationPage.kt:88-92` |
 | Skor tugas | integer 0..100 | `HomeworkScoringPage.kt:93-113` |
 
@@ -1053,11 +1127,18 @@ Semua intent FCM memakai `NEW_TASK | CLEAR_TOP | SINGLE_TOP`. Tidak ada notifika
 8. Syarat "upload jawaban" tetap terpenuhi setelah semua file dihapus / link dikosongkan; syarat "baca" terpenuhi walau dialog izin dibatalkan. Ketatkan? (§5.5)
 9. Tab Sudah tidak refresh otomatis setelah mengumpulkan; list tidak pernah dipangkas (tugas terhapus tetap tampil). (§5.5)
 10. Filter guru mengirim `school_classes_id=0` / `school_subject_id=0` untuk "Semua" — cek perilaku server; kirim hanya bila ≠0? (§6.4)
+    **Status 2026-10-22:** app lama kini tidak mengirim filter bernilai 0 (request tanpa filter terverifikasi 200 + data); perilaku server atas `0` tetap tak terverifikasi — untuk app baru lihat Q19.
 11. Edit tugas mengirim `end_at` = `end_at_label` (format label server). Verifikasi backend. (§6.4)
+    **Status 2026-10-22:** diperbaiki di app lama — label diurai jadi tanggal/jam (`parseEndAtLabel`) dan `end_at` dikirim `yyyy-MM-dd HH:mm:ss` sesuai spek backend; label nyata di dev berupa tanggal absolut (bukan teks relatif) dan terurai benar — untuk app baru lihat Q18.
 12. Poin: alert sukses pelanggaran/prestasi selalu tampil walau gagal; siswa non-Student tetap diproses; back membuka HomePage baru. (§9.4, §10.4)
 13. Notifikasi in-app: `child_id` tidak dibaca, ASSIGNMENT/EXAM tertukar, POIN membuka halaman guru untuk siswa. (§11)
 14. Perpustakaan (tak terjangkau), `MapelTeacherPage` (tab tersembunyi), `HomeworkFilterPage` (filter tersembunyi), "Edutainment" hub (GONE): migrasi atau buang?
 15. Nama file unduhan pembahasan memakai nama file materi / judul tugas tanpa ekstensi. Perbaiki? (§2.4, §5.5)
+16. **Deskripsi tugas kini wajib** di form guru app lama (spek backend: "ya di UI"); sebelumnya opsional. Pertahankan wajib, dan samakan di app baru? (§6.4)
+17. **Batas waktu tanpa default** (guru wajib memilih; dulu default "sekarang") dan **Posting tidak menunggu preview link** — dua keputusan implementasi app lama 2026-10-22 yang belum dikonfirmasi. Pertahankan? (§6.4)
+18. **Prefill `end_at` saat edit di app baru**: keputusan 2026-10-02 (#3) = default sekarang & wajib pilih ulang, dengan alasan label dianggap teks relatif. Bukti baru: label berupa tanggal absolut dan terurai benar. Ubah app baru jadi mengurai label (fallback kosong bila gagal)? (§6.4, `FLOW_QUESTIONS.md` 2026-10-02 #3)
+19. **Filter "Semua" di app baru** masih mengirim literal `0` (keputusan 2026-10-02 #6, tiru app lama); app lama kini tidak mengirimnya. Samakan (hilangkan bila 0)? (§6.4)
+20. **Multi-kelas**: spek backend membolehkan satu request per kelas dengan hasil sukses/gagal per kelas; belum dibangun (keputusan user: satu kelas dulu). Dibangun kapan, atau tidak? (§6.4)
 
 ---
 
@@ -1073,8 +1154,13 @@ Dibandingkan dengan `docs/repo lama/MATERI.md` dan `docs/repo lama/dokumentasi-t
 | TUGAS §4.6: "Jika masih ada syarat → tombol disabled; tap tetap bisa memunculkan prettyAlert" | Tombol `isEnabled=false` sehingga tap tidak diproses; alert hanya jalur cadangan (`HomeworkDetailPage.kt:540-543`) |
 | TUGAS §4.6: hanya kasus extra `id` hilang | Tambahan: `id` valid tetapi tidak di Room → layar kosong tanpa pesan (`:124`) |
 | TUGAS §12.3: in-app tugas memakai `child_id` | Juga: kategori `ASSIGNMENT` membuka `UjianDetailPage` dan `EXAM` membuka `HomeworkDetailPage` (tertukar) (`NotificationPage.kt:270-279`) |
-| TUGAS §11 guru: "filter Kelas/Mapel 'Semua' ... merefresh list" | Benar, tetapi "Semua" dikirim sebagai nilai `0` pada query filter, dan refresh terjadi 3× saat buka (§6.4) |
+| TUGAS §11 guru: "filter Kelas/Mapel 'Semua' ... merefresh list" | Benar, tetapi "Semua" dikirim sebagai nilai `0` pada query filter (sampai 2026-10-22; kini tidak dikirim), dan refresh terjadi 3× saat buka (§6.4) |
 | TUGAS: tab Sudah | Fragment Sudah tidak me-reset guard saat dibuat (berbeda dari Belum/Nilai) (`HomeworkSudahPage.kt:80`) |
+| TUGAS §5.4 guru: form Kelas → Hari → Mapel + payload `school_classes_id`, `school_subject_schedules_id`, `grade`, `teacher_id`, `school_id`, `downloded`; "create tidak memvalidasi ukuran file di client" | Sejak 2026-10-22 bercabang `teacher-data-scope` (assigned/bebas), payload canonical tanpa `teacher_id`/`school_id`/`grade`, `downloaded`, `end_at` `yyyy-MM-dd HH:mm:ss`; deskripsi wajib; tanpa default tanggal; file ≤ 12 MB di client (§6.4) |
+| TUGAS §5.1 guru: setelah create `RESULT_OK` → `fetchHomeworkTodo()` | Diganti `prefTeacher=-1` + `fetchHomeworkTeacher()` — list guru benar-benar refresh (§6.4) |
+| TUGAS §5.4: edit mengirim label tanggal apa adanya | Label diurai ke `yyyy-MM-dd HH:mm:ss`; gagal urai → kosong, wajib pilih ulang (§6.4) |
+| TUGAS §4.6 siswa: error submit hanya toast | 422 per file (`file.N`), 403 "Akses diblokir" + trace id, `link` tak dikirim bila kosong (§5.5) |
+| TUGAS §8: `teacher-data-scope` = `{teacher_master_data_scope, scope}` | Respons nyata: `{scope, label, restricted}`; form tugas memakai `restricted` (§6.4, §6.5) |
 | (tidak ada di dok lama) | Perpustakaan, Agenda Mingguan, Poin guru/siswa — didokumentasikan baru di §7–§10 |
 
 ---
@@ -1117,6 +1203,7 @@ jadi seluruh baris di bawah `(kode ada, belum diuji)`.
 - [ ] Form cascade Kelas → Hari → Mapel (jadwal), error "…wajib dipilih", deadline `dd-MM-yyyy HH:mm:ss` min hari ini. *(kode ada, belum diuji — fetch jadwal diperbaiki agar tidak crash saat gagal, beda dari app lama)*
 - [ ] Checkbox "Siswa wajib membaca materi" hanya muncul saat ada file/link. *(kode ada, belum diuji)*
 - [ ] Mode Detail read-only + menu Edit/Hapus; hapus dengan konfirmasi. *(kode ada, belum diuji)*
+- [ ] **Kontrak baru (2026-10-22)**: form bercabang `teacher-data-scope` (assigned/bebas), payload canonical, `teachers/subject`, error 422/404/401, refresh list setelah create. *(app lama: terverifikasi di Infinix X1102 + dev — create & update 200 (assigned), create 200 (bebas), 422 + draft utuh; **app baru: belum dikerjakan**, lihat `05c` §4)*
 - [ ] Tugas Terkumpul: panel Detail toggle, filter Semua/Belum/Sudah Dinilai, tombol Beri/Ubah Nilai; skor 0–100, tombol simpan disabled saat kosong. *(kode ada, belum diuji — tombol "Lihat Jawaban" yang mati di app lama sekarang terhubung ke Detail Tugas read-only, keputusan user)*
 
 **Agenda Mingguan** — status 2026-10-06 (`05e`/`05f`): kode dibangun penuh, belum diuji di device (butuh sesi guru).

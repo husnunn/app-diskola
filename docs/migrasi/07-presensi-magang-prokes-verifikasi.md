@@ -769,7 +769,7 @@ Base & header lihat dok 10. Semua non-2xx kecuali 401/403/500 dilempar sebagai `
 | Method | Path | Param/Body | Field dipakai | Kapan |
 |---|---|---|---|---|
 | GET | `mobile/attendance/schedule` | `date` (+ opsional class/subject/limit, tak dipakai) | `data[]{id,start_at,end_at,school_attendances[{attendance_id,plot_start_at,plot_end_at,late_at,teacher_name,subject_name,subject_icon_image,class_name,status,is_present,created_at}]}` | JurnalPage |
-| GET | `mobile/attendance/teacher-data-scope` | — | `teacher_master_data_scope`/`scope` | Jurnal & form guru |
+| GET | `mobile/attendance/teacher-data-scope` | — | `teacher_master_data_scope`/`scope` (Jurnal). Respons nyata dev 2026-10: `{scope, label, restricted}`; `restricted` dipakai form **tugas** guru (`05` §6.4), bukan Jurnal | Jurnal & form guru |
 | GET | `mobile/attendance/journal-capture-scope` | — | `required`, `label` | Buka form jurnal |
 | GET | `mobile/attendance/list-plot` | — | `time_plot_id, time_plot_start_at, time_plot_end_at` | Form jurnal |
 | GET | `mobile/attendance/list-class` · `list-subject` · `list-teacher` | `take, skip, name` | `id,name,grade` / `id,name` / `id,name,nip,user.id` | Picker (paging 20) |

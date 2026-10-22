@@ -7,6 +7,10 @@ di `05b-implementasi-hub-materi.md`. Doc `05` §5–12 (Tugas, Perpustakaan, Age
 
 Path relatif terhadap `Diskola-App-New/app/src/main/java/id/diskola/app/`.
 
+> **Diperbarui 2026-10-12:** baris Hub di §1 yang bertanda ⛔/🟡/"Di luar cakupan" (kartu kelas, tombol verifikasi, badge notifikasi,
+> badge Agenda, `title_class`, banner presensi) **sudah digantikan** oleh penyamaan penuh dengan aplikasi lama — lihat
+> `05g-gap-hub-pembelajaran.md`. Khusus kartu "Kelas Berlangsung": kini dari `check-account.current_subject`, bukan `schedule?date=`.
+
 Legenda status: ✅ Selesai & diverifikasi di device fisik · ✅* Selesai (kode benar, belum sempat
 diuji jalur ini secara langsung) · 🟡 Sebagian · ⛔ Ditunda (disengaja, alasan dicatat) · — Tidak
 diubah/di luar cakupan.

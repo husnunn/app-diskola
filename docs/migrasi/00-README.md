@@ -8,6 +8,8 @@ maupun fitur yang dipakai pengguna sekarang**.
 
 > Dokumen di `docs/repo lama/` dibuat untuk v2.1.37 dan sebagian sudah basi. Jika berbeda, **yang
 > berlaku adalah dokumen di folder ini**. Setiap dokumen punya bagian "Selisih dengan dokumen lama".
+>
+> **Versi terkini dokumen AKM:** `06` dan bagian terkait di `10` mengikuti android-portal **2.1.41, `versionCode 81`, commit `e0a12b62` (19-10-2026)**, lebih baru dari baseline v2.1.40 di atas.
 
 ## Daftar dokumen
 
@@ -27,13 +29,21 @@ maupun fitur yang dipakai pengguna sekarang**.
 | 05d | `05d-implementasi-tugas.md` | Laporan implementasi fase "Tugas" per fase kerja dan hasil uji di device fisik |
 | 05e | `05e-gap-poin-agenda.md` | Selisih implementasi Poin (siswa+guru) & Agenda Mingguan Compose vs aplikasi lama |
 | 05f | `05f-implementasi-poin-agenda.md` | Laporan implementasi fase "Poin + Agenda Mingguan", temuan teknis, dan hasil uji di device |
-| 06 | `06-asesmen-akm-tryout-ujian.md` | Asesmen/AKM (offline, timer, lockdown, pelanggaran, penalty, laporan masalah), try out, ujian |
+| 05g | `05g-gap-hub-pembelajaran.md` | Selisih Hub Pembelajaran (Home) baru vs `PembelajaranPage` lama: endpoint, data tampil, teks panjang |
+| 05h | `05h-implementasi-hub-pembelajaran.md` | Laporan implementasi penyamaan Hub Pembelajaran dengan aplikasi lama, temuan teknis, dan status uji |
+| 06 | `06-asesmen-akm-tryout-ujian.md` | Asesmen/AKM (offline, timer, lockdown, pelanggaran, penalty, laporan masalah, label/stempel dibatalkan, rumus LaTeX, tombol "Selesai" di soal terakhir, header `X-App-*`), try out, ujian |
+| 06a | `06a-gap-asesmen.md` | Selisih Asesmen/AKM (ujian sekolah, siswa) app baru vs lama (audit 2026-10-15), bug legacy yang tidak ditiru |
+| 06b | `06b-implementasi-asesmen-a1.md` | Laporan implementasi sub-fase A1 "data aman" (Room, repository, worker, blokir logout), temuan teknis, status uji |
+| 06c | `06c-gap-asesmen-a2.md` | Selisih keamanan ujian (priming, kunci layar, pelanggaran, penalti, laporan masalah) app baru vs lama, bug legacy yang tidak ditiru, celah yang diketahui |
+| 06d | `06d-implementasi-asesmen-a2.md` | Laporan implementasi sub-fase A2 (A2a sesi/kunci layar/priming, A2b pelanggaran/antrean/layanan latar, A2c penalti/laporan), temuan teknis, status uji |
 | 07 | `07-presensi-magang-prokes-verifikasi.md` | Presensi (QR, GPS/geofence, selfie, offsite, jurnal), izin, magang, prokes/screening, verifikasi akun |
 | 07a | `07a-gap-presensi.md` | Selisih implementasi Presensi harian Compose vs aplikasi lama |
 | 07b | `07b-implementasi-presensi.md` | Laporan implementasi fase "Presensi" (harian, Dinas Luar, Izin), temuan teknis, dan hasil uji |
 | 07c | `07c-gap-jurnal.md` | Selisih implementasi Jurnal KBM (daftar, Hadir kelas/QR, form guru & siswa, foto KBM, detail) Compose vs aplikasi lama |
 | 07d | `07d-implementasi-jurnal.md` | Laporan implementasi fase "Jurnal KBM", temuan teknis, dan status pengujian |
 | 08 | `08-keuangan-pembayaran-klaspay-ppob.md` | Pembayaran & SPP, PIN, QR, Klaspay (aktivasi, top up, riwayat, tagihan, promo), PPOB, dana partisipasi |
+| 08a | `08a-gap-pembayaran.md` | Selisih Pembayaran/Klaspay app baru vs lama (hasil audit 2026-10-14), status per bagian, selisih UI yang disengaja |
+| 08b | `08b-implementasi-pembayaran-p1.md` | Laporan implementasi sub-fase P1 (fondasi, hub nyata, aktivasi, PIN, dialog keamanan), temuan teknis, status uji |
 | 09 | `09-marketplace-entrepreneurs-toko.md` | Toko sekolah (pembeli) & kewirausahaan (penjual): produk, keranjang, checkout, pesanan, ulasan, pendapatan |
 | 10 | `10-infrastruktur-api-data-latar.md` | Build & dependency (lama → baru), manifest & permission, indeks endpoint, interceptor, DI, Room, semua key SharedPreferences, worker/service, utilitas, tema |
 

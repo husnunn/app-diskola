@@ -12,6 +12,12 @@ halaman sukses). Alur aktivasi Klaspay yang dipicu setelah login SSO (ringkasann
 > `res/` = `android-portal/app/src/main/res/`. Nomor baris mengacu ke kode per 29-09-2026.
 > Istilah: **VA** = virtual account, **retail** = pembayaran di minimarket, **saldo** = saldo Klaspay.
 
+> **Pembaruan 22-10-2026 (kode diubah 21-10-2026):** menu **Bayar Spp** dan **Dana Partisipasi** kini dijaga
+> *feature gate* server `payment` (§5.6, Q22). Berkas yang berubah: `PembayaranPage.kt`, `SppPaymentPage.kt`,
+> `PartisipasiPage.kt`, `NotificationPage.kt`, `DetailNotification.kt`, `feature/FeatureAvailabilityModels.kt`.
+> Nomor baris pada berkas-berkas itu yang tidak disebut ulang di bawah bisa bergeser ±2–12 baris; rujukan yang
+> disentuh pembaruan ini sudah disesuaikan. Perubahan ini belum diuji di device (build Android & iOS lolos).
+
 ## Daftar isi
 1. [Gambaran, gerbang akses & peta navigasi](#1-gambaran-gerbang-akses--peta-navigasi)
 2. [Komponen bersama (format uang, PIN, metode bayar, panduan, detail, sukses)](#2-komponen-bersama)
@@ -44,6 +50,7 @@ halaman sukses). Alur aktivasi Klaspay yang dipicu setelah login SSO (ringkasann
 | Tab **Pembayaran** di bottom nav Home (`menu_pembayaran`, judul `"Pembayaran"`) | `@/pages/home/HomePage.kt:249`, `res/menu/main_bot_menu.xml:35-39` | Semua peran. Extra `bannerData == "ppob"` membuka tab ini langsung (`HomePage.kt:237`) |
 | Wallet aktif | pref `klaspayActive` (ditulis login/SSO/check-account/aktivasi/`getWallet`) | **Hampir semua** menu keuangan (Top Up, QR Pay, Riwayat, Tagihanku, SPP, Dana Partisipasi, semua PPOB) memeriksa `isKlaspayActive`; jika `false` → dialog "Aktivasi Wallet Lebih Dahulu" (§5.4) |
 | Menu **Bayar Spp** | `is_student == true` (`@/pages/pembayaran/PembayaranPage.kt:524-534`) | Non-siswa tidak melihat item SPP |
+| Feature gate server `payment` | `GET mobile/app/check-feature-availability?name=payment` (§5.6) | Hanya **Bayar Spp** & **Dana Partisipasi** (menu hub, notifikasi `PAYMENT/SPP`, push `new-spp`/`spp`): `available=false` → bottom sheet "Fitur Belum Tersedia di Aplikasi"; gagal jaringan = dianggap tersedia. Menu Klaspay & PPOB tidak terpengaruh |
 | Menu PPOB **Game** | disembunyikan jika `is_teacher == true` (`PembayaranPage.kt:281-291`) | Guru melihat 5 item; posisi ke-5 = BPJS (`PembayaranPage.kt:615-621`) |
 | Transfer antar pengguna | pref `isToppers` / `toppersStatus` (dari `GET payment/wallet`) | Menentukan isi layar Top Up (§6) |
 
@@ -55,8 +62,8 @@ Tidak ada flag langganan sekolah (`onklas_lite/pro`) yang dicek di modul ini.
 | Login SSO, wallet belum aktif | `KlaspayAktivasiPage` | `isSso=true` | `@/pages/login/LoginSso.kt:80-88,106-114` |
 | Pembelajaran: ikon notifikasi saat wallet belum aktif | `KlaspayAktivasiPage` (+toast `"Silahkan aktivasi wallet terlebih dahulu untuk mengunakan fitur notifikasi"`) | – | `@/pages/pembelajaran/PembelajaranPage.kt:343-357` |
 | Toko: tombol chat penjual saat wallet belum aktif | alert `"Aktivasi Wallet Lebih Dahulu"` → `"Aktivasi Sekarang"` → `KlaspayAktivasiPage` | – | `@/pages/sekolah/store/DetailProduk.kt:187-231` |
-| Detail notifikasi, `parent="PAYMENT"` | `child`: `HISTORY` → `PaymentDetailPage(child_id)` / `KlaspayRiwayatPage`; `SPP` → `SppHistoryDetailPage(child_id)` ⚠️ / `SppPaymentPage`; `BILL` → `KlaspayTagihanDetailPage(child_id)` / `KlaspayTagihanPage`; `TOPUP` → `KlaspayTopupPage`; `PULSA` → `PulsaPage`; `PLN` → `ListrikPage`; `PDAM` → `AirPage`; `INTERNET` → `InternetPage`; `GAME` → `GamePage`; `BPJS` → `BpjsPage` (semua +`child_id`, diabaikan layar tujuan kecuali `PaymentDetailPage`) | `child_id` | `@/pages/notification/DetailNotification.kt:181-205` |
-| Push FCM menu `new-spp` / `spp` | `SppPaymentPage` / `SppPaymentPage(page="paid")` | `page` | `@/services/NotifRouter.kt:69-70` |
+| Detail notifikasi, `parent="PAYMENT"` | `child`: `HISTORY` → `PaymentDetailPage(child_id)` / `KlaspayRiwayatPage`; `SPP` → (gate `payment`, §5.6) `SppHistoryDetailPage(child_id)` ⚠️ / `SppPaymentPage`; `BILL` → `KlaspayTagihanDetailPage(child_id)` / `KlaspayTagihanPage`; `TOPUP` → `KlaspayTopupPage`; `PULSA` → `PulsaPage`; `PLN` → `ListrikPage`; `PDAM` → `AirPage`; `INTERNET` → `InternetPage`; `GAME` → `GamePage`; `BPJS` → `BpjsPage` (semua +`child_id`, diabaikan layar tujuan kecuali `PaymentDetailPage`) | `child_id` | `@/pages/notification/DetailNotification.kt:181-211` (daftar notifikasi: `NotificationPage.kt` sama, kecuali `SPP` tanpa id → `HomeWorkPage` tanpa gate; `03` §7.4) |
+| Push FCM menu `new-spp` / `spp` | `SppPaymentPage` / `SppPaymentPage(page="paid")` (gate `payment` di `onCreate`; tidak tersedia → bottom sheet lalu `finish`) | `page` | `@/services/NotifRouter.kt:69-70` |
 | Deep link `https://(dev.)api.diskola.id/api/payment/reset-pin/token/<token>` | `SetPinKlaspayPage(token)` | `token` | §4.3 |
 
 ⚠️ `SppHistoryDetailPage` adalah `DialogFragment`, bukan Activity → `startActivity` akan crash
@@ -72,8 +79,10 @@ flowchart TD
     HOME -->|QR Pay| QR[QrScanActivity]
     HOME -->|Riwayat| RW[KlaspayRiwayatPage]
     HOME -->|Tagihanku| TG[KlaspayTagihanPage]
-    HOME -->|Bayar Spp| SPP[SppPaymentPage]
-    HOME -->|Dana Partisipasi| DP[PartisipasiPage]
+    HOME -->|Bayar Spp / Dana Partisipasi| FG{Feature gate payment}
+    FG -->|available atau gagal jaringan| SPP[SppPaymentPage]
+    FG -->|available atau gagal jaringan| DP[PartisipasiPage]
+    FG -->|maintenance| FGS[Bottom sheet Fitur Belum Tersedia]
     HOME -->|Pulsa/Listrik/Air/Internet/Game/BPJS| PPOB[Layar produk PPOB]
     TU --> GUIDE[PaymentGuidePage]
     SPP --> CO[CheckoutPage] --> PT[PaymentTypePage] --> PIN[ConfirmPinPage]
@@ -439,8 +448,8 @@ Fragment tujuan `pembayaranPage` di `res/navigation/main_nav.xml:36-42`, file
 | QR Pay | izin kamera (§15.1) → `QrScanActivity` | dialog aktivasi |
 | Riwayat | `KlaspayRiwayatPage` | dialog aktivasi |
 | Tagihanku | `KlaspayTagihanPage` | dialog aktivasi |
-| Bayar Spp (siswa) | `SppPaymentPage` | dialog aktivasi |
-| Dana Partisipasi | `PartisipasiPage` + extra `klaspayId = klaspayData.wallet_id` | dialog aktivasi |
+| Bayar Spp (siswa) | gate `payment` (§5.6) → `SppPaymentPage` | dialog aktivasi (gate tidak dipanggil) |
+| Dana Partisipasi | gate `payment` (§5.6) → `PartisipasiPage` + extra `klaspayId = klaspayData.wallet_id` | dialog aktivasi (gate tidak dipanggil) |
 | Pinjam Buku | dialog `"Fitur belum tersedia"` / `"Fitur ini belum tersedia untuk sekolah ini"` / `"Ok Deh"` (tanpa cek wallet) | idem |
 | PPOB (Pulsa/Listrik/Air/Internet/Game/BPJS) | `PulsaPage`/`ListrikPage`/`AirPage`/`InternetPage`/`GamePage` (guru: posisi 5 → `BpjsPage`)/`BpjsPage` | dialog aktivasi |
 (`PembayaranPage.kt:227-264,536-636`)
@@ -480,6 +489,45 @@ Fragment tujuan `pembayaranPage` di `res/navigation/main_nav.xml:36-42`, file
 | GET | `payment/wallet` (`ApiService.kt:766-767`) | `status`, `data{wallet_id, user_id, name, email, school_id, is_toppers, toppers_status, balance, last_update}` | init hub (juga Home, SPP, Top Up, Partisipasi, PPOB) |
 | POST | `mobile/app/payment/check` | lihat §3.5 | tombol aktivasi |
 | POST | `mobile/app/authentication/check-account` | dokumen 02 | `onStart` |
+
+### 5.6 Feature gate `payment` (Bayar SPP & Dana Partisipasi)
+Tambahan 21-10-2026; belum diuji di device (hanya build). Memakai mesin yang sama dengan Presensi/Jurnal
+(`03` §10.6, `10` §6.6): `@/feature/FeatureGate.kt` dengan key baru `FeatureKey.PAYMENT = "payment"`
+(`@/feature/FeatureAvailabilityModels.kt:9`).
+
+- **Yang dijaga:** hanya layar **SPP** (`SppPaymentPage`, termasuk `SppHistoryDetailPage` dari notifikasi) dan **Dana
+  Partisipasi** (`PartisipasiPage`). Top Up, QR Pay, Riwayat, Tagihanku, PPOB, dan Pinjam Buku **tidak** dicek.
+- **Endpoint:** `GET mobile/app/check-feature-availability?name=payment` → `data{name, available, message}`, dengan
+  loading `"Memeriksa ketersediaan fitur…"`. Gagal jaringan atau format rusak → **fail-open** (tetap dibuka).
+- **Urutan di hub:** cek `isKlaspayActive` lebih dulu (belum aktif → dialog aktivasi, gate **tidak** dipanggil), baru
+  gate: `launchFeature(FeatureKey.PAYMENT, intent)` di tiga titik — siswa-SPP, siswa-Partisipasi, non-siswa-Partisipasi
+  (`PembayaranPage.kt:544,553,572`).
+- **Titik masuk lain:**
+
+  | Jalur | Mekanisme |
+  |---|---|
+  | Notifikasi `PAYMENT/SPP` dengan `child_id` (daftar & detail) | `launchFeature(PAYMENT, SppHistoryDetailPage)` (`NotificationPage.kt:306-314`, `DetailNotification.kt:188-198`) |
+  | Notifikasi `PAYMENT/SPP` tanpa id | Detail: `launchFeature(PAYMENT, SppPaymentPage)`. Daftar: tetap `HomeWorkPage`, tanpa gate (❓ Q2 dokumen 03) |
+  | Push FCM `new-spp` / `spp` | Langsung `SppPaymentPage`; dijaga `guardFeatureOnCreate(PAYMENT)` di `onCreate` |
+  | Notifikasi `PAYMENT/BILL` | **Tidak** dijaga: di Android tujuannya Klaspay Tagihan, bukan Dana Partisipasi |
+
+- **Guard `onCreate`:** `SppPaymentPage` (`:30-35`) dan `PartisipasiPage` (`:47-52`) memanggil
+  `guardFeatureOnCreate(PAYMENT) { init… }` (pola `PresensiPage`/`JurnalPage`). Tidak tersedia → bottom sheet dengan
+  `finishHostOnDismiss=true`. Isi `onCreate` lama pindah ke `initSppPaymentPage()` / `initPartisipasiPage()`; flag
+  `contentReady` baru `true` setelah guard lolos.
+- **Pemuatan data:** `GET payment/wallet` (SPP) serta `payment/wallet` + `payment/bill/list` (Partisipasi) dipindah ke
+  `loadBalance()` / `loadData()`. Fungsi itu dipanggil sekali dari `init…` dan di `onStart` berikutnya **hanya bila**
+  `contentReady` (`SppPaymentPage.kt:78-105`, `PartisipasiPage.kt:292-320`). Akibatnya tidak ada request payment di
+  belakang bottom sheet maintenance, sementara saldo/daftar tetap dimuat sekali saat pertama masuk.
+- **Pesan & tombol:** sama dengan Presensi/Jurnal. Guru = pesan API (kosong → `"Fitur ini sedang diperbarui. Silakan
+  gunakan website terlebih dahulu."`) + tombol `"Buka Website"`; non-guru = `"Fitur ini sedang diperbarui. Silakan
+  coba lagi nanti."` tanpa tombol website. `"Buka Website"` untuk key `payment` membuka **root portal**
+  (`https://portal.diskola.id` / `https://dev.portal.diskola.id`) karena `FeaturePortalUrl` tidak punya path
+  pembayaran (`else -> ""`) — ❓ Q22.
+- **Dua kali cek:** dari menu hub gate terpanggil dua kali (menu + `guardFeatureOnCreate`), sama seperti
+  Presensi/Jurnal (`07` §1).
+- **iOS:** `ios-portal` memakai gate setara (`MobileFeature.payment`) di tab Pembayaran serta notifikasi `SPP` dan
+  `BILL` (di iOS `BILL` membuka Dana Partisipasi). Di luar cakupan dokumen ini.
 
 ---
 
@@ -696,7 +744,7 @@ List = `select … where is_paid = 0 order by rowid` (urutan API).
 ### 9.1 Ringkasan & akses
 Siswa (`is_student`) dengan wallet aktif membayar tagihan SPP bulanan; bisa beberapa bulan sekaligus
 (harus berurutan dari yang tertua). Metode: saldo Klaspay (langsung lunas) atau VA/retail/dll. (menjadi
-invoice → panduan pembayaran).
+invoice → panduan pembayaran). Akses juga dijaga feature gate server `payment` (§5.6).
 
 ### 9.2 Peta layar
 | Layar | File | Layout | Keterangan |
@@ -722,12 +770,12 @@ flowchart TD
 
 ### 9.3 `SppPaymentPage`
 - Kartu siswa: nama (`student.name`), `nisn` `"|"` kelas (`student_class.class_room.name`), `"Total Saldo"`
-  `"Rp"` + `formatCurrency2(balance)`. Setiap `onStart` (jika wallet aktif) `GET payment/wallet`; error:
+  `"Rp"` + `formatCurrency2(balance)`. Sekali setelah gate `payment` lolos dan di setiap `onStart` berikutnya (jika wallet aktif) `GET payment/wallet` (§5.6); error:
   403 → toast `"Akses wallet ditolak. Silakan login ulang."`, 401 → `"Sesi kadaluarsa. Silakan login ulang."`,
   lain → `"Gagal memuat saldo wallet: <msg>"`; non-HTTP → `"Gagal memuat saldo wallet. Periksa koneksi internet Anda."`;
-  saldo di-set 0 (`SppPaymentPage.kt:68-90`).
+  saldo di-set 0 (`SppPaymentPage.kt:78-105`).
 - Tombol tab `"Tagihan"` / `"Sudah Dibayar"` (aktif = latar primary teks putih; lainnya putih + border
-  abu) → navigasi global action. Extra `page == "paid"` → otomatis klik `"Sudah Dibayar"` (`:41-61`).
+  abu) → navigasi global action. Extra `page == "paid"` → otomatis klik `"Sudah Dibayar"` (`:49-70`).
 - `errorString` VM → toast.
 
 ### 9.4 Tab Tagihan (`SppTagihanPage`)
@@ -1049,7 +1097,7 @@ flowchart TD
 
 ### 12.1 Ringkasan & akses
 Iuran/donasi kegiatan sekolah dengan target nominal; pengguna boleh mencicil. Semua peran (siswa: item
-ke-2 grid, lainnya item ke-1) dengan wallet aktif. Metode: saldo atau channel dari `payment/channel/spp`.
+ke-2 grid, lainnya item ke-1) dengan wallet aktif dan lolos feature gate `payment` (§5.6). Metode: saldo atau channel dari `payment/channel/spp`.
 
 | Layar | File | Layout | Toolbar |
 |---|---|---|---|
@@ -1076,10 +1124,10 @@ flowchart TD
 ### 12.2 `PartisipasiPage`
 - Tab `"Partisipasi"` (default; `is_active=1 & is_expired=0`) / `"Telah Berakhir"` (`is_active=1 &
   is_expired=1`), urut `deadline` naik (`PartisipasiDao.kt:22-32`). Item `is_active=0` tidak pernah tampil.
-- Header saldo `"Rp"` + `formatCurrency2(balance)` — `onStart`: `GET payment/wallet` (error 403
+- Header saldo `"Rp"` + `formatCurrency2(balance)` — `loadData()` (sekali setelah gate `payment` lolos, lalu tiap `onStart`): `GET payment/wallet` (error 403
   `"Akses Payment ditolak. Silakan login ulang."`, 401 `"Sesi kadaluarsa. Silakan login ulang."`, lain
   `"Gagal memuat saldo wallet: <msg>"`, non-HTTP `"Gagal memuat saldo wallet. Periksa koneksi internet Anda."`)
-  + `GET payment/bill/list` (`PartisipasiPage.kt:280-303`). Swipe → fetch + refresh.
+  + `GET payment/bill/list` (`PartisipasiPage.kt:292-320`). Swipe → fetch + refresh.
 - Error `bill/list`: 403 `"Akses Payment ditolak. Silakan login ulang untuk memperbarui izin Anda."`,
   401 `"Sesi kadaluarsa. Silakan login ulang."`, 404 `"Data partisipasi tidak ditemukan"`, 500
   `"Terjadi kesalahan pada server. Silakan coba lagi nanti."`, lain `"Gagal memuat data: <msg>"`;
@@ -1092,7 +1140,7 @@ flowchart TD
   Kartu berakhir: `"Total partisipasiku:"` (hijau bila ≥ target, merah bila kurang), tanpa tombol bayar.
 - Kosong: `"Belum Ada Tagihan Dana Partisipasi"` + gambar. Overlay `"Memuat data terbaru..."`.
 - `"Berpartisipasi"` → `PartisipasiAmountPage` extra `id`, `total_amount` (target, String),
-  `current_amount` (**sisa kekurangan** = target − terkumpul, String) (`:204-215`). Result OK → fetch.
+  `current_amount` (**sisa kekurangan** = target − terkumpul, String) (`:216-227`). Result OK → fetch.
 
 ### 12.3 `PartisipasiAmountPage`
 - Id kosong → alert `"Kegiatan tidak ditemukan"` → finish.
@@ -1307,6 +1355,10 @@ label hasil format sebagai string di Room.
   `AnnotatedString.fromHtml`.
 - `ApiService2` (Retrofit terpisah + header manual) → satukan ke klien utama (interceptor Authorization).
 - In-App Review → tetap `ReviewManager` di titik yang sama.
+- Feature gate `payment` (§5.6): pakai use-case `FeatureGate` yang sama dengan Presensi/Jurnal (`03` §13.2). Panggil di
+  ViewModel hub **sebelum** navigasi ke `Spp`/`Partisipasi` (setelah cek wallet aktif), dan pasang guard yang sama
+  pada route `Spp`/`Partisipasi` untuk jalur push `new-spp`/`spp` dan notifikasi `PAYMENT/SPP`. Bottom sheet memakai
+  komponen yang sama dengan Presensi/Jurnal.
 
 ### 17.3 Bug / anti-pattern (aman diperbaiki tanpa mengubah perilaku yang terlihat)
 - Fetch ganda: Tagihanku `fetchInvoice` 3× saat buka; Riwayat `loadMoreHistory` 4×; `SelectVoucher*`
@@ -1314,7 +1366,7 @@ label hasil format sebagai string di Room.
 - `Thread.sleep` di Main saat polling PPOB → ganti `delay()` di `viewModelScope` dengan interval & jumlah
   percobaan **sama** (1 s × 31 / 2 s × 16), reset `isTimeout` per percobaan. (UI tidak lagi membeku.)
 - Race `klaspay_id` (`PembayaranPage.kt:87-91`) → tulis setelah response.
-- Observer bocor di `PartisipasiPage.kt:110-127` (`items.observe` di dalam `collectLatest`).
+- Observer bocor di `PartisipasiPage.kt:120-137` (`items.observe` di dalam `collectLatest`).
 - `KlaspayTopupPayment`: izin kamera tanpa callback; Integrator tanpa extra `uuid`.
 - Validasi dead-branch `amount < 10_000` ganda di `PaymentTypePage`.
 - Double toast error aktivasi.
@@ -1322,6 +1374,8 @@ label hasil format sebagai string di Room.
 - Alert HTTP 403 wallet di hub tidak pernah tampil (exception ditelan).
 - `PpobPaymentDetailPage`: kondisi hapus "Nama Produk" membandingkan `productSubType` dengan konstanta
   `productType` (tidak pernah cocok) — pertahankan tampilan (baris tetap ada).
+- Gate `payment` terpanggil dua kali dari menu hub (menu + `guardFeatureOnCreate`; §5.6). Di Compose cukup sekali per
+  navigasi: teruskan hasilnya ke tujuan atau pasang guard hanya pada route yang bisa dibuka dari luar hub.
 
 ---
 
@@ -1329,7 +1383,8 @@ label hasil format sebagai string di Room.
 
 > Status per 30-09-2026 (`docs/FLOW_QUESTIONS.md` bagian G): Q3, Q8, Q14 sudah dijawab final. Q10
 > **belum dijawab eksplisit** oleh user — diberi asumsi kerja sementara (perbaiki), tandai untuk
-> dikonfirmasi ulang. Q1–Q2, Q4–Q7, Q9, Q11–Q13, Q15–Q21 **belum ditanyakan**, tetap terbuka.
+> dikonfirmasi ulang. Q1–Q2, Q4–Q7, Q9, Q11–Q13, Q15–Q22 **belum ditanyakan**, tetap terbuka (Q22 ditambahkan
+> 22-10-2026).
 
 | # | Temuan | Dampak ke pengguna | Opsi |
 |---|---|---|---|
@@ -1354,6 +1409,7 @@ label hasil format sebagai string di Room.
 | Q19 | Dialog "Aktivasi Sekarang" melewati `payment/check` (email/password) | Aktivasi tanpa email terverifikasi | (a) tiru; (b) samakan dengan tombol hub |
 | Q20 | Tidak ada nominal minimum transfer & partisipasi (Rp 0 lolos) | – | (a) tiru; (b) tambah validasi |
 | Q21 | Status detail partisipasi selalu `"Berhasil"` | Cicilan pending tampil berhasil | (a) tiru; (b) pakai status server |
+| Q22 | Gate `payment`: tombol `"Buka Website"` (guru) membuka root portal karena `FeaturePortalUrl` tidak punya path web pembayaran (Presensi/Jurnal punya path khusus) | Guru mendarat di beranda portal, bukan halaman pembayaran | (a) root portal (**asumsi kerja sementara**); (b) isi path portal pembayaran (butuh jawaban user/backend) |
 
 ---
 
@@ -1378,6 +1434,7 @@ label hasil format sebagai string di Room.
 | api/04 "Sumber ApiService.kt baris 812–1082" | Blok payment kini baris 756–889 (+1377–1381) |
 | api/04 contoh key channel `virtual account`, `e-money` | Kode juga menangani `bank`, `retail`, `saldo`, `qris`, `credit card`, `clickpay` |
 | `endpoint-per-fitur.md` mencantumkan `payment/transaction/transaction_spp` | Tidak dipanggil |
+| `api/01-auth-akun.md` (`check-feature-availability`): `name` contoh `jurnal-kbm` / `presensi` | Sejak 21-10-2026 juga `payment`, menjaga Bayar SPP & Dana Partisipasi (§5.6) |
 
 ---
 
@@ -1386,6 +1443,7 @@ label hasil format sebagai string di Room.
 - [ ] Tab Pembayaran: saldo `"Rp"+formatCurrency2` saat aktif, tombol `"Aktivasi Wallet"` saat belum.
 - [ ] Semua menu (Top Up, QR Pay, Riwayat, Tagihanku, SPP, Partisipasi, 6 PPOB) → dialog "Aktivasi Wallet Lebih Dahulu" bila belum aktif.
 - [ ] Bayar Spp hanya siswa; Game disembunyikan untuk guru (posisi 5 = BPJS); Pinjam Buku → "Fitur belum tersedia".
+- [ ] Feature gate `payment` (§5.6): menu Bayar Spp & Dana Partisipasi, notifikasi `PAYMENT/SPP`, dan push `new-spp`/`spp` → bottom sheet bila `available=false` (non-guru tanpa "Buka Website"; guru dengan tombol ke root portal — Q22); gagal jaringan = fail-open; Top Up/QR Pay/Riwayat/Tagihanku/PPOB tidak terpengaruh; tidak ada request wallet/daftar di belakang bottom sheet.
 - [ ] Top sheet ID Wallet menampilkan `user_id` + Salin → `"ID Wallet tersalin"`.
 - [ ] Tombol aktivasi: cek email → password default → `payment/check` (errorTypes email/password).
 - [ ] onStart: toast offline + retry otomatis saat online; school uuid kosong → dialog logout.
@@ -1445,4 +1503,4 @@ label hasil format sebagai string di Room.
 - [ ] Format Rupiah & spasi "Rp" per layar sesuai §2.1; tanggal `dd MMMM yyyy, HH:mm` Locale id.
 - [ ] Logging body HTTP (termasuk PIN) & Timber `DebugTree` **mati di build release** (Q14 — final).
 - [ ] Notifikasi `PAYMENT/SPP`+`child_id` dan `PAYMENT/BILL`+`child_id` membuka layar detail yang benar, tidak crash / tidak kosong (Q10 — asumsi kerja, konfirmasi ulang sebelum final).
-- [ ] Keputusan Q3, Q6, Q8, Q14 (final) serta Q1–Q2, Q4–Q5, Q7, Q9, Q11–Q13, Q15–Q21 (masih terbuka, jangan diasumsikan) diterapkan sesuai `docs/FLOW_QUESTIONS.md`.
+- [ ] Keputusan Q3, Q6, Q8, Q14 (final) serta Q1–Q2, Q4–Q5, Q7, Q9, Q11–Q13, Q15–Q22 (masih terbuka, jangan diasumsikan) diterapkan sesuai `docs/FLOW_QUESTIONS.md`.

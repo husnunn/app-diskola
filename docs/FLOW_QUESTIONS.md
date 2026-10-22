@@ -364,3 +364,246 @@ dan domain `status`, perilaku HTTP 307 di OkHttp (apakah redirect diikuti sebelu
 menegakkan "dalam jam plot" untuk QR, pemindaian QR fisik, serta seluruh layar Jurnal di device (HP uji terkunci saat
 fase selesai) — kode dan aturan murni lolos kompilasi/unit test saja.
 
+## 2026-10-12 — Penyamaan Hub Pembelajaran dengan `PembelajaranPage` lama: keputusan
+
+**Konteks:** permintaan user sebelum fase berikutnya — Home baru sama dengan lama dalam data tampil, endpoint, dan aturan tampil;
+UI boleh sedikit berbeda; teks/respons panjang tertangani. Detail: `docs/migrasi/05g-gap-hub-pembelajaran.md`, `05h-implementasi-hub-pembelajaran.md`.
+
+| # | Temuan | Jawaban | Keputusan final |
+|---|---|---|---|
+| 1 | Lonceng lama: badge angka (`payment/wallet` → `notification/summary`) dan dikunci bila Klaspay belum aktif | **Badge + penguncian seperti lama** | Badge "99+" dari 99; Klaspay belum aktif → toast "Silahkan aktivasi wallet terlebih dahulu untuk mengunakan fitur notifikasi" + layar aktivasi Klaspay (`returnToMain`). Daftar Notifikasi masih data contoh. |
+| 2 | Kartu "Kelas Berlangsung" lama TIDAK memanggil `schedule?date=`; datanya `check-account.current_subject` | **Persis lama** | `schedule` dihapus dari Home; kosong → "Tidak terdapat jadwal". Layar Jurnal tetap memakai `schedule`. |
+| 3 | Legacy memuat ulang semua data di tiap `onResume` dan refresh, tanpa pengaman; aturan proyek melarang fetch ulang tanpa syarat | **Seperti lama + pengaman** | Muat saat kembali ke halaman dan saat refresh; tidak tumpang-tindih; dilewati bila <30 dtk setelah muat sukses (refresh manual selalu jalan). |
+
+**Deviasi lain (default saya, belum ditanyakan):** sapaan "Assalamualaikum," dipertahankan (hanya gaya); baris kota dan placeholder "Carousel banner · 3 slide" dibuang (tak ada di legacy);
+label tombol kartu "Check In" (legacy) menggantikan "Hadiri"; "Check In" memakai sheet hanya "Verifikasi Jurnal" (QR di hub lama mati — layar Jurnal tetap punya QR); `current_subject.id` null → tombol disembunyikan (legacy meloloskan);
+banner presensi dibiarkan (tidak diganti "Jadwal absensi belum diatur") bila `setting/me/today` gagal; kartu verifikasi menampilkan pesan server dengan "Selengkapnya" (legacy: teks tombol tanpa batas);
+dialog akun nonaktif menghormati logout yang tertahan ujian; lonceng dimuat setelah check-account (legacy membaca `klaspayActive` basi); CTA banner satu warna; toast gagal check-account memakai pesan ramah, bukan `localizedMessage`;
+`AppDialog`/`FeatureUnavailableSheet` bisa di-scroll (berlaku ke semua dialog aplikasi); `Route.Jurnal` tidak lagi menerima argumen pintasan dari Hub.
+
+**Diuji di device (2026-10-12, sesi siswa "RIZKY", kelas DEVELOPER MOBILE, Klaspay aktif):** urutan endpoint saat buka tab = `check-account` → `current-user` → `payment/wallet` → `notification/summary?wallet_id=` dan **tanpa** `schedule`;
+header (logo sekolah, avatar → logo, nama, baris kelas), kartu "Kelas Berlangsung" ("Tidak terdapat jadwal", ikon = logo sekolah), 7 tile siswa, bell → Notifikasi. Bentuk respons asli: `current_subject` = `{}` (objek kosong, bukan null),
+`userProgress` = null, `school` tanpa `city_name`, `wallet.user_id` = string ("US…"), `summary.count_unread` = 0 (badge tersembunyi), `current-user` `single_device_login_enabled=true` + `device_id` ada (tidak ada konflik di perangkat ini).
+**Belum diverifikasi (jangan diasumsikan selesai):** sisi guru setelah perubahan ini (banner presensi, lencana agenda), tombol "Check In"/"Isi Jurnal" dengan `current_subject` terisi, status verifikasi in_review/rejected, badge lonceng > 0,
+`setting/me/today` dan `staff/check` di app baru, dialog "Perangkat Lain Terdeteksi", `VerificationPage` (tombol "Sudah"/"Belum" masih ke dialog "dalam pengembangan"). Item `HomePage` host (dialog jam "Otomatis",
+dialog keamanan email/password, dialog gagal wallet, FCM topic) di luar cakupan.
+
+## 2026-10-12 — UI tidak menembus status bar & bar navigasi: keputusan
+
+**Konteks:** permintaan user "pastikan ui tidak menembus status bar android & bottom nav android". Audit: layar di dalam `MainTabsScreen` aman; layar di luar shell
+(splash, onboarding, login, password, SSO, aktivasi Klaspay, reset password) tidak punya penanganan inset sama sekali; keyboard tidak ditangani di mana pun.
+Pedoman: `docs/ANDROID_DESIGN_PATTERN.md` §11 "Window Insets".
+
+| # | Temuan | Jawaban | Keputusan final |
+|---|---|---|---|
+| 1 | Layar auth menggambar logo/tombol di bawah bar sistem; gradien latarnya penuh layar | **Seluruh layar dibatasi seperti layar lain** | `SystemBarsFrame` (`safeDrawingPadding()` + latar `background`): gradien ikut berhenti di batas bar, strip polos di atas/bawah. |
+| 2 | Tombol bawah/kolom isian tertutup keyboard di form (Jurnal, Upload Materi/Tugas, Poin, Izin, Transfer, …) | **Ikut dibereskan** | `windowSoftInputMode="adjustResize"` + `imePadding()` di satu titik shell (setelah `consumeWindowInsets`); auth lewat `safeDrawingPadding()`. |
+
+**Deviasi lain (default saya, belum ditanyakan):** `AppBottomSheet` kini membuka setinggi isinya (`skipPartiallyExpanded = true`) — ditemukan saat uji di device: sheet "Pilih Sekolah" terbuka setengah layar dan baris
+terakhir daftar tergambar di bawah bar navigasi; `Scaffold` shell memakai `systemBars ∪ displayCutout` (cutout muncul bila kunci portrait diabaikan di layar besar Android 16); sheet kisi soal AKM dibatasi 50% tinggi layar;
+tema XML memakai bar transparan (kilatan hijau saat cold start hilang); `NavHost` luar diberi latar opak agar crossfade tidak menembus; seam warna tipis antara `bottomBar` sticky dan strip bar navigasi
+serta kamera/QR/header ujian yang "terbingkai" strip dibiarkan (kosmetik, konsisten dengan keputusan 1).
+
+**Diuji di device (HP 1080×2340, navigasi 3-tombol, mode terang):**
+- Layar Login (sesi berakhir): logo mulai di bawah status bar, isi berhenti di atas bar navigasi; dengan keyboard numerik terbuka isi berhenti di tepi atas keyboard dan tetap bisa di-scroll.
+- Sheet "Pilih Sekolah": sebelum perbaikan baris terakhir menembus bar navigasi (sheet terbuka setengah layar); sesudahnya terbuka setinggi isi dan seluruh daftar di atas bar.
+- Sesi siswa, di dalam shell: Home, Notifikasi, Akun, Ubah kata sandi, Presensi (bar "Lakukan Presensi"), Pengajuan Izin (bar "Ajukan Izin") rapi di antara status bar dan bar navigasi;
+  **Tambah Izin dengan keyboard terbuka** — bar "Kirim" naik tepat di atas keyboard dan kolom keterangan ter-scroll ke area terlihat.
+- **Kolom isian di atas bar sticky** (Transfer Saldo → "Catatan (opsional)"): sebelum perbaikan kolom tinggal terlihat setengah di balik bar (tepi bawah kolom 37 px di bawah area scroll). `AppTextField` kini memanggil
+  `BringIntoViewRequester` setelah tinggi keyboard (`WindowInsets.ime`) stabil 150 ms (batas tunggu 1,2 s bila tak ada keyboard) — penundaan tetap 300 ms gagal karena keyboard masih bergeser saat dipanggil. Sesudahnya: kolom [915–1041] penuh di dalam area scroll (berakhir di 1046).
+- Ubah kata sandi dengan keyboard terbuka (kolom terbawah fokus): kolom penuh terlihat, area scroll menyusut ke atas keyboard; tombol "simpan perubahan" ada di dalam scroll sehingga dijangkau dengan menggulir.
+- Splash: latar & logo di antara kedua bar, versi aplikasi di atas bar navigasi.
+- Tab Pembelajaran/Akun: `NavigationBar` tidak berubah.
+**Belum diverifikasi (jangan diasumsikan selesai):** Onboarding, Password, SSO, aktivasi Klaspay (akun uji sudah Klaspay-aktif), reset password — butuh logout/akun lain; form berkeyboard lain di dalam shell (JurnalForm, UploadMateri/Tugas, PoinForm,
+PresensiOffsite — memakai mekanisme `imePadding` + `AppTextField` yang sama dengan Izin/Transfer); sheet kisi AKM ≥40 soal (butuh memulai ujian, membuat data); navigasi gesture, mode gelap, font 1,3× (mengubah pengaturan sistem HP, tidak dilakukan).
+
+
+## 2026-10-14 — Pembayaran / Klaspay fase 6, sub-fase P1: keputusan
+
+**Konteks:** user memilih "Pembayaran / Klaspay" sebagai fase berikutnya (roadmap `01` fase 6). Audit: seluruh tab Pembayaran dan 9 layar sub berdata dummy (`08a-gap-pembayaran.md`).
+Dikerjakan bertahap P1–P6; P1 = fondasi, hub nyata, aktivasi, PIN (`08b-implementasi-pembayaran-p1.md`). Try Out & ujian lama (Asesmen) **tidak dibangun** (keputusan user, jawaban pada sesi yang sama);
+Asesmen nanti dua sub-fase (A1 data aman, A2 lockdown/pelanggaran/penalti/laporan masalah).
+
+| # | Temuan | Jawaban | Keputusan final |
+|---|---|---|---|
+| 1 | Hub dummy memuat Transfer, "Transaksi Terakhir", Toko, Perpus, Lainnya, "5 tagihan menunggu" — tak ada padanan di app lama | **Ikuti app lama** | Hub: Top Up, QR Pay, Riwayat; kartu Tagihanku; menu Bayar Spp (siswa)/Dana Partisipasi/Pinjam Buku (dialog "Fitur belum tersedia"); 6 PPOB (Game tersembunyi untuk guru). Elemen dummy dihapus; Transfer tetap ada di dalam Top Up untuk Toppers (P3). |
+| 2 | doc 08 Q19: dialog "Aktivasi Sekarang" membuka PIN tanpa cek email/password default, sedangkan tombol hub mengecek | **Samakan dengan tombol hub** | Semua jalan masuk aktivasi (tombol hub, dialog, lonceng Home) lewat: email terverifikasi → password default → `payment/check`. Jalur SSO tidak melewati pra-cek. |
+| 3 | doc 08 Q2: SSO + "TOP UP SEKARANG" tidak membuka Home | **Tiru app lama** | Top Up terbuka sendirian setelah aktivasi SSO (dibangun di P3). Sampai P3 tombol itu menampilkan "Fitur dalam pengembangan" lalu berperilaku seperti "NANTI SAJA". |
+| 4 | doc 08 Q14: PIN & body HTTP tercetak di Logcat release | (final 2026-09-30) | **Selesai di P1:** `LogRedactor`; level BODY & Timber `DebugTree` hanya `BuildConfig.DEBUG`; header `Authorization`/`Cookie` disamarkan; `LogFileInterceptor` ikut menyamarkan. |
+
+**Deviasi lain (default saya, belum ditanyakan):**
+- Input PIN tetap memakai `PinDots` + `NumericKeypad` yang sudah ada (legacy: 6 kotak + keyboard sistem); tempel tidak didukung; PIN tak masuk saved-state, route argument, atau log (`PinResultChannel`).
+- Hub tidak memanggil `check-account` lagi (sudah dilakukan hub Pembelajaran); muat ulang = on resume (throttle 5 dtk) + tarik-untuk-segarkan, tanpa `NetworkCallback`.
+- Format "Rp" diseragamkan menjadi `Rp 150.000` (legacy campur `"Rp "`/`"Rp"`).
+- Dialog "Nanti Saja" pada dialog email tidak lagi memicu ulang tombol aktivasi tanpa akhir (legacy); setelah dialog email: ke dialog password bila password masih default, selain itu berhenti.
+- Error `payment/check` selain `email`/`password` ditampilkan sebagai toast (legacy diam).
+- Pemicu otomatis dialog keamanan email/password di Home (listener pref) **belum** dibangun; dialog dipakai di alur pembayaran saja. Penyelesaian verifikasi email via deep link `portal.diskola.id/verify-email` ikut fase Notifikasi
+  (flag `is_email_verified` pulih sendiri lewat `check-account` di Home).
+- Deep link reset PIN memvalidasi token lewat base API build ini, bukan host dari tautan (legacy memanggil URL tautan apa adanya dengan kredensial pengguna).
+- Layar `Route.PembayaranSub.*` lama (berdata dummy) tidak terjangkau lagi dari hub; dipertahankan sebagai referensi UI dan diganti/dihapus per sub-fase, sisanya di P6 bersama `MockPembayaran`.
+- Info wallet berupa bottom sheet (legacy: top sheet).
+
+**Belum diverifikasi (jangan diasumsikan selesai):** semua perilaku di device — HP uji tidak terhubung saat P1 selesai (lihat `08b` §4); alur wallet belum aktif (butuh akun tanpa Klaspay); "Lupa pin" (email nyata, batas 1× per 3 hari);
+deep link `autoVerify` (butuh APK rilis + assetlinks server); sisi guru; `ConfirmPin` baru punya pemanggil di P2.
+
+## 2026-10-15 — Asesmen/AKM fase 5, sub-fase A1 "data aman": keputusan
+
+**Konteks:** user menunda Pembayaran (berhenti di P1) dan memilih Asesmen/AKM. Audit (`06a-gap-asesmen.md`): jawaban hanya di memori, tak ada auto-submit/antrean offline, risiko buntu logout, banyak data palsu
+(penalti "00:24", chip "Mode ketat", tombol "Simulasi offline"). Dikerjakan A1 = data aman (`06b-implementasi-asesmen-a1.md`); A2 = lockdown, pelacakan pelanggaran, penalti, laporan masalah, layar priming, pembahasan.
+
+| # | Temuan | Jawaban | Keputusan final |
+|---|---|---|---|
+| 1 | Try Out & ujian lama (doc 06 §19–§20) | **Tidak dibangun** | Hanya jalur ujian sekolah; scaffolding `TryOutApiService`/`UjianLegacyApiService` dibiarkan tak dipakai. |
+| 2 | Pemecahan cakupan Asesmen | **Dua sub-fase** | A1 data aman; A2 lockdown/pelanggaran/penalti/laporan/priming/pembahasan. |
+| 3 | Blokir logout bisa buntu (token mati / jawaban tak pernah terkirim) | **Blokir mutlak** | Persis keputusan 30-09: logout diblokir selama jawaban belum terkirim, tanpa pengecualian 401/24 jam. **Risiko sisa:** token tidak berlaku + jawaban tertunda = tak bisa logout/login ulang; mitigasi: worker terus mencoba; tindak lanjut bila terjadi = "login ulang tanpa menghapus tabel ujian". |
+| 4 | Push FCM `"logout"` / 401 saat jawaban belum terkirim (dulu diabaikan diam-diam) | **Tunda lalu jalankan otomatis** | `SessionManager.deferLogout()` + `LogoutBlockedByPendingExam` + dialog penjelasan; `AkmSubmitWorker` menjalankan logout tertunda begitu tidak ada ujian pending. |
+
+**Deviasi lain (default saya, belum ditanyakan):**
+- Migrasi Room eksplisit `7→8` untuk tabel ujian (konvensi proyek: destruktif); `fallbackToDestructiveMigration` tetap untuk jalur lain. Skema diekspor ke `app/schemas`.
+- Submission `REJECTED` (server menolak permanen, mis. 422) **tidak** memblokir logout dan tampil sebagai kegagalan — klarifikasi atas "mutlak": yang diblokir hanya yang masih mungkin terkirim.
+- Esai kosong dan Pilihan ganda multi-jawaban yang semua centangnya dilepas **tetap terhitung terjawab** (perilaku legacy §7.1/§22 #5; app baru sempat menghapusnya, yang memblokir tombol Kumpulkan).
+- Tipe soal tak dikenal dirender sebagai esai (fallback legacy) agar ujian tetap bisa diselesaikan.
+- Ujian terunduh yang tak pernah dibuka tetap dikirim (kosong) di batas waktu — perilaku legacy; `date_end` yang tak terbaca **tidak** dianggap "sekarang" (tak ada auto-submit atas tebakan).
+- Kegagalan POST online saat menekan "Kumpulkan": dialog "Gagal"/"Coba lagi" dan ujian tetap bisa diedit (legacy mengembalikan transaksi); deadline worker tetap mengirim di batas waktu.
+- Upload ulang saat offline = gagal ("Gagal mengirim jawaban. Coba lagi"); legacy mengantrekan lalu tetap menampilkan "Jawaban berhasil dikirim".
+- Teks ketentuan A1 hanya memuat butir yang benar-benar berlaku (offline boleh, koneksi stabil saat mengunggah, tidak boleh mengangkat telepon); butir kunci layar/sanksi/pelacakan kembali bersama teks legacy persis di A2. Chip "Mode ketat", ikon kunci, subtitle "Layar dikunci…", "00:24" dan tombol "Simulasi mulai saat offline" dihapus.
+- `exam_lock_mode` default `false` (keputusan 30-09); nilai `null` eksplisit dibiarkan `null` — legacy menafsirkannya sebagai strict (doc 06 §9.1), A2 yang memutuskan.
+- Fingerprint ujian tetap UUID `DeviceUtil` (legacy 2.1.40 memakai `ANDROID_ID`, doc 06 §12.2) — **belum diverifikasi ke backend**.
+- Sumber waktu tetap jam perangkat (seperti legacy); `AutoTimeGate` tetap hanya peringatan di daftar.
+
+**Belum diverifikasi (jangan diasumsikan selesai):** seluruh jalur unduh → jawab → kumpulkan, antrean offline, auto-submit di batas waktu, proses mati saat mengerjakan, FCM `"logout"` dan 401 tertahan, upload ulang + cooldown (butuh ujian uji yang bisa dimulai, izin, dan untuk offline mengubah pengaturan sistem HP).
+
+## 2026-10-16 — Asesmen/AKM: penyesuaian dengan dokumen 06 v2.1.41
+
+**Konteks:** doc `06` diperbarui ke android-portal 2.1.41 (`05ec898b`): label/stempel jadwal dibatalkan (§4.4) dan perilaku input esai (§5.7). Diterapkan ke A1 (`06b` §5).
+
+| # | Temuan | Jawaban | Keputusan final |
+|---|---|---|---|
+| 1 | doc 06 §4.4: layar "Sebelum Memulai Ujian" dan ringkasan ujian (Resume) di app lama **tidak** menandai jadwal berwatermark ("catat, jangan diperbaiki diam-diam") | **Tampilkan juga di layar Resume** | Banner informatif di `AkmResumeScreen` (tetap tidak menghalangi mengerjakan/mengumpulkan). Layar priming dibangun di A2 dan ikut menandai. Deviasi dari app lama. |
+
+**Deviasi lain (default saya, belum ditanyakan):**
+- Tanda "dibatalkan" disimpan di JSON cache jadwal (bukan kolom Room seperti legacy `akm.watermark_bool/label`); aturan "key tidak ada → pertahankan nilai lokal" dijalankan saat menyimpan cache (`AkmRepository.store`), sehingga berlaku juga setelah ujian pindah dari daftar ke nilai dan setelah restart.
+- Hasil (Score Detail) kini menampilkan tabel info peserta yang sama dengan Detail (termasuk baris "Status") — doc 06 §14 "info seperti detail"; sebelumnya hanya cincin skor + subtes.
+- Label baris "Nama" → "Peserta" (doc 06 §5.3).
+- Kursor "diikuti" memakai posisi akhir teks (`AppTextField` hanya melihat string, bukan seleksi) — kasus mengetik biasa; mengedit di tengah teks tidak menggulir ke kursor.
+- Esai: tombol "Selesai" menutup keyboard dan melepas fokus (legacy: `IME_ACTION_DONE`); `minLines = 8` dipakai untuk semua tipe esai (layout legacy), termasuk isian angka dan satu kata.
+
+**Belum diverifikasi (jangan diasumsikan selesai):** tampilan label/stempel/watermark/banner di device (butuh jadwal yang ditandai server — belum diketahui apakah backend ini sudah mengirim `watermark_bool`), perilaku keyboard esai di HP (Done pada field multi-baris, enter dibuang, scroll kursor), dan semua yang masih tercatat belum teruji di entri 2026-10-15. HP uji tidak terhubung saat penyesuaian ini selesai.
+
+## 2026-10-16 — Asesmen/AKM fase 5, sub-fase A2 "keamanan ujian" (A2a sesi + kunci layar, A2b pelanggaran, A2c penalti + laporan)
+
+**Konteks:** `06c-gap-asesmen-a2.md`, `06d-implementasi-asesmen-a2.md`. Sumber kebenaran kode lama: `origin/development` (`05ec898b`); checkout lokal basi. Rencana disetujui user 2026-10-16 ("lanjut ke A2"); keputusan di bawah adalah **default yang saya ambil di rencana** (user menyetujui rencana, belum menjawab tiap butir satu per satu).
+
+**Ditegaskan user (2026-10-19):** di repo lama penalti sudah dinonaktifkan (server) **tetapi pelanggaran tetap dikirim** saat siswa keluar aplikasi. Itu sudah aturan dokumen (§10.5, §11.2) dan menjadi tes (`AkmViolationTrackerTest`): pelanggaran **selalu dicatat dan dikirim**, penalti hanya menentukan dialog.
+
+| # | Temuan | Keputusan | Alasan |
+|---|---|---|---|
+| 1 | Arsitektur: banyak Activity (lama) vs satu Activity | Satu Activity + `ExamSessionController` singleton (bukan `ExamActivity`) | Memakai ulang nav/Hilt/tema; masalah "instance halaman basi" (§23.3 #11) hilang; manifest per-layar diganti deteksi runtime (targetSdk 36 mengabaikan batas itu di layar ≥ 600 dp) |
+| 2 | §23.3 #3 `forceRelock` no-op bila belum pernah ter-pin ⇒ siswa terjebak | Diperbaiki; verifikasi pin berbasis event bukan 1,8 dtk; setelah 3 "Aktifkan" gagal muncul "Keluar dari ujian" (abort: penanda tetap, penalti bila aktif) | Tanpa jalan keluar, perangkat yang menolak pin mengunci siswa selamanya. **Deviasi** |
+| 3 | Penalti ditahan bila ada dialog dalam-app (`isModalVisible`) — bisa dieksploitasi | Pelanggaran selalu dicatat; penalti **tidak** ditahan dialog milik app; tetap ditahan prompt pin sistem dan keluar sah (10 dtk). **Deviasi** (A2c) | Dialog app tidak boleh jadi tameng |
+| 4 | Judul setelah penalti: Resume "Kerjakan Ujian", Soal "Kerjakan Asesmen" | Tetap "Kerjakan Asesmen" (A2c) | Inkonsistensi legacy |
+| 5 | §23.3 #7 teks siswa + checkbox laporan tidak dikirim | Payload legacy persis; teks/checkbox/violations disimpan di Room tapi tidak dikirim (A2c) | Kontrak backend belum ada; `logcat` diberi `LogRedactor` |
+| 6 | §23.3 #10 penalti dari `HH:mm:ss` | Simpan epoch akhir, sisa dibatasi ≤ durasi (A2c) | Aman lewat tengah malam / jam mundur |
+| 7 | §23.3 #20 worker laporan periodik abadi; antrean berhenti setelah "Ya, keluar" | Worker pelanggaran membatalkan diri hanya bila antrean kosong **dan** sesi tak aktif; worker laporan one-time (A2c) | Pelanggaran sesi yang ditinggalkan tetap terkirim |
+| 8 | §23.3 #12/#17 pembahasan: unduh ulang paket mereset SCORED→NEW | **Ditunda** (backend belum mengirim `has_explanation`; tombol tersembunyi); layar kartu `file_path` dipertahankan | Tidak meniru perilaku yang menghilangkan nilai |
+| 9 | Deteksi screenshot di bawah API 34 (fallback `MediaStore`) | Hanya API 34+ (`ScreenCaptureCallback`) | Izin baca media dicabut di manifest lama ⇒ fallback tak pernah jalan; `FLAG_SECURE` sudah menghitamkan gambar |
+| 10 | Rotasi/resize membuat ulang Activity | Bukan `app_background` (`isChangingConfigurations`) | Tanpa itu satu rotasi = satu pelanggaran palsu |
+| 11 | Auto-backup bisa memulihkan penanda sesi ke perangkat lain | Prefs `akm_exam_state` dikecualikan dari backup | Penanda yang "bangkit" = `not_submitted` palsu |
+
+**Deviasi lain (default saya):**
+- `penalty_applied` yang **hilang** dari JSON ⇒ *mati* (default DTO `false`, persis legacy); `null` eksplisit ⇒ *aktif*; belum pernah diterima (−1) ⇒ aktif. (Rencana awal menulis "hilang ⇒ aktif" — itu salah terhadap legacy; kode mengikuti legacy.) `exam_lock_mode`: hilang ⇒ mati (keputusan 2026-09-30), `null` eksplisit ⇒ ketat (legacy).
+- Mode tidak ketat: tetap menampilkan alert "Peringatan" saat Back, dan mencatat pelanggaran (legacy: pelanggaran tidak bergantung pada mode ketat).
+- `connection_loss` dan jam dipantau **sepanjang sesi**, bukan hanya saat layar resume; baseline jam diambil saat sesi mulai dan `deviceTimeBefore` memakai jam yang seharusnya (legacy: jam event sebelumnya).
+- Baris pelanggaran tidak pernah dikirim dengan `studentExamId = 0` (legacy: 400 lalu dibuang); antrean menunggu id sesi.
+- Backoff 500/403 benar-benar berjalan (legacy: tidak, karena `HttpException`).
+- FGS `dataSync`: `START_NOT_STICKY`, dimulai hanya dari UI foreground, `onTimeout` (API 35), kanal senyap yang sudah ada (`AkmNotifications`), tanpa tergantung `POST_NOTIFICATIONS`.
+- Mode ketat: dialog pemulihan menutup sendiri begitu pin aktif (pemantau 500 ms) — perangkat uji menampilkan prompt pin **tanpa** perubahan fokus jendela, sehingga "prompt belum dijawab" tak dapat dibedakan dari "tak ada prompt".
+- Penalti (A2c): dialog juga menulis **"Sisa waktu m:ss"** (legacy hanya menampilkannya di pill header, yang tertutup dialog — tidak ada angka di dialog legacy). Penalti disimpan sebagai epoch akhir dan **dilanjutkan** (bukan diulang penuh) bila sesi dibuka lagi saat masih berjalan; hilang saat jawaban diserahkan.
+- "Ya, keluar" dengan penalti aktif tidak menyimpan `state_penalty` terpisah seperti legacy: penanda sesi yang tersisa ⇒ `not_submitted` di sesi berikut ⇒ penalti lewat jalur pelanggaran yang sama (hasilnya sama; sebabnya kini tertulis "keluar dari ujian tanpa mengumpulkan jawaban").
+- Laporan masalah: pekerja pengirim satu kali unik (bukan periodik abadi); teks siswa, checkbox, dan daftar pelanggaran disimpan di `akm_problem_report` tetapi tidak dikirim (kontrak backend belum ada, sama seperti legacy).
+- Hardware back di layar Soal tidak melakukan apa pun saat sesi berjalan (legacy `shouldDisableBackButton`); panah di header kembali ke Resume.
+
+**Belum diverifikasi (jangan diasumsikan selesai):** semua pelanggaran nyata di perangkat, pengiriman nyata ke endpoint `violations`, migrasi Room 8→9 pada DB nyata, pin sampai berhasil, FGS pada API 34/35. Server dev: `exam_lock_mode:false`, `penalty_applied:false`, dan ujian uji berstatus "Tidak Mengerjakan" — alur ketat hanya bisa diuji dengan memaksa setelan secara lokal.
+**Celah diketahui:** media soal (audio/video) membuka aplikasi lain ⇒ tercatat sebagai keluar aplikasi; perlu pemutar dalam-app (Media3), belum dibangun.
+
+## 2026-10-21 — Feature gate `payment` (menu Bayar SPP & Dana Partisipasi) di aplikasi lama
+
+**Konteks:** backend menambah key `payment` pada `GET mobile/app/check-feature-availability?name=` (sebelumnya hanya `jurnal-kbm` dan `presensi`). Permintaan user:
+bila `payment` maintenance, blokir menu SPP dan Dana Partisipasi, **disesuaikan seperti yang sudah ada di presensi dan jurnal-kbm**. Diterapkan di `android-portal` dan `ios-portal`.
+Spesifikasi: `08-keuangan-pembayaran-klaspay-ppob.md` §5.6; rujukan terkait di `03` §7.4/§8.5/§10.6, `10` §6.6, `01`, `08a`.
+
+| # | Temuan | Jawaban | Keputusan final |
+|---|---|---|---|
+| 1 | Key `payment` maintenance | **Blokir Bayar SPP & Dana Partisipasi, perilaku sama dengan presensi/jurnal-kbm** | Cek sebelum layar dibuka; fail-open bila jaringan/format gagal; bottom sheet (Android) / popup (iOS) "Fitur Belum Tersedia"; non-guru tanpa tombol website, guru dengan "Buka Website". |
+
+**Deviasi lain (default saya, belum ditanyakan):**
+- Yang dijaga hanya SPP dan Dana Partisipasi. Top Up, QR Pay, Riwayat, Tagihanku, dan PPOB **tidak** ikut diblokir (sesuai permintaan, tidak diperluas).
+- Pintu masuk yang ikut dijaga di Android: tiga tombol hub, notifikasi `PAYMENT/SPP` (daftar & detail), dan push `new-spp`/`spp` lewat `guardFeatureOnCreate` di `SppPaymentPage`/`PartisipasiPage`.
+  Notifikasi `PAYMENT/BILL` Android **tidak** dijaga (tujuannya Klaspay Tagihan); di iOS `BILL` dijaga karena tujuannya Dana Partisipasi.
+- `"Buka Website"` untuk guru mengarah ke **root portal** (tidak ada path web pembayaran di kode) — dicatat sebagai ❓ Q22 di doc 08 §18.
+- `SppPaymentPage` dan `PartisipasiPage` memuat saldo/daftar hanya setelah guard lolos (`contentReady`), agar tidak ada request payment di belakang bottom sheet maintenance; perilaku pertama masuk tetap sama.
+- Gate terpanggil dua kali dari menu hub (menu + `onCreate`), sama seperti Presensi/Jurnal; tidak dioptimalkan di aplikasi lama.
+- Notifikasi `SPP` tanpa id di daftar tetap membuka `HomeWorkPage` tanpa gate (perilaku lama, ❓ Q2 doc 03).
+
+**Belum diverifikasi (jangan diasumsikan selesai):** perilaku di device (menu, notifikasi, push `new-spp`/`spp`, akun siswa vs guru); respons backend sebenarnya untuk `name=payment` (bentuk `data.available`/`data.message` diasumsikan sama dengan `presensi`);
+perilaku bila key `payment` belum ada di server prod (dugaan: fail-open lewat error → tetap terbuka). Yang sudah dipastikan hanya build: `:app:compileDebugKotlin` (Android) dan `xcodebuild` generic iOS tanpa signing.
+
+## 2026-10-19 — Asesmen/AKM (app lama, `e0a12b62`): rumus LaTeX, tombol bawah "Selesai", header `X-App-*`
+
+**Konteks:** perubahan di app lama `android-portal` (commit `e0a12b62`, 19-10-2026) yang kini tercatat di `migrasi/06-asesmen-akm-tryout-ujian.md` §5.6, §5.8, §16, §23.4 dan `migrasi/10-infrastruktur-api-data-latar.md` §3.2. Kontrak backend untuk rumus ada di `android-portal/docs/api/formula-matematika-contract.md`. iOS (`ios-portal`) dikerjakan paralel atas permintaan user ("lakukan hal yang sama di ios-portal"; rumus LaTeX + header) dan memakai kontrak yang sama.
+
+| # | Temuan | Jawaban user | Keputusan final |
+|---|---|---|---|
+| 1 | Di soal terakhir, tombol bawah harus berubah dari "Berikutnya" menjadi "Selesai" seperti di header. Bila masih ada soal belum terjawab: tombol tetap aktif membuka ringkasan, atau ikut header (tersembunyi sampai semua terjawab)? | **"Ikut header"** | `FINISH` hanya bila `allowFinish && !penalti && !breach` (syarat sama dengan menu "Selesai"); selain itu tombol tersembunyi. Pilihan "selalu aktif" **ditolak** (doc 06 §5.6) |
+| 2 | Pembahasan: tetap PDF (Opsi A) atau ditambah field teks `question.explanation` berformat HTML+LaTeX (Opsi B)? | **Opsi A: tetap PDF** | Tidak ada kode/field baru untuk pembahasan; rumus di PDF otomatis tampil. Opsi B tetap tercatat sebagai pertanyaan terbuka di kontrak |
+| 3 | Halaman pembahasan Tryout lama (`AkmExplanationPage`, `Html.fromHtml` + teks polos) ikut diberi rumus? | **Lewati** | Tidak disentuh; hanya alur AKM sekolah |
+| 4 | Header `X-App-Platform` (`android`/`ios`) dan `X-App-Version` harus dikirim pada request download soal | Instruksi user (tanpa merinci cakupan) | Dikirim pada **semua** request lewat interceptor — lihat default di bawah |
+
+**Deviasi/default lain (default saya, belum ditanyakan):**
+- Header `X-App-*` dikirim di **semua** endpoint, bukan hanya download soal (satu tempat: `RequestInterceptor` di Android, `ApiTarget.headers` di iOS). Nilai versi = `versionName` / `CFBundleShortVersionString` (bukan `versionCode`). Bila backend menolak header tak dikenal di endpoint tertentu, batasi ke kasus download.
+- Tersembunyi memakai **INVISIBLE**, bukan GONE, supaya tinggi daftar soal tidak berubah; "Selesai" tampil terisi (`colorPrimary`) dan "Berikutnya" outline, tombol minimal 48dp (doc 06 §5.6).
+- App **ketat**: hanya rumus berpembatas (`\( \)`, `\[ \]`, `$$ $$`) yang digambar. Tawaran heuristik "LaTeX telanjang" (`\frac{a}{b}` tanpa pembatas) **belum diputuskan user** dan **tidak dibangun**; backend yang harus mengirim pembatas (sudah diperbaiki untuk jadwal 312881).
+- Rumus tidak valid ditampilkan sebagai **teks sumber** (bukan kosong); warna rumus dioper eksplisit (putih saat opsi PG terpilih); `LinkMovementMethod` hanya untuk teks soal, tidak untuk baris jawaban.
+- Soal benar/salah satu-jawaban: layar tak menampilkan `answers[0].answer`; kontrak meminta pernyataan + rumus ada di `question` (perilaku lama dipertahankan, bukan diubah).
+- Perubahan `ApiException` (`fieldErrors`, `traceId`, commit `d3aa201c`) berada di luar AKM dan **belum** dicerminkan di doc 06 §16 / doc 10 §3.3.
+
+**Belum diverifikasi (jangan diasumsikan selesai):**
+- Rumus di **pilihan jawaban nyata** dari backend pada tampilan Android setelah backend memperbaiki pembatas (uji Infinix 19-10-2026 masih memakai data lama tanpa pembatas; yang terbukti hanya tes instrumented dan teks soal berumus di device).
+- Tombol bawah di device untuk: swipe ke soal terakhir, mode pembahasan, penalti, soal tunggal (hanya `NextButtonModeTest`, logika murni). Yang terbukti di Infinix: tersembunyi → "Selesai" aktif setelah semua terjawab → membuka ringkasan; tanpa tombol hantu; aman dengan keyboard esai terbuka.
+- Laporan user "force close saat klik soal berumus berikutnya" (19-10-2026): **tidak tereproduksi/tertangkap** — log konsol iPhone berakhir normal (exit code 0), logcat Infinix kosong, tidak ada crash log app di iPhone. Penyebab belum diketahui; tetap terbuka.
+
+
+---
+
+## 2026-10-22 — Tugas Guru: kontrak backend baru (`teacher-data-scope`) + perbaikan app lama (Android & iOS)
+
+**Konteks:** tim backend mengubah API form tugas guru (spek: form tugas guru + `teacher-data-scope`; 4 endpoint assignment) agar sama dengan CMS sekolah.
+Perubahan dikerjakan di app **lama** (`android-portal`, `ios-portal`) dan diuji di Infinix X1102 + iPhone 13 terhadap `dev.api.diskola.id`. App baru
+(`Diskola-App-New`) tidak ada di disk — statusnya hanya dari dokumen. Dokumen yang diperbarui: `05` (§1.4, §1.8, §5.5, §6, §12–§15), `10` (§3.3, §3.7, indeks
+endpoint), `05c` (§4 baru), `01`, `07` (satu baris). `repo lama/` sengaja **tidak** diubah (basi); selisihnya dicatat di `05` §14. Pertanyaan produk yang belum
+dijawab = `05` §13 Q16–Q20.
+
+| # | Temuan | Jawaban | Keputusan final |
+|---|---|---|---|
+| 1 | Spek: satu request create = satu tugas untuk **satu kelas**; multi-kelas = satu request per kelas dengan hasil sukses/gagal per kelas | **Satu kelas dulu** (user) | App lama (Android & iOS) memilih satu kelas; payload sudah per kelas sehingga multi-kelas bisa menyusul (Q20) |
+| 2 | Dokumen spek kedua menyentuh sisi siswa & penilaian (`file[]`, 400/403/422, `data.id` null) | **Ikut dikerjakan** (user) | Android: `link` kosong tak dikirim, pesan 422 per file, 403 "Akses diblokir" + trace id, guard id ≤ 0 saat menilai; iOS: `file[]` selalu + penanganan 400/403/422/401 + guard id |
+| 3 | iOS tidak punya form edit tugas (hanya buat); spek mencakup `update/{id}` | **Tambah edit di iOS** (user) | `AddTaskViewController(assignment:)`; dibuka dari ⋮ pada kartu tugas guru → action sheet "Edit Tugas" / "Lihat File" / "Batal". Hapus tugas di iOS tidak diminta |
+| 4 | Saat dev masih memakai validasi lama (2026-10-20) create canonical ditolak 422 (minta `school_classes_id`, `school_subject_id`, `school_subject_schedules_id`, `grade`): kirim field lama berdampingan dengan canonical agar jalan di server lama? | **Tidak dijawab** — dev kemudian di-deploy | Tidak diterapkan; app lama hanya mengirim field canonical (spek §5 mengizinkan alias hanya untuk kompatibilitas) |
+
+**Deviasi lain (default saya, belum ditanyakan):**
+- **Bug alur lama diperbaiki** (dicatat sesuai `rules-global.md` §2): (a) daftar guru **tidak refresh setelah create** — handler hasil memanggil `fetchHomeworkTodo()` (bukan query list guru, ber-guard `prefBelum`), kini `prefTeacher = -1` + `fetchHomeworkTeacher()`; (b) **crash `PembelajaranPage.loadData()`** (`IllegalStateException` saat pindah tab cepat: coroutine melanjutkan ke `viewLifecycleOwner` setelah view hancur) — guard `if (view == null)`; (c) edit pada baris Room yang hilang membuat tugas **baru** (`homeworkId` tetap 0) — kini tutup form + toast; (d) `assignmentDay()` tanpa try/catch.
+- Form guru: **deskripsi wajib** (dulu opsional; Q16); **batas waktu tanpa default** dan **Posting tidak menunggu preview link** (Q17); file soal ≤ 12 MB di klien; kelas/mapel yang bergantung scope tidak ditulis ke Room/singleton `listClass`/`listSchedule`/`listSubject`.
+- Mode ditentukan **scope aktif**, bukan bentuk tugas yang diedit; mapel prefill dari `subjectId`.
+- **Prefill `end_at` diurai dari `end_at_label`** (app baru: default sekarang, keputusan 2026-10-02 #3 — Q18) dan **filter "Semua" tidak dikirim bila 0**, indeks `filter[n]` berurutan (app baru: kirim `0`, keputusan #6 — Q19). Dua hal ini sengaja **tidak** diubah di app baru; hanya dibuka sebagai pertanyaan.
+- Parsing JSON Android toleran: `HomeworkItem.schedule` nullable; `Assignment.id/score/scored/uploaded` memakai `@NullToZeroInt`.
+- iOS (belum ada dokumen iOS di `docs-new`): satu request multipart (dulu dua: create lalu upload file → risiko tugas ganda saat retry); kolom link dibaca (satu baris → `link`, banyak → `link[]`); `validateJson` membawa `errors`/`trace_id`; `SessionGuard.handleUnauthorized()` untuk 401; daftar guru dimuat ulang setelah create/edit (`onCompleted` → `refreshAll()`); kolom Mata Pelajaran mode bebas berhalaman 50.
+
+**Fakta terverifikasi (dev, 2026-10-19..21):**
+- `teacher-data-scope` → `{"data":{"scope":"assigned"|"all","label":"Cakupan Data Guru (Mapel & Kelas)","restricted":bool}}`. Teramati `assigned/true` (guru tunggal), `all/false`, dan `assigned/false` (guru ber-role tambahan) — jadi **`restricted`, bukan `scope`**, yang menentukan form.
+- `teachers/class`: `restricted=true` → 1 kelas (jadwal + wali); `restricted=false` → banyak kelas. `schedule-day` → `[{"key":"SENIN","lable":"Senin"},…]` (kapital + typo `lable`). `teachers/subject?take=100&skip=0` → 200 `{"data":[{id,name,icon_image}]}`.
+- Create/update: assigned & bebas → 200 `{"message":"Berhasil membuat Tugas"}` / `{"message":"Berhasil update Tugas"}`; 422 berbentuk `{"message","errors":{field:[…]},"error","trace_id"}`; draft tetap utuh di app.
+- `end_at_label` = tanggal absolut; tugas yang dibuat `2026-10-24 13:17:00` terisi kembali tepat saat Edit.
+- Linimasa: sebelum backend baru aktif di dev (2026-10-20) dev menolak payload canonical (422 field lama) dan `teachers/subject` 404 (juga `api.diskola.id` saat dicek); setelah itu 200. Di iPhone, kolom Mata Pelajaran sempat "Error, Tap to retry" karena 404 itu.
+- Daftar guru memakai Room `ORDER BY id DESC` sehingga tugas baru tampil di atas setelah fetch.
+
+**Belum diverifikasi (jangan diasumsikan selesai):** 404 saat update tugas yang sudah dihapus, 401 (token dicabut), 413, alur siswa (akun uji = guru; `link` kosong & error 422/403 siswa tidak teruji); tampilan form iOS di perangkat (UI Automation iPhone tidak aktif — hanya log jaringan mode bebas yang tertangkap; build & `build-for-testing` lulus, tes unit iOS belum dijalankan); `downloaded=1` (selalu `0` pada uji, belum terbukti tersimpan sebagai wajib baca); apakah `end_at` boleh dihilangkan saat update dan cara menghapus file/link lama (belum ditanyakan ke backend); `schedule: []` (array kosong) pada tugas mode bebas dapat menggagalkan parsing seluruh daftar Android (hanya `null`/`{}` tertangani; belum teramati). **Temuan terpisah, belum diselidiki:** tab Pembayaran Android menampilkan dialog "Sekolah anda sudah tidak terdaftar / anda akan dikeluarkan" (tombol OKE → logout) bila `school.uuid` tersimpan lokal kosong (`PembayaranPage.kt:443-446`); muncul saat uji pindah tab cepat di Infinix, belum jelas apakah muncul tiap kali tab dibuka.

@@ -807,6 +807,32 @@ fun LoginScreen(...) {
 }
 ```
 
+### Window Insets (edge-to-edge) — WAJIB
+
+`MainActivity` memanggil `enableEdgeToEdge()` dan `AndroidManifest` memakai `windowSoftInputMode="adjustResize"`: konten **boleh** tergambar di belakang status bar,
+bar navigasi, cutout, dan keyboard, jadi tiap layar harus berada di dalam area aman. Satu aturan, dua tempat:
+
+| Layar berada di… | Yang memberi padding | Yang harus kamu lakukan |
+|---|---|---|
+| Di dalam `MainTabsScreen` (semua tab dan layar yang di-push: `DetailScaffold`, dst.) | `Scaffold` luar `MainTabsScreen` (status bar + bar navigasi + cutout) lalu `consumeWindowInsets(padding).imePadding()` | **Tidak ada.** Jangan tambah `statusBarsPadding()`/`navigationBarsPadding()`/`systemBarsPadding()` (no-op, atau menggandakan jarak). |
+| Langsung di `AppNavHost` (splash, onboarding, login, password, SSO, aktivasi Klaspay, reset password) | tidak ada | Daftarkan dengan `framedComposable<…>` di `AppNavHost.kt` → `SystemBarsFrame` (`safeDrawingPadding()` + latar `background`; sekaligus keyboard). |
+
+- `Route.Main` sengaja **tidak** dibungkus `SystemBarsFrame`: `NavigationBar` menggambar kontainernya di belakang bar navigasi, dan bungkus luar akan membuatnya melayang.
+- Latar (gradien auth) ikut berhenti di batas bar — strip `background` di atas/bawah, sama seperti layar lain (keputusan 2026-10-12).
+- Bottom sheet (`AppBottomSheet`) dan dialog memegang inset-nya sendiri (jendela sendiri). `AppBottomSheet` **membuka setinggi isinya** (`skipPartiallyExpanded = true`); bawaan Material membuka setengah layar sehingga isi yang
+  lebih tinggi terpotong di tepi layar dan tergambar di bawah bar navigasi. Isi sheet yang tingginya bergantung data harus dibatasi (`heightIn`/scroll) agar tidak melewati status bar.
+- Tema XML (`themes.xml`) memakai bar transparan agar cocok dengan `enableEdgeToEdge()` saat cold start.
+- Kolom isian: pakai `AppTextField`. Ia menggulirkan dirinya sendiri ke area terlihat begitu keyboard berhenti bergerak (`BringIntoViewRequester` + `WindowInsets.ime`);
+  scroll bawaan platform hanya membawa kursor, sehingga kolom di atas bar sticky tinggal setengah terlihat. Jangan memakai `delay` tetap untuk menunggu keyboard.
+
+### PIN & dialog keamanan (Pembayaran)
+
+- **PIN** diketik lewat `PinEntry` (`PinDots` + `NumericKeypad`), bukan `TextField`/keyboard sistem. PIN **tidak** boleh lewat argumen route, `SavedStateHandle`,
+  `rememberSaveable` atau log; layar yang memintanya menunggu hasil dari `PinResultChannel` (`take(requestKey)` saat kembali ke komposisi, sekali baca). `LogRedactor` menyamarkan sisanya.
+- **Aktivasi wallet** hanya dimulai lewat `ActivationGate` (`rememberActivationGate`, satu per shell): dialog "Aktivasi Wallet Lebih Dahulu", dialog email, dialog ganti password, dan `payment/check`
+  bersatu di `ActivationGateViewModel`. Layar baru yang butuh wallet memanggil `gate.prompt()` bila wallet belum aktif, jangan membuat dialog sendiri.
+- Tujuan pembayaran yang belum dibangun **tidak** boleh menampilkan data contoh: hub menjawab "Fitur dalam pengembangan" (`availablePaymentDestinations` di `MainTabsScreen`).
+
 ### Pull-to-Refresh
 
 ```kotlin
@@ -1232,6 +1258,7 @@ Sebelum melaporkan task selesai ke user, pastikan semua ini sudah dilakukan:
 - [ ] **ViewModel extend `BaseViewModel`** dan pakai `launchWithHandling`
 - [ ] **Flag loading di-set SEBELUM `launch`** (atau pakai `launchWithHandling`)
 - [ ] **Penyimpangan dari alur lama** (jika ada) sudah dicatat di `docs/FLOW_QUESTIONS.md`
+- [ ] **Inset sistem** — layar baru di dalam shell tidak menambah `*Padding` bar sistem; layar baru di luar shell didaftarkan lewat `framedComposable` (lihat §11 "Window Insets")
 - [ ] **Build berjalan** — `./gradlew :app:assembleDebug` tidak error
 
 ---

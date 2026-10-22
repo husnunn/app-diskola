@@ -72,7 +72,7 @@ tapi titik masuknya dikomentari/tidak ada) · 🧩 **Stub** (layar ada tapi isin
 | Perangkat terhubung (`DevicesPage`) | — | Hanya dari drawer Home yang tidak bisa dibuka | ⛔ | 03 §2.5, §6.5 |
 | Notifikasi in-app + push FCM + deep link | Semua (list notifikasi butuh Klaspay aktif) | Lonceng Beranda, tray | ✅ | 03 |
 | Materi (siswa & guru) | Siswa, guru | Menu "Materi" | ✅ | 05 |
-| Tugas/PR (siswa & guru) | Siswa, guru | Menu "Tugas" | ✅ | 05 |
+| Tugas/PR (siswa & guru) | Siswa, guru | Menu "Tugas" | ✅ | 05 (+ 05c §4: kontrak form guru baru 2026-10-22, belum di app baru) |
 | Agenda Mingguan | Guru | Menu "Agenda Mingguan" | ✅ | 05 |
 | Poin (guru & siswa) | Siswa, guru | Menu "Poin", notifikasi | ✅ | 05 |
 | Perpustakaan | — | Tidak ada pemanggil | ⛔ | 05 |
@@ -84,7 +84,7 @@ tapi titik masuknya dikomentari/tidak ada) · 🧩 **Stub** (layar ada tapi isin
 | Magang | Siswa | Menu "Magang" | ✅ | 07 |
 | Verifikasi / pengajuan data akun | Tamu / belum berkelas | Tombol "Verifikasi Data" di Beranda | ✅ | 07 §13 |
 | Prokes (screening kesehatan) | — | Pemanggil dikomentari | ⛔ | 07 §12 |
-| Pembayaran: aktivasi Klaspay (2 langkah PIN), top up & transfer, riwayat, Tagihanku, bayar SPP, PIN (lupa/atur ulang), QR Pay kantin & My QR, PPOB, dana partisipasi | Semua (sebagian besar butuh Klaspay aktif) | Tab Pembayaran, notifikasi, deep link reset PIN | ✅ | 08 |
+| Pembayaran: aktivasi Klaspay (2 langkah PIN), top up & transfer, riwayat, Tagihanku, bayar SPP, PIN (lupa/atur ulang), QR Pay kantin & My QR, PPOB, dana partisipasi | Semua (sebagian besar butuh Klaspay aktif) | Tab Pembayaran (+ feature gate server `payment` untuk Bayar SPP & Dana Partisipasi), notifikasi, deep link reset PIN | ✅ | 08 |
 | Sub-fitur pembayaran yang tersembunyi: riwayat SPP, WebView payment gateway, promo, tab "Sudah Dibayar", filter riwayat, periode BPJS, detail kegiatan partisipasi, halaman listrik/air lama | — | Pemanggil dikomentari / `gone` | ⛔ | 08 §13 |
 | Feed sekolah, buat post/e-book, jelajah | — | Tab "Sekolah"/"Jelajah" dikomentari | ⛔ / 🧩 | 04 §0 |
 | Komentar post, daftar penyuka, post per tagar | Semua | Notifikasi `feed-detail`, profil | ✅ | 04 |

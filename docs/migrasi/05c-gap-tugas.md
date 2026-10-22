@@ -54,3 +54,31 @@ diuji jalur ini secara langsung) · ⛔ Ditunda/di luar cakupan.
   diterima backend (dev server tidak dicoba karena tidak ada tugas untuk dikirim jawabannya).
 - Komponen baru yang diekstrak jadi reusable: `ui/components/SimpleDropdown.kt` (sebelumnya privat
   di `UploadMateriScreen.kt`, sekarang dipakai juga oleh `UploadTugasScreen.kt`).
+
+## 4. Kontrak backend baru (2026-10-22) — belum diterapkan di app baru
+
+Backend mengubah API form tugas guru (cabang `teacher-data-scope`, payload canonical) dan app lama (`android-portal`; iOS juga) sudah disesuaikan —
+rincian perilaku di `05-pembelajaran-materi-tugas.md` §6.4–§6.5 dan keputusan/asumsi di `FLOW_QUESTIONS.md` (2026-10-22). App baru tidak ada di disk, jadi
+status di bawah diambil dari dokumen ini (§1–§3: `UploadTugasViewModel` memakai kontrak lama — cascade Kelas→Hari→Mapel, payload `school_classes_id`/
+`school_subject_schedules_id`/`grade`/`teacher_id`/`school_id`). **Belum ada yang dikerjakan di app baru.**
+
+Legenda: ⛔ belum dikerjakan · ❓ menunggu keputusan user (nomor = ❓ di `05` §13).
+
+| Item | Status | Keterangan |
+|---|---|---|
+| Baca `GET mobile/attendance/teacher-data-scope`; cabang `data.restricted` (gagal/hilang → mode assigned) | ⛔ | App baru hanya punya mode assigned. Jangan memakai cache scope presensi (default ALL saat gagal) |
+| Mode bebas: Kelas + Mapel dari `GET .../teachers/subject?take&skip` (tanpa Hari; mapel langsung aktif) | ⛔ | Endpoint baru — `TugasApiService` perlu `assignmentSubject(take, skip)` (`data[]{id,name,icon_image}`) |
+| Payload canonical: assigned → `school_subject_schedule_id`; bebas → `school_class_id` + `school_subject_id`; `title,description,end_at,checked,downloaded,uploaded`; hapus `teacher_id`, `school_id`, `grade`, `school_classes_id`, `school_subject_schedules_id`, `downloded`; `link` hanya bila tidak kosong | ⛔ | `createAssignment`/`updateAssignment`. Mode bebas **tidak boleh** mengirim `school_subject_schedule_id` |
+| `end_at` dikirim `yyyy-MM-dd HH:mm:ss` | ⛔ | Periksa format kirim app baru (app lama dulu `dd-MM-yyyy HH:mm:ss`; spek baru mewajibkan `yyyy-MM-dd HH:mm:ss`) |
+| Penanganan error: 422 per field + draft dipertahankan; 404 saat update (tutup + hapus baris lokal + refresh); 401 → login; 403 dialog "Akses diblokir" + `trace_id`; 413 | ⛔ | `ApiException` app baru perlu membawa `errors` (per field) & `trace_id` |
+| Prefill edit: mapel dari `subjectId`; baris lokal hilang → tutup form (bukan membuat tugas baru) | ⛔ | Di app lama dulu Posting pada baris hilang membuat tugas **baru** |
+| Prefill edit: `end_at` dari `end_at_label` (fallback kosong bila gagal) | ❓ Q18 | Bertentangan keputusan 2026-10-02 #3 (app baru: default sekarang). Bukti baru: label berupa tanggal absolut dan terurai benar di data nyata |
+| Filter "Semua": tidak kirim `school_classes_id`/`school_subject_id` bila 0 | ❓ Q19 | App baru masih mengirim `0` (baris §2 "Filter 'Semua' kirim literal `0`", keputusan #6). App lama kini tidak mengirimnya; request tanpa filter terverifikasi 200 + data |
+| Deskripsi wajib; tanpa default tanggal; Posting tidak menunggu preview link; file soal ≤ 12 MB di klien | ❓ Q16, Q17 | Keputusan implementasi app lama yang belum dikonfirmasi |
+| Refresh daftar guru setelah create (list memuat tugas baru di atas) | ⛔ / periksa | App baru memakai `ensureFirstPage()` per filter — pastikan dipicu setelah form sukses (bug app lama: list tidak refresh) |
+| Sisi siswa: `link` kosong tidak dikirim; 422 per file (`file.N` → "File ke-N: …"); 403 "Akses diblokir" + trace id; 400 "sudah mengumpulkan" | ⛔ | `TugasDetailViewModel` / `TugasApiService.collectAssignment` |
+| Penilaian: id pengumpulan 0/null tidak memanggil API; parsing toleran `id`/`score` null dan `schedule` null | ⛔ | `TugasScoringViewModel`; model `Assignment`/`HomeworkItem` |
+| Multi-kelas (satu request per kelas, hasil per kelas) | ⛔ ditunda (❓ Q20) | Keputusan user: satu kelas dulu |
+
+Catatan: pola yang berhasil di app lama dan layak ditiru — logika murni (payload + validasi + format/parse tanggal + pemetaan error) dipisah dari UI sehingga
+bisa diuji JVM (`AssignmentPayload`, `AssignmentDates`, `AssignmentErrors`, `ApiErrorParser`), selaras `rules-global.md` §5.2.

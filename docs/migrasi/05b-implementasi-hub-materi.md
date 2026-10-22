@@ -1,5 +1,8 @@
 # 05b — Implementasi Fase Pembelajaran: Hub + Materi
 
+> **Diperbarui 2026-10-12:** bagian Hub dari dokumen ini (cakupan "bagian berisiko-rendah", badge ditunda, kartu dari `attendance/schedule`) sudah digantikan —
+> lihat `05h-implementasi-hub-pembelajaran.md`. Bagian Materi tetap berlaku.
+
 Laporan implementasi untuk fase "halaman pembelajaran" (Hub menu grid + audit/perbaikan Materi
 siswa & guru), dikerjakan 30-09-2026. Melengkapi `05-pembelajaran-materi-tugas.md` (spesifikasi
 perilaku target) dan `05a-gap-pembelajaran-hub-materi.md` (status selisih per item). Dokumen ini

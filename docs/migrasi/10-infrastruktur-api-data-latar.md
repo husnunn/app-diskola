@@ -81,6 +81,7 @@ Catatan migrasi: pertahankan `abiFilters` yang sama; setiap library ber-`.so` ba
 | OkHttp | 58-60, 123-134 | keep `okhttp3.**`, publicsuffix, dontwarn conscrypt/bouncycastle/openjsse |
 | Dagger | 62-65 | keep `dagger.**`, `javax.inject.**` |
 | Retrofit | 67-118 | aturan resmi R8 full-mode (keep interface ber-anotasi `@retrofit2.http.*`, `Continuation`, `retrofit2.Response`) |
+| JLaTeXMath (**BARU 19-10-2026**) | 137-139 | keep `org.scilab.forge.jlatexmath.**` dan `ru.noties.jlatexmath.**` (library memuat macro/font berdasarkan nama dan tidak membawa consumer rules); `:app:minifyReleaseWithR8` lolos, rilis penuh tak bisa diuji di mesin dev (keystore) |
 
 Model respons dilindungi lewat anotasi `@Keep` + `@JsonClass(generateAdapter = true)` di tiap model (mis. `J/viewmodels/GeneralViewModel.kt:64-89`), bukan lewat aturan ProGuard.
 
@@ -158,7 +159,7 @@ Legenda status di project baru: ✅ = sudah ada di `app/build.gradle.kts`; 📦 
 | 352 | `skydoves:powerspinner:1.2.7` | 2 file | — | `ExposedDropdownMenuBox` |
 | 353 | `relex:circleindicator:2.1.6` | 2 file | — | indikator pager kustom |
 | 355-356 | `gson:2.8.9` + `converter-gson` | `J/db/DbConverter.kt`, converter Retrofit kedua | ✅ gson 2.10.1 | Buang (satu lib JSON) |
-| 360 | `jlatexmath-android:0.2.0` | render LaTeX soal (`J/utils/HtmlMathRenderer.kt`) | ✅ | Pertahankan |
+| 360 | `jlatexmath-android:0.2.0` | render LaTeX di teks soal, pilihan jawaban, dan pernyataan (`J/utils/HtmlMathRenderer.kt`, `J/utils/MathParser.kt`, adapter `mathHtml` di `J/utils/BindingAdapters.kt:42`; `06` §5.8) | ✅ | Pertahankan (+ keep rule R8) |
 | 337-339, 363-365 | junit, androidx test, espresso, uiautomator | test | ✅ sebagian | — |
 
 Yang **perlu ditambahkan** ke project baru untuk paritas: `lifecycle-service`, `review-ktx`, Paging 3 (opsional), CameraX + ML Kit barcode, `zxing:core`, socket.io-client, emoji2, jsoup, uCrop (atau cropper lain), `maps-compose`, `firebase-inappmessaging-display`, `core-splashscreen` (pengganti `LoginTheme` splash), plugin `kotlin-parcelize` (📦 belum di-apply) bila memakai `@Parcelize`.
@@ -264,12 +265,14 @@ flowchart LR
 
 | Perilaku | Baris |
 |---|---|
-| Jika `Utils.isInternetAvailable()` false → lempar `ApiException("Terjadi gangguan pada koneksi internet Anda, silahkan ulangi beberapa saat lagi", 0)` **sebelum** request (responseCode `0` = sentinel offline) | 12-17 |
-| Header `Accept: application/json` | 21 |
-| Header `Authorization: Bearer <pref user_token>` — selalu ditambahkan, walau token kosong (menjadi `"Bearer "`) | 23 |
-| ETag/`If-none-match` dikomentari | 22 |
+| Jika `Utils.isInternetAvailable()` false → lempar `ApiException("Terjadi gangguan pada koneksi internet Anda, silahkan ulangi beberapa saat lagi", 0)` **sebelum** request (responseCode `0` = sentinel offline) | 17-22 |
+| Header `Accept: application/json` | 26 |
+| Header `Authorization: Bearer <pref user_token>` — selalu ditambahkan, walau token kosong (menjadi `"Bearer "`) | 28 |
+| ETag/`If-none-match` dikomentari | 27 |
+| Header `X-App-Platform: android` — konstanta `APP_PLATFORM`; selalu ditambahkan (**BARU 19-10-2026**, `e0a12b62`) | 14, 31 |
+| Header `X-App-Version: <BuildConfig.VERSION_NAME>` (mis. `2.1.41`; **bukan** `versionCode`) — selalu ditambahkan (**BARU 19-10-2026**) | 32 |
 
-**Tidak ada** header versi app, device id, client id, bahasa, atau User-Agent kustom. Header khusus hanya per-endpoint: `X-Device-Fingerprint` (= `Settings.Secure.ANDROID_ID`, `J/utils/DeviceFingerprint.kt:16-21`) di `checkPasswordUjianSchool` & `uploadJawabanUjianSchool` (`J/api/ApiService.kt:938,965`); `Accept: */*` pada `download` (`:83`).
+Header versi app **ada sejak 19-10-2026** (`X-App-Platform`, `X-App-Version` — dipakai backend untuk membedakan platform/versi pemanggil, mis. rollout rumus LaTeX; lihat `06` §16). **Tidak ada** device id global, client id, bahasa, atau User-Agent kustom. Header khusus hanya per-endpoint: `X-Device-Fingerprint` (= `Settings.Secure.ANDROID_ID`, `J/utils/DeviceFingerprint.kt:16-21`) di `checkPasswordUjianSchool` & `uploadJawabanUjianSchool` (`J/api/ApiService.kt:938,965`); `Accept: */*` pada `download` (`:83`).
 
 `isInternetAvailable` hanya cek `NET_CAPABILITY_INTERNET` (bukan `VALIDATED`) — sengaja tidak diperketat (`J/utils/Utils.kt:19-41`).
 
@@ -287,7 +290,7 @@ flowchart TD
   DLG --> F
   F --> G{401, 403, 500?}
   G -- ya --> PASS[kembalikan response apa adanya<br/>→ Retrofit melempar HttpException]
-  G -- tidak --> H[baca Retry-After → throw ApiException(pesan, kode, errorTypes, data, retryAfter, errorCode)]
+  G -- tidak --> H[baca Retry-After → throw ApiException(pesan, kode, errorTypes, data, retryAfter, errorCode, fieldErrors, traceId)]
 ```
 
 Detail:
@@ -295,9 +298,10 @@ Detail:
 - 2xx: bila root JSON punya key `status` dan nilainya **bukan String `"success"`** (termasuk boolean/angka) → error (`:83-88`). `errorTypes` = key dari objek `errors` (`:77-82`). Respons non-JSON/array → map kosong → lolos.
 - 503/504: membuat `AlertDialog.Builder(context)` dengan **application context dari thread OkHttp**, layout `DialogActivateKlaspayBinding`, judul `"Perbaikan Sistem"`, pesan `"Kami sedang melakukan perbaikan sistem untuk meningkatkan layanan kami kepada Anda. Kami akan segera kembali."`, tombol `"OK"` (`:92-112`). ⚠️ Dengan app context + non-main thread, dialog hampir pasti gagal dan hanya tercatat `Timber.e("failed to open maintenance dialog…")` (belum terverifikasi di perangkat). ❓ App baru: tampilkan dialog maintenance sungguhan (perilaku berubah) atau tetap hanya pesan error?
 - 401/403/500 **tidak dilempar sebagai `ApiException`** (`:145-147`) → pemanggil menerima `retrofit2.HttpException`. **Tidak ada refresh token, tidak ada force-logout global.** `GlobalErrorBus` (`J/utils/GlobalErrorBus.kt:5-13`) di-import tapi tidak pernah di-emit/di-collect (kode mati).
-- 429: `Retry-After` (detik) → `ApiException.retryAfterSeconds` (`:149-153`, `:171-172`).
-- `error_code` top-level (mis. `"DEVICE_CONFLICT"` untuk 409 single-device-login) → `ApiException.errorCode` (`:133-137`, `:173-174`).
-- `ApiException(message, responseCode, errorTypes, data, retryAfterSeconds, errorCode) : IOException` (`:166-175`) — karena `IOException`, coroutine yang menangkap `Exception` juga menangkapnya.
+- 429: `Retry-After` (detik) → `ApiException.retryAfterSeconds` (`:149-153`, `:183`).
+- `error_code` top-level (mis. `"DEVICE_CONFLICT"` untuk 409 single-device-login) → `ApiException.errorCode` (`:133-137`, `:185`).
+- `ApiException(message, responseCode, errorTypes, data, retryAfterSeconds, errorCode, fieldErrors, traceId) : IOException` (`:177-188`; dua parameter terakhir **baru 2026-10-22**, default kosong/null, jadi pemanggil lama tak terpengaruh) — karena `IOException`, coroutine yang menangkap `Exception` juga menangkapnya.
+- **`fieldErrors` / `traceId` (baru 2026-10-22):** `fieldErrors: Map<String, List<String>>` = isi objek `errors` per field (nilai String atau array; kunci berindeks seperti `file.0` dipertahankan), `traceId` = `trace_id` top-level atau `data.trace_id`. Diisi `ApiErrorParser.fromMap(contentMap)` (`@/api/ApiErrorParser.kt`; objek murni dengan try/catch sendiri agar bug parsing tak merusak interceptor — `catch` luar interceptor melempar ulang). `message`/`errorTypes` **tidak berubah** (dipakai Presensi/Login/Klaspay). 401/403/500 tetap lolos sebagai `HttpException`; `AssignmentErrors.classify` (`@/pages/homework/AssignmentErrors.kt`) mem-parse `errorBody()` untuk 403 (`message`, `trace_id`) dan 401. Dipakai form tugas guru & submit jawaban siswa (lihat `05` §6.4, §5.5).
 
 ### 3.4 Penanganan sesi (401 / perangkat lain)
 
@@ -344,10 +348,13 @@ tanpa header `Authorization`, atau dihentikan — jangan diasumsikan, tanyakan b
 | Adapter | Perilaku | Baris |
 |---|---|---|
 | `@ObjectToList` (field `List<T>`) | Jika JSON bukan array → dibungkus `listOf(obj)`; `toJson` tidak menulis apa-apa | 32-49, 94-107, 125-128 |
-| `@NullToEmptyString` | `null` → `""` | 52-67, 109-111 |
+| `@NullToEmptyString` | `null` → `""` | 51-67, 125-127 |
+| `@NullToZeroInt` (**baru 2026-10-22**) | `null` → `0` untuk `Int` — dipakai `Assignment.id/score/scored/uploaded` agar `"id": null` pada detail pengumpulan (backend mengembalikan field null bila `ids` tak valid) tak melempar `JsonDataException` | 69-83, 129-131 |
 | `@FlexibleToString` | angka → `toString()`, string apa adanya, null/lainnya → `""` (mis. `year` presensi by-year) | 70-90, 121-123 |
 | `Moshi` di-provide `@Reusable` (bukan singleton) | — | 13-16 |
 | Room `DbConverter` (Gson) | `Long?↔Date` (null → **`Date()` sekarang**, `Date?`→`0`), `List<String>↔JSON`, `Page?↔JSON` | `J/db/DbConverter.kt:13-49` |
+
+Nomor baris adapter/anotasi **setelah** `@NullToZeroInt` pada tabel ini bergeser +16 (blok) / +4 (anotasi) sejak 2026-10-22.
 
 Model tidak memakai `KotlinJsonAdapterFactory` (hanya codegen `@JsonClass(generateAdapter = true)`); default nilai di constructor data class = nilai fallback bila field hilang.
 
@@ -391,7 +398,7 @@ Kelas pembungkus (tidak di-scope → instance baru tiap injeksi) yang menggabung
 
 ### 3.11 Indeks lengkap endpoint
 
-`ApiService.kt` (1639 baris) memuat **314 endpoint aktif** (+ 24 anotasi yang dikomentari, hampir semuanya varian `mock/…`), ditambah **3 endpoint `ApiService2.kt`**. Kolom "Baris" = baris anotasi HTTP di `J/api/ApiService.kt`. Path param terlihat di kolom Path; "Q" = `@Query`, "Part" = `@Part`, "Body" = `@Body` (hampir semua bertipe `Any`/`Map`, lihat rules-global #5). Pengelompokan per fitur di bawah dibuat dari lokasi & path (komentar pengelompokan di file sumber banyak yang menyesatkan, mis. endpoint AKM berada di bawah komentar `// klaspay`).
+`ApiService.kt` (1645 baris) memuat **315 endpoint aktif** (+ 24 anotasi yang dikomentari, hampir semuanya varian `mock/…`), ditambah **3 endpoint `ApiService2.kt`**. Kolom "Baris" = baris anotasi HTTP di `J/api/ApiService.kt` (baris setelah `assignmentSubject`, 443, bergeser +6 sejak 2026-10-22; baris yang disebut di bagian Tugas sudah disesuaikan, sisanya bisa bergeser). Path param terlihat di kolom Path; "Q" = `@Query`, "Part" = `@Part`, "Body" = `@Body` (hampir semua bertipe `Any`/`Map`, lihat rules-global #5). Pengelompokan per fitur di bawah dibuat dari lokasi & path (komentar pengelompokan di file sumber banyak yang menyesatkan, mis. endpoint AKM berada di bawah komentar `// klaspay`).
 
 #### Utilitas, konfigurasi app & kebijakan (6)
 
@@ -400,7 +407,7 @@ Kelas pembungkus (tidak di-scope → instance baru tiap injeksi) yang menggabung
 | GET | `@Url` (URL penuh) | `download` | 83 | Accept */* | `ResponseBody` |
 | GET | `@Url` (URL penuh) | `downloadString` | 86 |  | `Any` |
 | GET | `mobile/app/config/check-android-version` | `checkVersion` | 89 |  | `CheckVersionResponse` |
-| GET | `mobile/app/check-feature-availability` | `checkFeatureAvailability` | 92 | Q: name | `FeatureAvailabilityResponse` |
+| GET | `mobile/app/check-feature-availability` | `checkFeatureAvailability` | 92 | Q: name (`jurnal-kbm`, `presensi`, `payment`) | `FeatureAvailabilityResponse` |
 | GET | `mobile/app/policy` | `policy` | 750 |  | `PolicyResponse` |
 | GET | `mobile/app/accounts/user/{userId}/get-layout-about` | `about` | 753 |  | `PolicyResponse` |
 
@@ -505,7 +512,7 @@ Kelas pembungkus (tidak di-scope → instance baru tiap injeksi) yang menggabung
 | DELETE | `mobile/app/learning/theories/teachers/theories/{id}` | `deleteTheory` | 396 |  | `Any` |
 | GET | `mobile/teacher/school-grade` | `gradeTeach` | 399 |  | `GradeResponse` |
 
-#### Tugas (assignment) (16)
+#### Tugas (assignment) (17)
 
 | Method | Path | Fungsi | Baris | Param / catatan | Return |
 |---|---|---|---|---|---|
@@ -515,23 +522,24 @@ Kelas pembungkus (tidak di-scope → instance baru tiap injeksi) yang menggabung
 | GET | `mobile/app/learning/assignment/students/scored` | `studentTaskScored` | 420 | Q: take, skip | `HomeworkResponse` |
 | POST | `mobile/app/learning/assignment/students/{id}/collect` | `answerHomework` | 427 | Part: PartMap, file; multipart | `CollectHomeworkResponse` |
 | GET | `mobile/app/learning/assignment/students/{subjectAssignmentId}/collect/{studentAssignmentId}` | `studentAssignmentCollectDetail` | 434 |  | `StudentCollectDetailResponse` |
-| GET | `mobile/app/learning/assignment/teachers/class` | `assignmentClass` | 440 |  | `ClassRoomResponse` |
-| GET | `mobile/app/learning/assignment/teachers/schedule-day` | `assignmentDay` | 443 |  | `AssignmentDayResp` |
-| GET | `mobile/app/learning/assignment/teachers/schedule` | `assignmentScheduleClass` | 446 | Q: school_class_id, day | `AssignmentScheduleResp` |
-| POST | `mobile/app/learning/assignment/teachers/create` | `createAssignment` | 453 | Part: PartMap, file; multipart | `Any` |
-| POST | `mobile/app/learning/assignment/teachers/update/{id}` | `updateAssignment` | 460 | Part: PartMap, file; multipart | `Any` |
-| DELETE | `mobile/app/learning/assignment/teachers/delete/{id}` | `deleteAssignment` | 467 |  | `Any` |
-| GET | `mobile/app/learning/assignment/teachers/backlog` | `teacherAssignment` | 470 | QueryMap (`filter[i][j]`); path sama dgn `teacherTaskTodo` | `HomeworkResponse` |
-| GET | `mobile/app/learning/assignment/teachers/scored` | `assignmentCollected` | 475 | Q: take, skip | `HomeworkCollectedResponse` |
-| POST | `mobile/app/learning/assignment/teachers/scored/{colledtedId}/student-assignment/{assignmentId}` | `scoreAssignment` | 481 | Body | `Any` |
-| GET | `mobile/app/learning/assignment/teachers/scored/{id}` | `assignmentDetail` | 488 |  | `AssignmentResponse` |
+| GET | `mobile/app/learning/assignment/teachers/class` | `assignmentClass` | 440 |  | `ClassRoomResponse` (ikut `restricted`: assigned = kelas jadwal guru + wali, bebas = semua kelas kecuali ALUMNI) |
+| GET | `mobile/app/learning/assignment/teachers/subject` | `assignmentSubject` | 443 | Q: take, skip | `MapelResponse` (**baru 2026-10-22**; mapel mode bebas, `data[]{id,name,icon_image}`) |
+| GET | `mobile/app/learning/assignment/teachers/schedule-day` | `assignmentDay` | 449 |  | `AssignmentDayResp` (`key` huruf kapital, label di `lable`) |
+| GET | `mobile/app/learning/assignment/teachers/schedule` | `assignmentScheduleClass` | 452 | Q: school_class_id, day | `AssignmentScheduleResp` |
+| POST | `mobile/app/learning/assignment/teachers/create` | `createAssignment` | 459 | Part: PartMap (payload canonical, `05` §6.4), file; multipart | `Any` (`{"message":"Berhasil membuat Tugas"}`) |
+| POST | `mobile/app/learning/assignment/teachers/update/{id}` | `updateAssignment` | 466 | Part: PartMap (idem), file; multipart | `Any` (`{"message":"Berhasil update Tugas"}`) |
+| DELETE | `mobile/app/learning/assignment/teachers/delete/{id}` | `deleteAssignment` | 473 |  | `Any` |
+| GET | `mobile/app/learning/assignment/teachers/backlog` | `teacherAssignment` | 476 | QueryMap (`filter[i][j]`; kelas/mapel hanya bila > 0 sejak 2026-10-22); path sama dgn `teacherTaskTodo` | `HomeworkResponse` |
+| GET | `mobile/app/learning/assignment/teachers/scored` | `assignmentCollected` | 481 | Q: take, skip | `HomeworkCollectedResponse` |
+| POST | `mobile/app/learning/assignment/teachers/scored/{colledtedId}/student-assignment/{assignmentId}` | `scoreAssignment` | 487 | Body | `Any` |
+| GET | `mobile/app/learning/assignment/teachers/scored/{id}` | `assignmentDetail` | 494 |  | `AssignmentResponse` (`assignments[].id`/`score` bisa `null` → `@NullToZeroInt`) |
 
 #### Presensi, jurnal KBM & presensi QR (38)
 
 | Method | Path | Fungsi | Baris | Param / catatan | Return |
 |---|---|---|---|---|---|
 | GET | `mobile/attendance/schedule` | `schedule` | 491 | Q: date, school_class_id, school_subject_id, limit | `PresensiListResponse` |
-| GET | `mobile/attendance/teacher-data-scope` | `teacherDataScope` | 499 |  | `TeacherDataScopeResponse` |
+| GET | `mobile/attendance/teacher-data-scope` | `teacherDataScope` | 505 |  | `TeacherDataScopeResponse` (`data{scope, label, restricted}`; **`restricted`** menentukan mode form tugas guru — `05` §6.4; `PresensiViewModel` tetap memakai `scope`) |
 | GET | `mobile/attendance/data/{month}/{year}` | `attendance` | 502 |  | `AbsensiResponse` |
 | GET | `mobile/attendance/summary/{year}` | `attendanceSummary` | 508 |  | `RekapAbsensiResponse` |
 | GET | `mobile/attendance/schedule/{id}` | `attendanceSchedule` | 513 |  | `ScheduleDetailResponse` |
@@ -847,7 +855,7 @@ Kelas pembungkus (tidak di-scope → instance baru tiap injeksi) yang menggabung
 | ⚠️ `acceptTransaksiBuyer` memakai URL absolut `https://dev.api.diskola.id/api/…` → build release memanggil server **dev** | `J/api/ApiService.kt:1244`; dipanggil `J/pages/entrepreneurs/PembelianVM.kt:254` |
 | ⚠️ `loadCategoryProduct` path `{categoryId}{categorySubId}` tanpa pemisah | `:1048` |
 | Nama fungsi dobel beda parameter: `listClass()` (prokes, `:1453`) vs `listClass(take, skip, name)` (presensi, `:1570`) | — |
-| Path sama dipakai dua fungsi: `teacherSubject`/`teacherSubjectTeach` (`:346,352`), `teacherTaskTodo`/`teacherAssignment` (`:408,470`), `paySpp`/`paySppChannel` (`:834,837`), `updateFcm`/`updateFcmAsync` (`:194,197`), `endExam`/`endExamAsync` (`:692,695`) | — |
+| Path sama dipakai dua fungsi: `teacherSubject`/`teacherSubjectTeach` (`:346,352`), `teacherTaskTodo`/`teacherAssignment` (`:408,476`), `paySpp`/`paySppChannel` (`:834,837`), `updateFcm`/`updateFcmAsync` (`:194,197`), `endExam`/`endExamAsync` (`:692,695`) | — |
 | Endpoint FCM berada di prefix legacy `sosmed/setting/setup-user-fcm` | `:194` |
 | `logout`, `sessions/*` berada di root (tanpa prefix `mobile/`) | `:178-187` |
 | `postQrAttendance` mengembalikan `Response<Unit>` (tidak melempar pada non-2xx; tetap melewati `ResponseInterceptor`) | `:1632` |
@@ -1119,10 +1127,10 @@ Channel dibuat di `Loginpage.onCreate` **setelah** early-return jalur klik notif
 ### 6.6 `feature/*` — gerbang ketersediaan fitur (bukan Play Feature Delivery)
 
 - `launchFeature(featureKey, intent)` untuk Activity/Fragment: tampilkan loading `"Memeriksa ketersediaan fitur…"`, panggil `GET mobile/app/check-feature-availability?name=<key>`, bila `available` → buka Intent; bila tidak → `FeatureUnavailableBottomSheet` (`J/feature/FeatureGate.kt:19-78`).
-- `guardFeatureOnCreate` (deep link/notifikasi): bila tidak tersedia → bottom sheet yang menutup host saat dismiss (`finishHostOnDismiss = true`) (`:84-116`).
+- `guardFeatureOnCreate` (deep link/notifikasi; dipakai `PresensiPage`, `JurnalPage`, `SppPaymentPage`, `PartisipasiPage`): bila tidak tersedia → bottom sheet yang menutup host saat dismiss (`finishHostOnDismiss = true`) (`:84-116`).
 - **Fail-open**: error jaringan/format → dianggap tersedia (`J/viewmodels/GeneralViewModel.kt:48-60`).
-- Pesan: guru = pesan API (fallback `DEFAULT_UNAVAILABLE_MESSAGE` `"Fitur ini sedang diperbarui. Silakan gunakan website terlebih dahulu."`); siswa = `"Fitur ini sedang diperbarui. Silakan coba lagi nanti."` (`FeatureGate.kt:118-138`, `J/feature/FeatureAvailabilityModels.kt:11-12`, `R/values/strings.xml:223`). Tombol `"Buka Website"` hanya untuk guru, `"Kembali"`; judul `"Fitur Belum Tersedia di Aplikasi"`, badge `"Sedang diperbarui"` (`strings.xml:221-226`).
-- Key: `jurnal-kbm` → portal `/jurnal-kbm/presensi-kelas`; `presensi` → `/presensi/presensi-guru-staff/presensi` (hanya guru); base URL portal di-hardcode per build type (`J/feature/FeaturePortalUrl.kt:5-27`).
+- Pesan: guru = pesan API (fallback `DEFAULT_UNAVAILABLE_MESSAGE` `"Fitur ini sedang diperbarui. Silakan gunakan website terlebih dahulu."`); siswa = `"Fitur ini sedang diperbarui. Silakan coba lagi nanti."` (`FeatureGate.kt:118-138`, `J/feature/FeatureAvailabilityModels.kt:12-13`, `R/values/strings.xml:223`). Tombol `"Buka Website"` hanya untuk guru, `"Kembali"`; judul `"Fitur Belum Tersedia di Aplikasi"`, badge `"Sedang diperbarui"` (`strings.xml:221-226`).
+- Key: `jurnal-kbm` → portal `/jurnal-kbm/presensi-kelas`; `presensi` → `/presensi/presensi-guru-staff/presensi` (hanya guru); `payment` (sejak 21-10-2026; menjaga Bayar SPP & Dana Partisipasi, `08` §5.6) → tanpa path, root portal (`08` Q22); base URL portal di-hardcode per build type (`J/feature/FeaturePortalUrl.kt:5-27`).
 - Compose: `FeatureGate` sebagai use-case di ViewModel pemanggil + `ModalBottomSheet`; navigasi hanya setelah hasil diterima.
 
 ### 6.7 `widgets/*` (custom view, bukan App Widget)
@@ -1178,7 +1186,9 @@ Channel dibuat di `Loginpage.onCreate` **setelah** early-return jalur klik notif
 | `PlayInAppReview.launch` | review flow Play | `J/utils/PlayInAppReview.kt:7-21` | `review-ktx` |
 | `LoadingDialogue` / `BasePage.loading()` | dialog loading transparan tidak bisa dibatalkan (`R/layout/dialogue_loading.xml`) | `J/utils/LoadingDialogue.kt:11-25` | `Dialog` Compose / overlay |
 | `ConnectionLiveData`, `NetworkState` | §3.9 | — | Flow |
-| `HtmlMathRenderer.setTextWithMath` | HTML → Spanned + LaTeX `$$…$$`, `\(...\)`, `\[...\]` via JLatexMath | `J/utils/HtmlMathRenderer.kt:22-119` | `AndroidView(TextView)` atau renderer bitmap JLatexMath di Compose |
+| `HtmlMathRenderer.setTextWithMath(textView, html, textColor, enableLinks)` | HTML → Spanned + LaTeX `$$…$$`, `\(...\)`, `\[...\]` via JLaTeXMath, digambar langsung ke Canvas (`TeXIconDrawable`), cache ikon `LruCache(64)`, gagal parse → teks sumber; **ditulis ulang 19-10-2026** (versi lama menampilkan rumus kosong) | `J/utils/HtmlMathRenderer.kt:32-165` (`setTextWithMath` `:48`) | `AndroidView(TextView)` atau renderer JLaTeXMath di Compose (`06` §5.8, §23.4) |
+| `findMathRanges`, `containsMath` | pencari rumus murni Kotlin: 3 pola, urut posisi, buang tumpang-tindih, abaikan isi kosong (**BARU 19-10-2026**) | `J/utils/MathParser.kt:14,24` | port apa adanya (bisa dites JVM) |
+| adapter `mathHtml` + `mathColor` | satu adapter data-binding untuk teks + warna jawaban/pernyataan; guard tag `math_render_key` (`R/values/ids.xml`) (**BARU 19-10-2026**) | `J/utils/BindingAdapters.kt:42-48` | state warna dioper ke composable rumus |
 | `OffsitePhotoUtil` | foto dinas luar: maks 2 MB, target 500 KB, sisi maks 1600, watermark (alamat ≤200 karakter, `lat,lng` 6 desimal, `dd MMM yyyy HH:mm`) | `J/utils/OffsitePhotoUtil.kt:23-160` | port apa adanya |
 | `ExamLockdown` | screen pinning ujian (lock task), `desired`, `arm/requestLock/release/consumeBreach/watchdogCheck` | `J/utils/ExamLockdown.kt:28-367` | port apa adanya (dokumen AKM) |
 | `ProcessRestoreState` | token proses di Bundle untuk deteksi proses mati | `J/utils/ProcessRestoreState.kt:20-39` | `SavedStateHandle` + sama |
@@ -1291,7 +1301,7 @@ Project baru sudah punya `ui/theme/Color.kt`, `Type.kt`, `Shape.kt`, `Spacing.kt
 |---|---|
 | `REBUILD_PROMPT.md:16` versionName 2.1.37, 75 rilis | 2.1.40, versionCode 79 (`app/build.gradle:34-35`) |
 | `REBUILD_PROMPT.md:22` "101 tabel Room (2 database: cache **in-memory** + persistent)" | 93 entity di `MemoryDB` yang **persisten** (`databaseBuilder`, bukan in-memory) + 4 entity duplikat di `PersistentDB`, **keduanya di file `diskola.db`**; ~96 anotasi `@Entity` termasuk yang tidak terdaftar |
-| `REBUILD_PROMPT.md:21` "~355 endpoint"; `api/README.md` "311 endpoint dari ~355 anotasi" | 314 endpoint aktif + 24 dikomentari di `ApiService.kt` (338 anotasi) + 3 di `ApiService2.kt` |
+| `REBUILD_PROMPT.md:21` "~355 endpoint"; `api/README.md` "311 endpoint dari ~355 anotasi" | 315 endpoint aktif + 24 dikomentari di `ApiService.kt` (339 anotasi; +1 `assignmentSubject` sejak 2026-10-22) + 3 di `ApiService2.kt` |
 | `REBUILD_PROMPT.md:28` compileSdk 35 | compileSdk 36 (`app/build.gradle:12`) |
 | `REBUILD_PROMPT.md:41` "161 Activity … 612 layout XML" | 162 Activity (`AndroidManifest.xml`), 618 layout |
 | `rules-global.md` anti-pattern #3 menyebut `MemoryDB`(v42) | `MemoryDB` sekarang v46 dengan 4 migrasi manual 42→46 (`DbModules.kt:21-93`) |
@@ -1313,6 +1323,7 @@ Project baru sudah punya `ui/theme/Color.kt`, `Type.kt`, `Shape.kt`, `Spacing.kt
 
 **Jaringan**
 - [ ] Header `Accept: application/json` + `Authorization: Bearer <user_token>` di semua request; `X-Device-Fingerprint` = `ANDROID_ID` di endpoint ujian sekolah.
+- [ ] **(BARU 19-10-2026)** Header `X-App-Platform: android` dan `X-App-Version` = `versionName` di semua request (termasuk download soal); versi dibandingkan backend per platform.
 - [ ] Offline → error dengan pesan `"Terjadi gangguan pada koneksi internet Anda, silahkan ulangi beberapa saat lagi"` sebelum request (kode 0).
 - [ ] 2xx dengan `status != "success"` diperlakukan error; pesan `message. error`; fallback `"Mohon maaf, terjadi kesalahan"`.
 - [ ] 401/403/500 tidak dipetakan ke `ApiException`; 401 memaksa logout hanya di jalur `SessionGuard` (❓ bila memilih auto-logout global).

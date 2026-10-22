@@ -176,12 +176,16 @@ membukanya** (satu-satunya pemicu di toolbar `AkunPage2` ter-comment, `AkunPage2
 
 ## 3. Beranda (`PembelajaranPage`)
 
+> Status 2026-10-12: Hub di app baru disamakan dengan bagian ini (endpoint, kartu kelas `current_subject`, banner presensi, status verifikasi,
+> lonceng + badge, SessionGuard, teks panjang) — `05g-gap-hub-pembelajaran.md` / `05h-implementasi-hub-pembelajaran.md`. Di luar cakupan: item `HomePage` (host) di §2.4, `VerificationPage`.
+
 ### 3.1 Ringkasan
 Halaman paling sering dilihat; start destination tab 1. Memuat header sekolah, lonceng notifikasi (badge),
 kartu profil + kelas/kelas berlangsung, tombol presensi/jurnal siswa, tombol verifikasi data (tamu/belum
 berkelas), banner absensi kantor (non-siswa), dan grid menu fitur. **Semua menu hardcoded di app** — tidak ada
 menu dari server; satu-satunya kontrol server adalah feature gate `check-feature-availability` untuk Presensi &
-Jurnal (§10.6). Flag yang dipakai semuanya dari SharedPreferences, di-refresh oleh `SosmedViewModel.checkUser()`
+Jurnal di Beranda (§10.6); tab Pembayaran punya gate sendiri `payment` untuk Bayar SPP & Dana Partisipasi (`08`
+§5.6). Flag yang dipakai semuanya dari SharedPreferences, di-refresh oleh `SosmedViewModel.checkUser()`
 setiap resume (`@/pages/sekolah/SosmedViewModel.kt:276-361`; flag lain seperti `onklas_pro`, `has_store`,
 `is_librarian` **tidak** dipakai di Home).
 
@@ -610,7 +614,7 @@ tandai dibaca → routing §7.4 (`:258-342`). Filter `"Belum Dibaca"` = `!is_rea
 - ⚠️ Bukan `BasePage`: tidak dikunci portrait & tanpa listener FIAM (belum terverifikasi dampaknya).
 
 ### 7.4 Tabel routing `page.parent` / `page.child` → layar
-Sama di `NotificationPage.navigateToPage` (`:258-342`) & `DetailNotification.navigateToPage` (`:144-222`), kecuali
+Sama di `NotificationPage.navigateToPage` (`:258-346`) & `DetailNotification.navigateToPage` (`:144-228`), kecuali
 baris bertanda †. Semua extras bernama `child_id` (String).
 
 | parent | child | `child_id` ada | `child_id` kosong |
@@ -622,7 +626,7 @@ baris bertanda †. Semua extras bernama `child_id` (String).
 | `COURSE` | `POIN` | `PoinPage(child_id)` | sama |
 | `COURSE` | `JOURNAL` | feature gate `jurnal-kbm` → `JurnalPage(child_id)` | sama |
 | `PAYMENT` | `HISTORY` | `PaymentDetailPage(child_id)` | `KlaspayRiwayatPage` |
-| `PAYMENT` | `SPP` | `SppHistoryDetailPage(child_id)` | † List: `HomeWorkPage` ⚠️ / Detail: `SppPaymentPage` |
+| `PAYMENT` | `SPP` | feature gate `payment` → `SppHistoryDetailPage(child_id)` | † List: `HomeWorkPage` ⚠️ (tanpa gate) / Detail: feature gate `payment` → `SppPaymentPage` |
 | `PAYMENT` | `BILL` | `KlaspayTagihanDetailPage(child_id)` | `KlaspayTagihanPage` |
 | `PAYMENT` | `TOPUP` / `PULSA` / `PLN` / `PDAM` / `INTERNET` / `GAME` / `BPJS` | `KlaspayTopupPage` / `PulsaPage` / `ListrikPage` / `AirPage` / `InternetPage` / `GamePage` / `BpjsPage` (+`child_id`) | sama |
 | `SETTING` | `PROFILE` / `PASSWORD` / `CARD` / `POLICY` | `ProfilePage` / `ChangePassPage` / `StudentCardPage` / `TermsPage` (+`child_id` jika non-null) | sama |
@@ -687,8 +691,8 @@ Semua intent diberi `NEW_TASK | CLEAR_TOP | SINGLE_TOP`.
 | `menu` | Layar tujuan | Extras |
 |---|---|---|
 | `feed-single`, `feed-detail` | `CommentPage` | `feed_id` = id |
-| `new-spp` | `SppPaymentPage` | — |
-| `spp` | `SppPaymentPage` | `page="paid"` |
+| `new-spp` | `SppPaymentPage` (gate `payment` di `onCreate`; tidak tersedia → bottom sheet lalu `finish`) | — |
+| `spp` | `SppPaymentPage` (gate `payment`, sama) | `page="paid"` |
 | `presensi` | `PresensiPage` (gate `presensi` di `onCreate`; tidak tersedia → bottom sheet lalu `finish`) | — |
 | `penilaian` | `HomeWorkPage` | — |
 | `poin-student-calling` | `PoinStudentPage` | — |
@@ -802,14 +806,17 @@ cakupan ini: `SessionGuard` (DIALOG, 02-auth §9).
 - `launchFeature(key, intent)` (Activity & Fragment, `:19-78`): loading `"Memeriksa ketersediaan fitur…"` →
   `GET mobile/app/check-feature-availability?name={key}` → `available` → `startActivity`; **gagal jaringan =
   fail-open** (`@/viewmodels/GeneralViewModel.kt:48-60`); tidak tersedia → `FeatureUnavailableBottomSheet`.
-- `guardFeatureOnCreate(key)` di `PresensiPage`/`JurnalPage` (untuk deep link/notif): tidak tersedia → bottom sheet
-  dengan `finishHostOnDismiss=true`.
+- `guardFeatureOnCreate(key)` di `PresensiPage`/`JurnalPage`/`SppPaymentPage`/`PartisipasiPage` (untuk deep link/notif):
+  tidak tersedia → bottom sheet dengan `finishHostOnDismiss=true`.
+- Key yang dikenal: `presensi`, `jurnal-kbm`, `payment` (`@/feature/FeatureAvailabilityModels.kt:7-9`). `payment` menjaga
+  Bayar SPP & Dana Partisipasi (ditambahkan 21-10-2026; detail di `08` §5.6).
 - Bottom sheet (`FeatureUnavailableBottomSheet.kt:33-136`): non-cancelable, tidak bisa di-drag, expanded; badge
   `"Sedang diperbarui"`, judul `"Fitur Belum Tersedia di Aplikasi"`, deskripsi = pesan API (guru) atau
   `"Fitur ini sedang diperbarui. Silakan coba lagi nanti."` (non-guru); pesan API kosong →
   `"Fitur ini sedang diperbarui. Silakan gunakan website terlebih dahulu."`; tombol `"Buka Website"` (hanya
   guru) → browser `https://portal.diskola.id` (release) / `https://dev.portal.diskola.id` + path
-  `/jurnal-kbm/presensi-kelas` (jurnal) atau `/presensi/presensi-guru-staff/presensi` (presensi); `"Kembali"`.
+  `/jurnal-kbm/presensi-kelas` (jurnal) atau `/presensi/presensi-guru-staff/presensi` (presensi); key `payment` tanpa
+  path (root portal, `08` Q22); `"Kembali"`.
   Kunci: `jurnal-kbm`, `presensi`.
 
 ### 10.7 Tema, in-app update, in-app review
@@ -836,7 +843,7 @@ Base URL & header → 02-auth/dokumen jaringan. Path persis dari `@/api/ApiServi
 | GET | `mobile/notification` | `wallet_id`, `page`, `limit=50` | `data[]` Notification | buka list, paging, refresh | 500 → toast server |
 | GET | `mobile/notification/{id}` | — | `data` Notification | detail (bila tidak ada di Room), markRead | — |
 | POST | `mobile/notification/{id}` | `{wallet_id}` | — | tandai dibaca | diabaikan |
-| GET | `mobile/app/check-feature-availability` | `name` (`presensi`/`jurnal-kbm`) | `data.available`, `data.message` | sebelum buka Presensi/Jurnal | gagal = available |
+| GET | `mobile/app/check-feature-availability` | `name` (`presensi`/`jurnal-kbm`/`payment`) | `data.available`, `data.message` | sebelum buka Presensi/Jurnal/Bayar SPP/Dana Partisipasi | gagal = available |
 | GET | `mobile/attendance/setting/me/today` | — | `status`, `jam_masuk`, `events[]{name, day_off, start_time, end_time}` | Beranda non-siswa | exception → banner GONE |
 | GET | `mobile/attendance/staff/check` | — | `allow_attendance`, `type_attendance`, `attendance_response_text`, `schedule{start_at,end_at,source}` | Beranda non-siswa | null → OUTSIDE_HOURS |
 | GET | `mobile/attendance/staff/agendas/today` | — | `data.agenda_enabled`, `data.summary.missing` | Beranda guru (badge) | gagal → 0 |
@@ -903,7 +910,7 @@ unread count, by id) — cache kotak masuk; `SessionData` (sesi perangkat, `db.l
   dialog; satu dialog aktif per layar.
 - `ErrorUi` mapping (SNACKBAR/INLINE/BOTTOM_SHEET/DIALOG/TOAST/EMPTY_STATE/BANNER) sama dengan §10.4.
 - `FeatureGate` use-case + `FeatureUnavailableSheet` (fail-open) dipakai tile Presensi/Jurnal, CTA banner,
-  notifikasi, dan guard di layar tujuan.
+  menu Bayar SPP/Dana Partisipasi, notifikasi, dan guard di layar tujuan.
 - `HomeGates`: efek lifecycle `ON_RESUME` untuk cek waktu otomatis; izin notifikasi (Accompanist/`rememberPermissionState`)
   dengan perilaku ❓ Q6; dialog keamanan (02-auth).
 - `NotificationRouter` tunggal (parent/child/child_id → route) dan `PushRouter` (`menu` → route), dipakai list,
