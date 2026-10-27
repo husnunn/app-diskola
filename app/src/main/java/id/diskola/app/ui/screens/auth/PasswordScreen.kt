@@ -5,11 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -51,7 +47,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
 import id.diskola.app.R
 import id.diskola.app.ui.components.AmbientGradientBackground
 import id.diskola.app.ui.components.AppBottomSheet
@@ -60,6 +55,7 @@ import id.diskola.app.ui.components.AppCard
 import id.diskola.app.ui.components.AppDialog
 import id.diskola.app.ui.components.AppLoadingDialog
 import id.diskola.app.ui.components.AppTextField
+import id.diskola.app.ui.components.AvatarImage
 import id.diskola.app.ui.components.BadgeTone
 import id.diskola.app.ui.components.CardVariant
 import id.diskola.app.ui.components.StatusBadge
@@ -143,31 +139,7 @@ fun PasswordScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(modifier = Modifier.size(Spacing.sm))
-                    val avatar = account?.user_avatar_image.orEmpty()
-                    if (avatar.isNotBlank()) {
-                        AsyncImage(
-                            model = avatar,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(84.dp)
-                                .background(MaterialTheme.colorScheme.surfaceContainerLow, CircleShape)
-                                .border(2.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .size(84.dp)
-                                .background(MaterialTheme.colorScheme.surfaceContainerLow, CircleShape)
-                                .border(2.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                account?.name?.firstOrNull()?.uppercase().orEmpty(),
-                                style = MaterialTheme.typography.titleLarge,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    }
+                    AvatarImage(imageUrl = account?.user_avatar_image, name = account?.name.orEmpty(), size = 84.dp)
                     Spacer(modifier = Modifier.size(Spacing.sm))
                     Text(account?.name.orEmpty().ifBlank { "-" }, style = MaterialTheme.typography.titleLarge, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                     Spacer(modifier = Modifier.size(Spacing.xs))

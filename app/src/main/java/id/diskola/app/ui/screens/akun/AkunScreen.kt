@@ -2,7 +2,6 @@ package id.diskola.app.ui.screens.akun
 
 import android.content.Context
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,10 +40,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppCard
 import id.diskola.app.ui.components.AppDialog
+import id.diskola.app.ui.components.AvatarImage
 import id.diskola.app.ui.components.ButtonVariant
 import id.diskola.app.ui.components.CardVariant
 import id.diskola.app.ui.screens.auth.clearGoogleCredentialState
@@ -100,20 +99,12 @@ fun AkunScreen(
 
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg), horizontalAlignment = Alignment.CenterHorizontally) {
             Box(contentAlignment = Alignment.BottomEnd) {
-                if (session.avatarUrl.isNotBlank()) {
-                    AsyncImage(
-                        model = session.avatarUrl,
-                        contentDescription = null,
-                        modifier = Modifier.size(88.dp).background(MaterialTheme.colorScheme.surfaceContainerLow, CircleShape).border(2.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier.size(88.dp).background(MaterialTheme.colorScheme.surfaceContainerLow, CircleShape).border(2.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(session.name.firstOrNull()?.uppercase().orEmpty(), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
-                    }
-                }
+                AvatarImage(
+                    imageUrl = session.avatarUrl,
+                    name = session.name,
+                    size = 88.dp,
+                    initialStyle = MaterialTheme.typography.headlineSmall,
+                )
                 Box(
                     modifier = Modifier.size(30.dp).background(MaterialTheme.colorScheme.primary, CircleShape),
                     contentAlignment = Alignment.Center,

@@ -1,9 +1,6 @@
 package id.diskola.app.ui.screens.auth
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,12 +9,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -36,12 +31,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
 import id.diskola.app.ui.components.AmbientGradientBackground
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppCard
 import id.diskola.app.ui.components.AppLoadingDialog
 import id.diskola.app.ui.components.AppTextField
+import id.diskola.app.ui.components.AvatarImage
 import id.diskola.app.ui.components.ButtonVariant
 import id.diskola.app.ui.components.CardVariant
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
@@ -126,22 +121,12 @@ fun SsoScreen(
                     Text("masuk sebagai".uppercase(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.size(Spacing.sm))
                     val image = ssoData?.image?.takeIf { it.isNotBlank() } ?: account.profilePictureUri
-                    if (image.isNotBlank()) {
-                        AsyncImage(
-                            model = image,
-                            contentDescription = null,
-                            modifier = Modifier.size(84.dp).background(MaterialTheme.colorScheme.surfaceContainerLow, CircleShape).border(1.5.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .size(84.dp)
-                                .border(1.5.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(Icons.Rounded.Person, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(38.dp))
-                        }
-                    }
+                    AvatarImage(
+                        imageUrl = image,
+                        name = ssoData?.username?.takeIf { it.isNotBlank() } ?: account.displayName,
+                        size = 84.dp,
+                        borderWidth = 1.5.dp,
+                    )
                     Spacer(modifier = Modifier.size(Spacing.sm))
                     Text((ssoData?.username?.takeIf { it.isNotBlank() } ?: account.displayName).ifBlank { "-" }, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
                     Text(ssoData?.email?.takeIf { it.isNotBlank() } ?: account.email, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
