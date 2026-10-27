@@ -23,6 +23,8 @@ data class ActivateKlaspayRequest(val pin: String, val password: String = "")
  * Typed so far (phase P1): activation, wallet and PIN reset. The remaining endpoints are untyped placeholders that each payment
  * sub-phase (P2 SPP … P6 partisipasi) replaces with real request/response models as it builds the screen that calls them.
  */
+// Retrofit rejects the wildcard Kotlin writes for `Map<String, Any>` in a parameter (ApiServiceSignatureTest).
+@JvmSuppressWildcards
 interface KlaspayApiService {
 
     // --- Aktivasi & wallet ---

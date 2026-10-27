@@ -28,6 +28,8 @@ fun SimpleDropdown(
     onSelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
     label: String? = null,
+    /** Off for a field that cannot be used yet (e.g. Mapel before Kelas and Hari are chosen) or a read-only detail screen. */
+    enabled: Boolean = true,
 ) {
     var sheetVisible by remember { mutableStateOf(false) }
     val selectedLabel = options.find { it.first == selected }?.second
@@ -38,7 +40,8 @@ fun SimpleDropdown(
         label = label,
         placeholder = placeholder,
         readOnly = true,
-        onClick = { sheetVisible = true },
+        enabled = enabled,
+        onClick = { if (enabled) sheetVisible = true },
         trailing = { Icon(Icons.Rounded.ExpandMore, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
         modifier = modifier,
     )

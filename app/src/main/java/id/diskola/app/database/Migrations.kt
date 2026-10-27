@@ -60,6 +60,21 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
     }
 }
 
+/**
+ * v9 -> v10 adds one column to the teacher-task cache so that editing a task made for a schedule can load that schedule's list again
+ * (`schedule.day`). It is an explicit migration for a reason that is easy to miss: `fallbackToDestructiveMigration` is still on, and a
+ * database version without a migration is **wiped whole** — including the exam answers and violations that have not been sent yet.
+ */
+object HomeworkMigrationSql {
+    const val ADD_SCHEDULE_DAY = "ALTER TABLE homework ADD COLUMN schedule_day TEXT NOT NULL DEFAULT ''"
+}
+
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(HomeworkMigrationSql.ADD_SCHEDULE_DAY)
+    }
+}
+
 val MIGRATION_8_9 = object : Migration(8, 9) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL(AkmMigrationSql.VIOLATION)

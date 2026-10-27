@@ -1,5 +1,6 @@
 package id.diskola.app.ui.components
 
+import android.graphics.Typeface
 import android.widget.TextView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,6 +32,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.annotation.ColorInt
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,7 +47,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.Spacing
 import id.diskola.app.ui.theme.extendedColors
+import androidx.core.view.doOnLayout
 import id.diskola.app.utils.HtmlMathRenderer
+import id.diskola.app.utils.containsMath
 
 /** ALL-CAPS section label used throughout the Materi and Asesmen screens. */
 @Composable
@@ -143,11 +147,15 @@ fun ExamModeHeader(
 }
 
 /**
- * Renders AKM question/answer text, which is always raw HTML from the server and may embed a
- * math formula via a `data-value="..."` attribute (ported verbatim from the legacy app's
- * `HtmlMathRenderer.setTextWithMath`, see `utils/HtmlMathRenderer.kt`). Compose's `Text()` cannot
- * host the `ImageSpan`-based formula rendering that pipeline produces, so this wraps a plain
- * `TextView` via `AndroidView` instead.
+ * Renders AKM question/answer text, which is raw server HTML that may hold LaTeX formulas (`\( \)`, `\[ \]`, `$$ $$`, doc 06 §5.8). Compose's
+ * `Text()` cannot host the `ImageSpan`-based formula drawing, so this wraps a plain `TextView` ([HtmlMathRenderer]) in an `AndroidView`.
+ *
+ * - [color] is handed to the renderer explicitly: a formula is drawn, not text, so it does not follow the TextView's text colour.
+ * - The width is only known after layout, and a formula wider than its row is scaled down to it — so the text is rendered once at once
+ *   and once more after the first layout (and again if the width changes). The key `"colour|width|html"` keeps identical re-binds free.
+ * - [dataValueFormulas] is for the **question text** only (legacy turns a WYSIWYG plugin's `data-value` into a formula there, never in answers).
+ * - [enableLinks] is off by default: `LinkMovementMethod` makes the TextView swallow touches, which broke the Menjodohkan long-press drag and
+ *   the tap on an answer row.
  */
 @Composable
 fun MathHtmlText(
@@ -155,17 +163,17 @@ fun MathHtmlText(
     modifier: Modifier = Modifier,
     style: TextStyle = LocalTextStyle.current,
     color: Color = LocalContentColor.current,
+    dataValueFormulas: Boolean = false,
+    enableLinks: Boolean = false,
 ) {
     val textSizeSp = if (style.fontSize.type == TextUnitType.Sp) style.fontSize.value else 14f
     val textColorArgb = color.toArgb()
     val isBold = (style.fontWeight?.weight ?: 400) >= FontWeight.Bold.weight
+    val source = if (dataValueFormulas) HtmlMathRenderer.preprocessDataValueFormula(html) else html
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
             TextView(ctx).apply {
-                textSize = textSizeSp
-                setTextColor(textColorArgb)
-                setTypeface(typeface, if (isBold) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
                 // This text is never interactive (no real links/selection in AKM content) — make
                 // sure it never claims touch itself, so gestures on ancestor composables (e.g. the
                 // Menjodohkan drag handle wrapping this) always see the full press-and-drag stream.
@@ -177,9 +185,21 @@ fun MathHtmlText(
         update = { textView ->
             textView.textSize = textSizeSp
             textView.setTextColor(textColorArgb)
-            HtmlMathRenderer.setTextWithMath(textView, HtmlMathRenderer.preprocessDataValueFormula(html))
+            textView.setTypeface(textView.typeface, if (isBold) Typeface.BOLD else Typeface.NORMAL)
+            renderMath(textView, source, textColorArgb, enableLinks)
         },
     )
+}
+
+/** Draws [source] into [view] unless exactly this (colour, width, text) is already drawn; draws again after layout when the width was still 0. */
+private fun renderMath(view: TextView, source: String, @ColorInt color: Int, enableLinks: Boolean) {
+    val key = "$color|${view.width}|$enableLinks|$source"
+    if (view.tag == key) return
+    view.tag = key
+    HtmlMathRenderer.setTextWithMath(view, source, color, enableLinks)
+    if (view.width == 0 && containsMath(source)) {
+        view.doOnLayout { if (view.tag == key) renderMath(view, source, color, enableLinks) }
+    }
 }
 
 /**

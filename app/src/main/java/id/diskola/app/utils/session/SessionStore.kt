@@ -7,6 +7,7 @@ import id.diskola.app.dataclass.ResponData.LoginAccountApiResponse
 import id.diskola.app.dataclass.ResponData.LoginSsoSchoolData
 import id.diskola.app.dataclass.ResponData.LoginSsoUserData
 import id.diskola.app.dataclass.ResponData.SchoolItem
+import id.diskola.app.utils.AssignmentAccess
 import id.diskola.app.utils.PreferenceClass
 import javax.inject.Inject
 
@@ -58,6 +59,9 @@ class SessionStore @Inject constructor(
         get() = preference.getString(SessionKeys.ROLE_LABEL).ifBlank { preference.getString(SessionKeys.ROLES) }
 
     val isGuest: Boolean get() = !isStudent && !isTeacher
+
+    /** Teacher side of Tugas: a staff account that really has a teacher record (see [AssignmentAccess]). */
+    val canManageAssignments: Boolean get() = AssignmentAccess.canManage(isTeacher, isStudent, teacher?.id ?: 0)
 
     fun setOnboarded() {
         preference.putBoolean(SessionKeys.ONBOARD, true)

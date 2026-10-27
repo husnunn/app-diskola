@@ -4,10 +4,12 @@ import id.diskola.app.dataclass.ResponData.AssignmentAnswerDetailResponse
 import id.diskola.app.dataclass.ResponData.AssignmentDayResp
 import id.diskola.app.dataclass.ResponData.AssignmentResponse
 import id.diskola.app.dataclass.ResponData.AssignmentScheduleResp
+import id.diskola.app.dataclass.ResponData.ClassRoomResponse
 import id.diskola.app.dataclass.ResponData.CollectHomeworkResponse
 import id.diskola.app.dataclass.ResponData.HomeworkCollectedResponse
 import id.diskola.app.dataclass.ResponData.HomeworkCreateResponse
 import id.diskola.app.dataclass.ResponData.HomeworkResponse
+import id.diskola.app.dataclass.ResponData.MapelResponse
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.http.Body
@@ -25,6 +27,8 @@ import retrofit2.http.QueryMap
  * `mobile/app/learning/assignment/teachers/class` ("Daftar kelas") is intentionally not duplicated
  * here — it's already [MateriApiService.assignmentClass].
  */
+// Retrofit rejects the wildcard Kotlin writes for `Map<String, Any>` in a parameter (ApiServiceSignatureTest).
+@JvmSuppressWildcards
 interface TugasApiService {
 
     // --- Siswa ---
@@ -65,6 +69,17 @@ interface TugasApiService {
     // --- Guru ---
     @GET("mobile/app/learning/assignment/teachers/backlog")
     suspend fun teacherAssignmentBacklog(@QueryMap filter: Map<String, String> = emptyMap()): HomeworkResponse
+
+    /** Classes the teacher may make a task for: only the teacher's own when the scope is restricted, many otherwise. */
+    @GET("mobile/app/learning/assignment/teachers/class")
+    suspend fun teacherAssignmentClass(): ClassRoomResponse
+
+    /** Free-mode subjects (the scope is not restricted): `data[]{id, name, icon_image}`, paged with `take`/`skip`. */
+    @GET("mobile/app/learning/assignment/teachers/subject")
+    suspend fun teacherAssignmentSubject(
+        @Query("take") take: Int,
+        @Query("skip") skip: Int,
+    ): MapelResponse
 
     @GET("mobile/app/learning/assignment/teachers/schedule-day")
     suspend fun teacherAssignmentScheduleDay(): AssignmentDayResp

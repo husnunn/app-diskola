@@ -6,6 +6,8 @@ import retrofit2.http.POST
 import retrofit2.http.Path
 
 /** Placeholder scaffolding: request/response shapes not yet defined, no UI consumer yet. */
+// Retrofit rejects the wildcard Kotlin writes for `Map<String, Any>` in a parameter (ApiServiceSignatureTest).
+@JvmSuppressWildcards
 interface PpobApiService {
 
     // --- Katalog produk ---

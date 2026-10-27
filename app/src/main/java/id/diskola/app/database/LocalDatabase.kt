@@ -42,7 +42,7 @@ import id.diskola.app.dataclass.localDb.User
 import id.diskola.app.dataclass.localDb.UserDao
 
 @Database(
-    version = 9,
+    version = 10,
     exportSchema = true,
     entities = [
         User::class,

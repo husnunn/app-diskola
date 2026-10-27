@@ -2,6 +2,7 @@ package id.diskola.app.ui.screens.tugas
 
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -34,6 +35,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
@@ -45,11 +47,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.diskola.app.ui.components.AppButton
+import id.diskola.app.ui.components.AppDialog
+import id.diskola.app.ui.components.AppLoadingDialog
 import id.diskola.app.ui.components.AppTextField
 import id.diskola.app.ui.components.BannerError
 import id.diskola.app.ui.components.DetailScaffold
@@ -64,12 +69,16 @@ import id.diskola.app.ui.navigation.Route
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
+import id.diskola.app.utils.AssignmentInput
+import id.diskola.app.utils.AssignmentPayload
+import id.diskola.app.viewmodel.TugasFormDialog
 import id.diskola.app.viewmodel.UploadTugasViewModel
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -79,9 +88,12 @@ import java.io.File
 
 private val END_AT_DISPLAY_FORMATTER = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm", Locale("id"))
 
-/** `CreateHomeworkPage` (doc §6.4) — 3 modes (create/edit/detail) via `route.editable`. Kelas→Hari→
- * Mapel cascade; edit mode's deadline always defaults to "now" rather than attempting to parse the
- * server's display-label string (decision, see `UploadTugasViewModel`'s doc comment). */
+/**
+ * "Buat/Edit/Detail Tugas" of the teacher (`CreateHomeworkPage`, doc §6.4) — 3 modes via `route.editable`/`route.isEdit`, and two forms by the
+ * teacher's data scope (see [UploadTugasViewModel]): Kelas → Hari → Mata Pelajaran, or Kelas + Mata Pelajaran. The deadline has no default (the
+ * teacher must choose it), the description is required, and "Posting" does not wait for the link preview. Messages of a 422 appear under their
+ * field; the draft stays as it is.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UploadTugasScreen(
@@ -91,77 +103,100 @@ fun UploadTugasScreen(
     viewModel: UploadTugasViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
+    val zone = ZoneId.systemDefault()
 
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var selectedClassId by remember { mutableStateOf<Int?>(null) }
-    var selectedDay by remember { mutableStateOf<String?>(null) }
-    var selectedScheduleId by remember { mutableStateOf<Int?>(null) }
-    var selectedSubjectId by remember { mutableStateOf<Int?>(null) }
-    var endAt by remember { mutableStateOf(LocalDateTime.now()) }
+    var dueAtMillis by remember { mutableStateOf<Long?>(null) }
+    var pendingDate by remember { mutableStateOf<LocalDate?>(null) }
     var attachSoal by remember { mutableStateOf(false) }
     var requireRead by remember { mutableStateOf(false) }
     var requireUpload by remember { mutableStateOf(false) }
     var link by remember { mutableStateOf("") }
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
     var selectedFileName by remember { mutableStateOf<String?>(null) }
+    var selectedFileSize by remember { mutableStateOf<Long?>(null) }
     var prefilled by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var touchedClass by remember { mutableStateOf(false) }
     var touchedDay by remember { mutableStateOf(false) }
-    var touchedSchedule by remember { mutableStateOf(false) }
+    var touchedSubject by remember { mutableStateOf(false) }
 
+    val restricted by viewModel.restricted.collectAsStateWithLifecycle()
     val classes by viewModel.classes.collectAsStateWithLifecycle()
     val days by viewModel.days.collectAsStateWithLifecycle()
     val schedules by viewModel.schedules.collectAsStateWithLifecycle()
-    val existing by viewModel.existing.collectAsStateWithLifecycle()
-    val uploadSuccess by viewModel.uploadSuccess.collectAsStateWithLifecycle()
+    val subjects by viewModel.subjects.collectAsStateWithLifecycle()
+    val selection by viewModel.selection.collectAsStateWithLifecycle()
+    val initialLoading by viewModel.initialLoading.collectAsStateWithLifecycle()
+    val scheduleLoading by viewModel.scheduleLoading.collectAsStateWithLifecycle()
+    val submitting by viewModel.submitting.collectAsStateWithLifecycle()
+    val prefill by viewModel.prefill.collectAsStateWithLifecycle()
+    val fieldErrors by viewModel.fieldErrors.collectAsStateWithLifecycle()
+    val dialog by viewModel.dialog.collectAsStateWithLifecycle()
+    val finished by viewModel.finished.collectAsStateWithLifecycle()
     val linkPreview by viewModel.linkPreview.collectAsStateWithLifecycle()
     val linkPreviewLoading by viewModel.linkPreviewLoading.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
-    val loading by viewModel.loading.collectAsStateWithLifecycle()
 
-    LaunchedEffect(Unit) {
-        viewModel.loadReferenceData()
-        if (route.isEdit && route.tugasId > 0) viewModel.loadExisting(route.tugasId)
+    val assigned = restricted != false
+
+    LaunchedEffect(Unit) { viewModel.start(if (route.isEdit && route.tugasId > 0) route.tugasId else 0) }
+    LaunchedEffect(Unit) { viewModel.toasts.collect { Toast.makeText(context, it, Toast.LENGTH_LONG).show() } }
+    LaunchedEffect(prefill) {
+        val ready = prefill ?: return@LaunchedEffect
+        if (prefilled) return@LaunchedEffect
+        prefilled = true
+        val item = ready.table
+        title = item.title
+        description = item.description
+        link = item.link
+        dueAtMillis = ready.dueAtMillis
+        requireRead = item.downloded > 0
+        requireUpload = item.uploaded > 0
+        attachSoal = item.file_name.isNotBlank() || item.link.isNotBlank()
+        selectedFileName = item.file_name.takeIf { it.isNotBlank() }
     }
-    LaunchedEffect(existing) {
-        val item = existing
-        if (item != null && !prefilled) {
-            prefilled = true
-            title = item.title
-            description = item.description
-            link = item.link
-            selectedClassId = item.class_id.takeIf { it > 0 }
-            selectedSubjectId = item.subject_id.takeIf { it > 0 }
-            selectedScheduleId = item.schedule_id.takeIf { it > 0 }
-            requireRead = item.downloded > 0
-            requireUpload = item.uploaded > 0
-            attachSoal = item.file_name.isNotBlank() || item.link.isNotBlank()
-            selectedFileName = item.file_name.takeIf { it.isNotBlank() }
-            // Decision: deadline always defaults to "now" in edit mode — the server's `end_at_label`
-            // is a display string, not guaranteed parseable back into a real date.
-        }
+    // Saved, or the task is gone: say so (if there is something to say), then leave; the list refreshes behind us.
+    LaunchedEffect(finished) {
+        val close = finished ?: return@LaunchedEffect
+        close.toast?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
+        onDone()
     }
-    LaunchedEffect(uploadSuccess) { if (uploadSuccess) onDone() }
     LaunchedEffect(link) { viewModel.onLinkChanged(link) }
 
     val filePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri ?: return@rememberLauncherForActivityResult
-        val (name, _) = queryTugasFileInfo(context, uri)
+        val (name, size) = queryTugasFileInfo(context, uri)
+        if (size != null && size > AssignmentPayload.MAX_FILE_BYTES) {
+            Toast.makeText(context, "Ukuran file maksimal 12 MB", Toast.LENGTH_LONG).show()
+            return@rememberLauncherForActivityResult
+        }
         selectedFileUri = uri
         selectedFileName = name ?: "soal"
+        selectedFileSize = size
     }
 
-    val selectedClass = classes.find { it.id == selectedClassId }
     val hasAttachment = selectedFileUri != null || selectedFileName != null || link.isNotBlank()
-    val canSubmit = title.isNotBlank() &&
-        (selectedSubjectId ?: 0) > 0 &&
-        (selectedClassId ?: 0) > 0 &&
-        !selectedDay.isNullOrBlank() &&
-        (selectedScheduleId ?: 0) > 0 &&
-        (!attachSoal || hasAttachment)
+    val input = AssignmentInput(
+        restricted = restricted,
+        classId = selection.classId,
+        subjectId = selection.subjectId,
+        day = selection.day,
+        scheduleId = selection.scheduleId,
+        title = title,
+        description = description,
+        dueAt = dueAtMillis,
+        // File, link and "must read" belong to "Upload Soal": switched off, none of them is sent.
+        link = if (attachSoal) link else "",
+        needDownload = attachSoal && hasAttachment && requireRead,
+        needUpload = requireUpload,
+        uploadFile = attachSoal,
+        hasFile = attachSoal && (selectedFileUri != null || selectedFileName != null),
+        fileSizeBytes = if (attachSoal) selectedFileSize else null,
+    )
+    val canSubmit = AssignmentPayload.validate(input).isEmpty() && !submitting && !scheduleLoading && !initialLoading
 
     DetailScaffold(
         title = if (!route.editable) "Detail Tugas" else if (route.isEdit) "Edit Tugas" else "Buat Tugas",
@@ -174,25 +209,17 @@ fun UploadTugasScreen(
                     AppButton(
                         text = "Posting Tugas",
                         onClick = {
-                            val parts = selectedFileUri?.let { uri -> buildTugasFilePart(context, uri, selectedFileName ?: "soal") }
+                            val fileUri = selectedFileUri
+                            val fileName = selectedFileName ?: "soal"
                             viewModel.submit(
                                 isEdit = route.isEdit,
                                 tugasId = route.tugasId,
-                                title = title,
-                                description = description,
-                                classId = selectedClassId ?: 0,
-                                subjectId = selectedSubjectId ?: 0,
-                                scheduleId = selectedScheduleId ?: 0,
-                                grade = selectedClass?.grade ?: 0,
-                                endAt = endAt,
-                                requireRead = requireRead,
-                                requireUpload = requireUpload,
-                                link = link,
-                                filePart = parts,
+                                input = input,
+                                buildFile = if (attachSoal && fileUri != null) ({ buildTugasFilePart(context, fileUri, fileName) }) else null,
                             )
                         },
                         enabled = canSubmit,
-                        loading = loading,
+                        loading = submitting,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -214,48 +241,59 @@ fun UploadTugasScreen(
                 FieldLabel("Kelas", required = true)
                 SimpleDropdown(
                     options = classes.map { it.id to (if (it.grade > 0) "${it.grade} - ${it.name}" else it.name) },
-                    selected = selectedClassId,
+                    selected = selection.classId.takeIf { it > 0 },
                     placeholder = "Pilih Kelas",
+                    enabled = route.editable,
                     onSelected = {
-                        selectedClassId = it
-                        selectedDay = null
-                        selectedScheduleId = null
-                        selectedSubjectId = null
                         touchedClass = true
-                        viewModel.onClassSelected()
+                        viewModel.selectClass(it)
                     },
                 )
-                if (touchedClass && selectedClassId == null) ErrorText("Kelas wajib dipilih")
+                (fieldErrors["school_class_id"] ?: "Kelas wajib dipilih".takeIf { touchedClass && selection.classId <= 0 })?.let { ErrorText(it) }
 
-                FieldLabel("Hari Mata Pelajaran", required = true)
-                SimpleDropdown(
-                    options = days.mapIndexed { index, d -> index to d.lable.ifBlank { d.key } },
-                    selected = days.indexOfFirst { it.key == selectedDay }.takeIf { it >= 0 },
-                    placeholder = "Pilih Hari Mata Pelajaran",
-                    onSelected = { index ->
-                        val day = days.getOrNull(index)?.key.orEmpty()
-                        selectedDay = day
-                        selectedScheduleId = null
-                        selectedSubjectId = null
-                        touchedDay = true
-                        selectedClassId?.let { viewModel.onDaySelected(it, day) }
-                    },
-                    modifier = Modifier,
-                )
-                if (touchedDay && selectedDay.isNullOrBlank()) ErrorText("Hari Mata Pelajaran wajib dipilih")
+                if (assigned) {
+                    FieldLabel("Hari Mata Pelajaran", required = true)
+                    SimpleDropdown(
+                        options = days.mapIndexed { index, d -> index to d.lable.ifBlank { d.key } },
+                        selected = days.indexOfFirst { it.key == selection.day }.takeIf { it >= 0 },
+                        placeholder = "Pilih Hari Mata Pelajaran",
+                        enabled = route.editable && selection.classId > 0,
+                        onSelected = { index ->
+                            touchedDay = true
+                            viewModel.selectDay(days.getOrNull(index)?.key.orEmpty())
+                        },
+                    )
+                    (fieldErrors["day"] ?: "Hari Mata Pelajaran wajib dipilih".takeIf { touchedDay && selection.day.isBlank() })?.let { ErrorText(it) }
 
-                FieldLabel("Mata Pelajaran", required = true)
-                SimpleDropdown(
-                    options = schedules.map { it.id to "[${it.time_plot.start_at} - ${it.time_plot.end_at}] ${it.subject.name}" },
-                    selected = selectedScheduleId,
-                    placeholder = "Pilih Mata Pelajaran",
-                    onSelected = { id ->
-                        selectedScheduleId = id
-                        selectedSubjectId = schedules.find { it.id == id }?.subject?.id
-                        touchedSchedule = true
-                    },
-                )
-                if (touchedSchedule && (selectedScheduleId ?: 0) <= 0) ErrorText("Mata Pelajaran wajib dipilih")
+                    FieldLabel("Mata Pelajaran", required = true)
+                    SimpleDropdown(
+                        options = schedules.map { it.id to "[${it.time_plot.start_at} - ${it.time_plot.end_at}] ${it.subject.name}" },
+                        selected = selection.scheduleId.takeIf { it > 0 },
+                        placeholder = "Pilih Mata Pelajaran",
+                        enabled = route.editable && selection.classId > 0 && selection.day.isNotBlank(),
+                        onSelected = {
+                            touchedSubject = true
+                            viewModel.selectSchedule(it)
+                        },
+                    )
+                    if (scheduleLoading) {
+                        Text("Memuat jadwal…", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    (fieldErrors["school_subject_id"] ?: "Mata Pelajaran wajib dipilih".takeIf { touchedSubject && selection.scheduleId <= 0 })?.let { ErrorText(it) }
+                } else {
+                    FieldLabel("Mata Pelajaran", required = true)
+                    SimpleDropdown(
+                        options = subjects.map { it.id to it.name },
+                        selected = selection.subjectId.takeIf { it > 0 },
+                        placeholder = "Pilih Mata Pelajaran",
+                        enabled = route.editable,
+                        onSelected = {
+                            touchedSubject = true
+                            viewModel.selectSubject(it)
+                        },
+                    )
+                    (fieldErrors["school_subject_id"] ?: "Mata Pelajaran wajib dipilih".takeIf { touchedSubject && selection.subjectId <= 0 })?.let { ErrorText(it) }
+                }
             }
 
             FormCard {
@@ -270,24 +308,39 @@ fun UploadTugasScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(Icons.Rounded.CalendarMonth, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Text(endAt.format(END_AT_DISPLAY_FORMATTER), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = Spacing.md))
+                    val chosen = dueAtMillis
+                    Text(
+                        chosen?.let { END_AT_DISPLAY_FORMATTER.format(Instant.ofEpochMilli(it).atZone(zone)) } ?: "Pilih waktu berakhir",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (chosen == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(start = Spacing.md),
+                    )
                 }
+                fieldErrors["end_at"]?.let { ErrorText(it) }
             }
 
             FormCard {
                 FieldLabel("Judul Tugas", required = true, counter = "${title.length}/500")
                 AppTextField(
                     value = title,
-                    onValueChange = { if (it.length <= 500) title = it },
+                    onValueChange = {
+                        if (it.length <= 500) title = it
+                        viewModel.clearFieldError("title")
+                    },
                     placeholder = "Ketik Judul tugas",
+                    errorText = fieldErrors["title"],
                     enabled = route.editable,
                 )
 
-                FieldLabel("Deskripsi", required = false)
+                FieldLabel("Deskripsi", required = true)
                 AppTextField(
                     value = description,
-                    onValueChange = { description = it },
+                    onValueChange = {
+                        description = it
+                        viewModel.clearFieldError("description")
+                    },
                     placeholder = "Ketik deskripsi tugas",
+                    errorText = fieldErrors["description"],
                     enabled = route.editable,
                 )
             }
@@ -301,14 +354,25 @@ fun UploadTugasScreen(
                     Text("Upload Soal", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
                 }
                 if (attachSoal) {
-                    Text("File dalam format pdf", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("File dalam format pdf, maksimal 12 MB", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     TugasFileDropZone(
                         fileName = selectedFileName,
                         onPick = { if (route.editable) filePickerLauncher.launch(arrayOf("application/pdf")) },
-                        onClear = { selectedFileUri = null; selectedFileName = null },
+                        onClear = {
+                            selectedFileUri = null
+                            selectedFileName = null
+                            selectedFileSize = null
+                        },
                     )
                     FieldLabel("Url Link", required = false)
-                    AppTextField(value = link, onValueChange = { link = it }, placeholder = "Ketik url", enabled = route.editable)
+                    AppTextField(
+                        value = link,
+                        onValueChange = { link = it },
+                        placeholder = "Ketik url",
+                        errorText = fieldErrors["link"],
+                        enabled = route.editable,
+                    )
+                    // The preview only informs: "Posting" never waits for it.
                     if (link.isNotBlank()) {
                         LinkPreviewCard(url = link, loading = linkPreviewLoading, data = linkPreview, onClick = { openLink(context, link) })
                     }
@@ -334,21 +398,25 @@ fun UploadTugasScreen(
     }
 
     if (showDatePicker) {
-        val state = rememberDatePickerState(initialSelectedDateMillis = endAt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
+        val today = LocalDate.now()
+        val todayUtc = today.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        val initialDate = dueAtMillis?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() } ?: today
+        // The date picker speaks UTC midnight: the chosen day is converted both ways in UTC so it never slips a day near midnight.
+        val state = rememberDatePickerState(
+            initialSelectedDateMillis = initialDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long): Boolean = utcTimeMillis >= todayUtc
+                override fun isSelectableYear(year: Int): Boolean = year >= today.year
+            },
+        )
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    val millis = state.selectedDateMillis
-                    if (millis != null) {
-                        val date = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
-                        if (date.isAfter(LocalDate.now()) || date.isEqual(LocalDate.now())) {
-                            endAt = LocalDateTime.of(date, endAt.toLocalTime())
-                        }
-                    }
+                    state.selectedDateMillis?.let { pendingDate = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate() }
                     showDatePicker = false
-                    showTimePicker = true
-                }) { Text("Batas pengumpulan") }
+                    if (pendingDate != null) showTimePicker = true
+                }) { Text("Lanjut") }
             },
             dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Batal") } },
         ) {
@@ -357,7 +425,8 @@ fun UploadTugasScreen(
     }
 
     if (showTimePicker) {
-        val timeState = rememberTimePickerState(initialHour = endAt.hour, initialMinute = endAt.minute, is24Hour = true)
+        val initialTime = dueAtMillis?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalTime() } ?: LocalTime.now()
+        val timeState = rememberTimePickerState(initialHour = initialTime.hour, initialMinute = initialTime.minute, is24Hour = true)
         Dialog(onDismissRequest = { showTimePicker = false }) {
             Column(
                 modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerLowest, DiskolaExtraShapes.card).padding(Spacing.xl),
@@ -368,12 +437,41 @@ fun UploadTugasScreen(
                 Row(modifier = Modifier.padding(top = Spacing.lg)) {
                     TextButton(onClick = { showTimePicker = false }) { Text("Batal") }
                     TextButton(onClick = {
-                        endAt = LocalDateTime.of(endAt.toLocalDate(), LocalTime.of(timeState.hour, timeState.minute))
+                        val date = pendingDate ?: LocalDate.now()
+                        dueAtMillis = LocalDateTime.of(date, LocalTime.of(timeState.hour, timeState.minute)).atZone(zone).toInstant().toEpochMilli()
+                        viewModel.clearFieldError("end_at")
                         showTimePicker = false
                     }) { Text("Simpan") }
                 }
             }
         }
+    }
+
+    if (initialLoading) AppLoadingDialog(message = "Mohon tunggu")
+    if (submitting) AppLoadingDialog(message = if (route.isEdit) "Sedang menyimpan tugas" else "Sedang membuat tugas")
+    when (val shown = dialog) {
+        is TugasFormDialog.Blocked -> AppDialog(
+            onDismiss = viewModel::dismissDialog,
+            title = "Akses diblokir",
+            body = shown.message + (shown.traceId?.let { "\n\nID: $it" } ?: ""),
+            primaryButtonText = "Mengerti",
+            onPrimaryClick = viewModel::dismissDialog,
+        )
+        is TugasFormDialog.Invalid -> AppDialog(
+            onDismiss = viewModel::dismissDialog,
+            title = "Periksa kembali isian",
+            body = shown.text,
+            primaryButtonText = "Mengerti",
+            onPrimaryClick = viewModel::dismissDialog,
+        )
+        is TugasFormDialog.Failed -> AppDialog(
+            onDismiss = viewModel::dismissDialog,
+            title = "Gagal menyimpan tugas",
+            body = shown.text,
+            primaryButtonText = "Mengerti",
+            onPrimaryClick = viewModel::dismissDialog,
+        )
+        null -> Unit
     }
 }
 

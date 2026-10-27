@@ -38,3 +38,8 @@
 # Silence Room warnings (optional)
 -dontwarn androidx.room.**
  
+
+# LaTeX formulas in exam questions (doc 06 §5.8): JLaTeXMath reads its fonts/symbols by name and ships no consumer rules,
+# so R8 would otherwise strip or rename them and every formula would fail to draw in a release build.
+-keep class org.scilab.forge.jlatexmath.** { *; }
+-keep class ru.noties.jlatexmath.** { *; }

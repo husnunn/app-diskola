@@ -13,6 +13,8 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 /** Placeholder scaffolding: request/response shapes not yet defined, no UI consumer yet. */
+// Retrofit rejects the wildcard Kotlin writes for `Map<String, Any>` in a parameter (ApiServiceSignatureTest).
+@JvmSuppressWildcards
 interface SosmedApiService {
 
     @Multipart

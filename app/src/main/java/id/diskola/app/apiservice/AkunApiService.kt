@@ -17,6 +17,8 @@ import retrofit2.http.Query
  * Typed so far: `updateProfile` and `changePassword` (the e-mail / default-password dialogs in front of wallet activation). The rest
  * is placeholder scaffolding for the Akun phase.
  */
+// Retrofit rejects the wildcard Kotlin writes for `Map<String, Any>` in a parameter (ApiServiceSignatureTest).
+@JvmSuppressWildcards
 interface AkunApiService {
 
     @GET("mobile/app/accounts/user/{userId}")

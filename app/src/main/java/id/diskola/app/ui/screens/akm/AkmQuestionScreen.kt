@@ -50,6 +50,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -93,6 +95,8 @@ import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
 import id.diskola.app.ui.theme.extendedColors
 import id.diskola.app.utils.AkmPenaltyRules
+import id.diskola.app.utils.AkmQuestionRules
+import id.diskola.app.utils.NextButtonMode
 import id.diskola.app.viewmodel.AkmQuestionViewModel
 import kotlinx.coroutines.delay
 
@@ -227,6 +231,7 @@ fun AkmQuestionScreen(
 
                 MathHtmlText(
                     question.text,
+                    dataValueFormulas = true,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurface,
                 )
@@ -348,11 +353,33 @@ fun AkmQuestionScreen(
                     enabled = index > 0,
                     modifier = Modifier.weight(1f),
                 )
+                // The right-hand button is always in the layout, so its place never changes; hidden, it is only invisible and dead.
+                val nextMode = AkmQuestionRules.nextButtonMode(
+                    position = index,
+                    questionCount = questions.size,
+                    penaltyActive = penalty != null,
+                    isExplanation = false,
+                    allowFinish = AkmRules.allAnswered(questions.map { it.id }, answers.keys),
+                    // Whether the pin was lost is only known to a checkpoint (never run while composing); a lost pin shows the recovery dialog.
+                    hasBreach = sessionState.recovery != null,
+                )
                 AppButton(
-                    text = "Berikutnya",
-                    onClick = { if (session.checkpoint("next_soal")) viewModel.nextQuestion() },
-                    enabled = index < questions.lastIndex,
-                    modifier = Modifier.weight(1f),
+                    text = if (nextMode == NextButtonMode.FINISH) "Selesai" else "Berikutnya",
+                    onClick = {
+                        if (nextMode == NextButtonMode.FINISH) {
+                            // Same as the back arrow: back to the lobby, where "Kumpulkan" is (this does not hand in anything).
+                            if (session.checkpoint("menu_kumpulkan")) {
+                                viewModel.flush()
+                                onBack()
+                            }
+                        } else if (session.checkpoint("next_soal")) {
+                            viewModel.nextQuestion()
+                        }
+                    },
+                    enabled = nextMode != NextButtonMode.HIDDEN,
+                    modifier = Modifier
+                        .weight(1f)
+                        .then(if (nextMode == NextButtonMode.HIDDEN) Modifier.alpha(0f).clearAndSetSemantics { } else Modifier),
                 )
             }
         }

@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import id.diskola.app.dataclass.ResponData.HomeworkCollected
 import id.diskola.app.repository.TugasRepository
+import id.diskola.app.utils.session.SessionStore
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.stateIn
 @HiltViewModel
 class TugasPenilaianViewModel @Inject constructor(
     private val repository: TugasRepository,
+    private val sessionStore: SessionStore,
 ) : BaseViewModel() {
 
     val scoredGroups: StateFlow<List<HomeworkCollected>> =
@@ -30,12 +32,15 @@ class TugasPenilaianViewModel @Inject constructor(
     /** Runs once per backstack entry, not once per composition — see `TugasGuruViewModel`'s
      * `init` doc comment for why this must not also be called from a `LaunchedEffect(Unit)`. */
     init {
-        launchWithHandling(showLoading = false) {
-            _listLoading.value = true
-            try {
-                repository.ensureScoredGroupsFirstPage()
-            } finally {
-                _listLoading.value = false
+        // An account without teacher data is stopped by the screen; it does not ask the teacher endpoints for anything.
+        if (sessionStore.canManageAssignments) {
+            launchWithHandling(showLoading = false) {
+                _listLoading.value = true
+                try {
+                    repository.ensureScoredGroupsFirstPage()
+                } finally {
+                    _listLoading.value = false
+                }
             }
         }
     }

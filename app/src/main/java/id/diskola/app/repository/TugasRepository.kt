@@ -1,21 +1,29 @@
 package id.diskola.app.repository
 
+import id.diskola.app.apiservice.JurnalApiService
 import id.diskola.app.apiservice.TugasApiService
 import id.diskola.app.dataclass.ResponData.AssignmentData
 import id.diskola.app.dataclass.ResponData.AssignmentDay
 import id.diskola.app.dataclass.ResponData.AssignmentSchedule
+import id.diskola.app.dataclass.ResponData.ClassRoomTable
 import id.diskola.app.dataclass.ResponData.HomeworkAnswerFileTable
 import id.diskola.app.dataclass.ResponData.HomeworkCollected
 import id.diskola.app.dataclass.ResponData.HomeworkCreateResponse
 import id.diskola.app.dataclass.ResponData.HomeworkTable
+import id.diskola.app.dataclass.ResponData.MapelItem
+import id.diskola.app.dataclass.ResponData.TeacherDataScope
 import id.diskola.app.dataclass.localDb.HomeworkDao
+import id.diskola.app.utils.AssignmentFilter
 import id.diskola.app.utils.session.SessionStore
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 
 private const val PAGE_SIZE = 10
+private const val SUBJECT_PAGE_SIZE = 100
 
 /**
  * Tugas's local-only 10/page tabs (doc `05-pembelajaran-materi-tugas.md` §5.5/§6) — same
@@ -25,6 +33,7 @@ private const val PAGE_SIZE = 10
  */
 class TugasRepository @Inject constructor(
     private val tugasApiService: TugasApiService,
+    private val jurnalApiService: JurnalApiService,
     private val homeworkDao: HomeworkDao,
     private val sessionStore: SessionStore,
 ) {
@@ -122,24 +131,9 @@ class TugasRepository @Inject constructor(
         return fetchTeacherOwnPage(teacherId, subjectId, classId, 0)
     }
 
-    /** Filter kirim literal `0` untuk "Semua" (bukan dihilangkan) — tiru app lama persis, keputusan
-     * user eksplisit (bukan bug yang diperbaiki di sini). */
+    /** "Semua" (null/0) sends no filter and the indices stay in sequence — see [AssignmentFilter] (decision 2026-10-22; replaces the literal `0`). */
     private suspend fun fetchTeacherOwnPage(teacherId: Int, subjectId: Int?, classId: Int?, skip: Int): Boolean {
-        val filter = buildMap {
-            put("take", PAGE_SIZE.toString())
-            put("skip", skip.toString())
-            put("filter[0][0]", "teacher_id")
-            put("filter[0][1]", "=")
-            put("filter[0][2]", teacherId.toString())
-            put("filter[1]", "and")
-            put("filter[2][0]", "school_classes_id")
-            put("filter[2][1]", "=")
-            put("filter[2][2]", (classId ?: 0).toString())
-            put("filter[3]", "and")
-            put("filter[4][0]", "school_subject_id")
-            put("filter[4][1]", "=")
-            put("filter[4][2]", (subjectId ?: 0).toString())
-        }
+        val filter = AssignmentFilter.teacherListQuery(teacherId, classId, subjectId, PAGE_SIZE, skip)
         val response = tugasApiService.teacherAssignmentBacklog(filter)
         homeworkDao.insertAll(response.data.map { HomeworkTable.fromHomeworkItem(it, HomeworkTable.TYPE_BACKLOG).copy(school_uuid = sessionStore.school.uuid) })
         return response.data.size >= PAGE_SIZE
@@ -147,16 +141,52 @@ class TugasRepository @Inject constructor(
 
     // ---- Form buat/edit ----
 
+    /**
+     * What this teacher may see in the form (`GET mobile/attendance/teacher-data-scope`). Read on every open and **never** cached: the
+     * Presensi/Jurnal copy falls back to "all" when it fails, the opposite of what this form needs (a failure must read as restricted).
+     */
+    suspend fun fetchTeacherScope(): TeacherDataScope? = jurnalApiService.teacherDataScope().data
+
+    /**
+     * The classes of the form, from `teachers/class`. They are **not** written to Room: the `classroom` table is shared with Materi and the
+     * filter screens, and what this list holds depends on the teacher's scope.
+     */
+    suspend fun fetchFormClasses(): List<ClassRoomTable> =
+        tugasApiService.teacherAssignmentClass().data.sortedWith(compareBy<ClassRoomTable> { it.grade }.thenBy { it.name.lowercase() })
+
+    /** Free-mode subjects, page by page (100), until a short page or a page with nothing new; duplicates dropped, sorted by name. */
+    suspend fun fetchFormSubjects(): List<MapelItem> {
+        val all = LinkedHashMap<Int, MapelItem>()
+        var skip = 0
+        while (true) {
+            val page = tugasApiService.teacherAssignmentSubject(take = SUBJECT_PAGE_SIZE, skip = skip).data
+            val before = all.size
+            page.forEach { all.putIfAbsent(it.id, it) }
+            if (page.size < SUBJECT_PAGE_SIZE || all.size == before) break
+            skip += SUBJECT_PAGE_SIZE
+        }
+        return all.values.sortedBy { it.name.lowercase() }
+    }
+
     suspend fun fetchScheduleDays(): List<AssignmentDay> = tugasApiService.teacherAssignmentScheduleDay().data
 
     suspend fun fetchSchedule(classId: Int, day: String): List<AssignmentSchedule> =
         tugasApiService.teacherAssignmentSchedule(classId, day).data
 
-    suspend fun createTugas(data: Map<String, RequestBody>, file: MultipartBody.Part?): HomeworkCreateResponse =
-        tugasApiService.createAssignment(data, file)
+    /** [fields] are the canonical keys of `AssignmentPayload.fields`; each goes as a plain-text part. */
+    suspend fun createTugas(fields: Map<String, String>, file: MultipartBody.Part?): HomeworkCreateResponse =
+        tugasApiService.createAssignment(fields.asTextParts(), file)
 
-    suspend fun updateTugas(id: Int, data: Map<String, RequestBody>, file: MultipartBody.Part?): HomeworkCreateResponse =
-        tugasApiService.updateAssignment(id, data, file)
+    suspend fun updateTugas(id: Int, fields: Map<String, String>, file: MultipartBody.Part?): HomeworkCreateResponse =
+        tugasApiService.updateAssignment(id, fields.asTextParts(), file)
+
+    /** The server no longer knows this task (404 on update): its row on this phone goes too. */
+    suspend fun forgetLocalTugas(id: Int) = homeworkDao.deleteById(id)
+
+    private fun Map<String, String>.asTextParts(): Map<String, RequestBody> {
+        val plain = "text/plain".toMediaTypeOrNull()
+        return mapValues { it.value.toRequestBody(plain) }
+    }
 
     suspend fun deleteTugas(id: Int) {
         tugasApiService.deleteAssignment(id)

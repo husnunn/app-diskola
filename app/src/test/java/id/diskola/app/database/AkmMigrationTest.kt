@@ -24,6 +24,7 @@ class AkmMigrationTest {
 
     private val v8 by lazy { schema(8) }
     private val v9 by lazy { schema(9) }
+    private val v10 by lazy { schema(10) }
 
     @Suppress("UNCHECKED_CAST")
     private fun entity(schema: Map<String, Any?>, table: String): Map<String, Any?> {
@@ -92,5 +93,30 @@ class AkmMigrationTest {
     fun `the second migration spans exactly 8 to 9`() {
         assertEquals(8, MIGRATION_8_9.startVersion)
         assertEquals(9, MIGRATION_8_9.endVersion)
+    }
+
+    // ---- v9 -> v10 (teacher-task cache) ----
+
+    @Test
+    fun `the added homework column appears in the exported table with the same definition`() {
+        assertTrue(createSql(v10, "homework").contains("`schedule_day` TEXT NOT NULL DEFAULT ''"))
+        assertTrue(HomeworkMigrationSql.ADD_SCHEDULE_DAY.endsWith("schedule_day TEXT NOT NULL DEFAULT ''"))
+        assertTrue(HomeworkMigrationSql.ADD_SCHEDULE_DAY.startsWith("ALTER TABLE homework ADD COLUMN"))
+    }
+
+    @Test
+    fun `version 10 changes the homework table and nothing else — the exam tables are untouched`() {
+        @Suppress("UNCHECKED_CAST")
+        val tables = ((v9["database"] as Map<String, Any?>)["entities"] as List<Map<String, Any?>>).map { it["tableName"] as String }
+        assertTrue(tables.contains("akm_violation") && tables.contains("akm_answer"))
+        tables.filter { it != "homework" }.forEach { table ->
+            assertEquals(table, createSql(v9, table), createSql(v10, table))
+        }
+    }
+
+    @Test
+    fun `the third migration spans exactly 9 to 10`() {
+        assertEquals(9, MIGRATION_9_10.startVersion)
+        assertEquals(10, MIGRATION_9_10.endVersion)
     }
 }

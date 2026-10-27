@@ -19,13 +19,19 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.Spacing
+import id.diskola.app.utils.BannerRules
+import kotlinx.coroutines.delay
 
 /** Skeleton rows shown while a screen's first load is in flight. */
 @Composable
@@ -155,9 +161,19 @@ private fun StateScaffold(
     }
 }
 
-/** Dismissible inline error banner. */
+/**
+ * Inline error banner: the X clears it at once, otherwise it clears itself after [BannerRules.autoDismissMillis] (stretched when the system
+ * asks for more time to read, e.g. with TalkBack) — a new message restarts the clock.
+ */
 @Composable
 fun BannerError(message: String, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+    val latestOnDismiss by rememberUpdatedState(onDismiss)
+    val accessibility = LocalAccessibilityManager.current
+    LaunchedEffect(message) {
+        val base = BannerRules.autoDismissMillis(message)
+        delay(accessibility?.calculateRecommendedTimeoutMillis(base, containsIcons = true, containsText = true, containsControls = true) ?: base)
+        latestOnDismiss()
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()

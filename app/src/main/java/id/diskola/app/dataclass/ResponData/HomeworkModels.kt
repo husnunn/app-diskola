@@ -1,6 +1,7 @@
 package id.diskola.app.dataclass.ResponData
 
 import id.diskola.app.di.module.NullToEmptyString
+import id.diskola.app.di.module.NullToZeroInt
 
 import androidx.annotation.Keep
 import androidx.room.*
@@ -55,7 +56,8 @@ data class HomeworkItem(
     @Json(name = "class") val classRoom: ClassRoomTable = ClassRoomTable(),
     val uri: MateriLink? = null,
     val uri_student: MateriLink? = null,
-    val schedule: AssignmentSchedule = AssignmentSchedule(),
+    /** Null for a task made for a whole class (free mode): it has no schedule. */
+    val schedule: AssignmentSchedule? = null,
     // change to file_edited because backend not ready yet
 //    val is_explanations: Boolean = false,
 //    val explanations: Explanations = Explanations(),
@@ -121,6 +123,8 @@ data class HomeworkTable(
     val class_id: Int = 0,
     val class_name: String = "",
     val schedule_id: Int = 0,
+    /** `schedule.day` of the task (`senin`…), so editing an assigned-mode task can load its schedule list again; empty for a free-mode task. */
+    @ColumnInfo(defaultValue = "''") val schedule_day: String = "",
     val link: String = "",
     val link_student: String = "",
     /** Doc §5.4: only rows whose `school.uuid` matches the current session school are kept. */
@@ -158,7 +162,8 @@ data class HomeworkTable(
             teacher_name = it.teacher.name,
             class_id = it.classRoom.id,
             class_name = it.classRoom.name,
-            schedule_id = it.schedule.id,
+            schedule_id = it.schedule?.id ?: 0,
+            schedule_day = it.schedule?.day.orEmpty(),
             link = it.uri?.link?.firstOrNull().orEmpty(),
             link_student = it.uri_student?.link?.firstOrNull().orEmpty(),
             school_uuid = it.school?.uuid.orEmpty(),
@@ -230,12 +235,12 @@ data class TugasStudentUser(@NullToEmptyString val avatar: String = "")
 @Keep
 @JsonClass(generateAdapter = true)
 data class Assignment(
-    val id: Int = 0,
-    val upload_at: String = "",
-    var score: Int = 0,
-    var scored: Int = 0,
-    val uploaded: Int = 0,
-    var scored_at: String = "",
+    @NullToZeroInt val id: Int = 0,
+    @NullToEmptyString val upload_at: String = "",
+    @NullToZeroInt var score: Int = 0,
+    @NullToZeroInt var scored: Int = 0,
+    @NullToZeroInt val uploaded: Int = 0,
+    @NullToEmptyString var scored_at: String = "",
     val file_name: String = "",
     val file_path: String = "",
     val file_format: String = "",
@@ -326,7 +331,7 @@ data class CollectHomeworkResponse(val data: CollectHomework = CollectHomework()
 
 @Keep
 @JsonClass(generateAdapter = true)
-data class CollectHomework(val id: Int = 0)
+data class CollectHomework(@NullToZeroInt val id: Int = 0)
 
 /** One file in [AssignmentAnswerDetailData.files] — `getAssignmentAnswerDetail`'s shape (doc §5.6
  * last row), reused for both the teacher-attached "soal" file and a student's "jawaban" files. */

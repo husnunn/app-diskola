@@ -13,6 +13,7 @@ import dagger.Provides
 import dagger.Reusable
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import id.diskola.app.dataclass.ResponData.AssignmentSchedule
 import java.lang.reflect.Type
 import java.util.Collections
 
@@ -76,6 +77,43 @@ object MoshiModule {
                 }
             })
 
+            // add adapter to null int: a number the backend left out of a row (e.g. `"id": null` on a submission whose ids were invalid) reads as 0
+            .add(object {
+                @ToJson
+                fun toJson(@NullToZeroInt value: Int): Int = value
+
+                @FromJson
+                @NullToZeroInt
+                fun fromJson(reader: JsonReader): Int =
+                    if (reader.peek() === JsonReader.Token.NULL) {
+                        reader.nextNull<Any>()
+                        0
+                    } else {
+                        reader.nextInt()
+                    }
+            })
+
+            // A task made for a whole class (free mode) has no schedule: the backend sends `null` — or an empty array, the way PHP encodes an
+            // empty map — instead of the schedule object. Either reads as "no schedule" instead of failing the whole page of tasks.
+            .add(object : JsonAdapter.Factory {
+                override fun create(type: Type, annotations: Set<Annotation>, moshi: Moshi): JsonAdapter<*>? {
+                    if (annotations.isNotEmpty() || Types.getRawType(type) != AssignmentSchedule::class.java) return null
+                    val delegate = moshi.nextAdapter<AssignmentSchedule>(this, type, annotations)
+                    return object : JsonAdapter<AssignmentSchedule>() {
+                        override fun fromJson(reader: JsonReader): AssignmentSchedule? = when (reader.peek()) {
+                            JsonReader.Token.NULL -> reader.nextNull()
+                            JsonReader.Token.BEGIN_ARRAY -> {
+                                reader.skipValue()
+                                null
+                            }
+                            else -> delegate.fromJson(reader)
+                        }
+
+                        override fun toJson(writer: JsonWriter, value: AssignmentSchedule?) = delegate.toJson(writer, value)
+                    }
+                }
+            })
+
 //            .add(object {
 //                @ToJson
 //                fun toJson(@JsonStringToInt value: Int?): Int? = value
@@ -114,9 +152,10 @@ annotation class NullToEmptyString
 //@Retention(AnnotationRetention.RUNTIME)
 //annotation class JsonStringToInt
 
-//@JsonQualifier
-//@Retention(AnnotationRetention.RUNTIME)
-//annotation class NullToInt
+/** `null` reads as `0` for an `Int` (see the adapter in [MoshiModule]). */
+@JsonQualifier
+@Retention(AnnotationRetention.RUNTIME)
+annotation class NullToZeroInt
 
 @JsonQualifier
 @Retention(AnnotationRetention.RUNTIME)

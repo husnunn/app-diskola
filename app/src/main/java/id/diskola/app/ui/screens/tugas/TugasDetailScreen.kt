@@ -119,6 +119,8 @@ fun TugasDetailScreen(
     val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
     val submitSuccess by viewModel.submitSuccess.collectAsStateWithLifecycle()
+    val submitting by viewModel.submitting.collectAsStateWithLifecycle()
+    val accessBlocked by viewModel.accessBlocked.collectAsStateWithLifecycle()
 
     var permissionDialogFor by remember { mutableStateOf<Triple<String, String, Boolean>?>(null) }
     var fileSizeError by remember { mutableStateOf<String?>(null) }
@@ -179,8 +181,8 @@ fun TugasDetailScreen(
                             val parts = selectedFiles.map { f -> buildAnswerFilePart(context, f) }
                             viewModel.submit(parts)
                         },
-                        enabled = allMet,
-                        loading = false,
+                        enabled = allMet && !submitting,
+                        loading = submitting,
                         modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm),
                     )
                 }
@@ -307,6 +309,16 @@ fun TugasDetailScreen(
                 }
             }
         }
+    }
+
+    accessBlocked?.let { blocked ->
+        AppDialog(
+            onDismiss = viewModel::dismissAccessBlocked,
+            title = "Akses diblokir",
+            body = blocked.message + (blocked.traceId?.let { "\n\nID: $it" } ?: ""),
+            primaryButtonText = "Mengerti",
+            onPrimaryClick = viewModel::dismissAccessBlocked,
+        )
     }
 
     if (notFound) {

@@ -18,6 +18,8 @@ import retrofit2.http.Query
  * The reference API also lists a buyer transaction-accept call made against an absolute URL
  * (not the configured base URL) — omitted here since its exact path wasn't specified.
  */
+// Retrofit rejects the wildcard Kotlin writes for `Map<String, Any>` in a parameter (ApiServiceSignatureTest).
+@JvmSuppressWildcards
 interface EntrepreneurApiService {
 
     // --- Katalog & pencarian ---

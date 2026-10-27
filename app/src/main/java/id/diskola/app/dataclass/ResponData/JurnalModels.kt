@@ -54,7 +54,18 @@ data class TeacherDataScopeResponse(val data: TeacherDataScope? = null)
 data class TeacherDataScope(
     val teacher_master_data_scope: String? = null,
     val scope: String? = null,
+    /** Shown by the backend as the name of the scope; informational. */
+    val label: String? = null,
+    /**
+     * Whether this teacher's classes and subjects are limited to their schedule. **This** — not [scope] — decides the shape of the Tugas
+     * form: dev showed `assigned/restricted=false` (a teacher with an extra role). Missing or `null` is read as limited, the safe side.
+     */
+    val restricted: Boolean? = null,
 ) {
+    /** `true` = the form offers class → day → subject from the schedule; only an explicit `false` opens the free form (class + subject). */
+    val isRestrictedForForm: Boolean
+        get() = restricted != false
+
     /** Only `assigned` is special; anything else (or blank) means every class/subject/plot is offered. */
     val isAssigned: Boolean
         get() = (teacher_master_data_scope?.takeIf { it.isNotBlank() } ?: scope).orEmpty().trim().equals("assigned", ignoreCase = true)

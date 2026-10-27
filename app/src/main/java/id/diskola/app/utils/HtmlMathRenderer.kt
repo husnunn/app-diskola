@@ -1,134 +1,175 @@
 package id.diskola.app.utils
 
-import android.content.Context
-import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.drawable.BitmapDrawable
+import android.graphics.ColorFilter
+import android.graphics.PixelFormat
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.text.Html
 import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.method.LinkMovementMethod
 import android.text.style.ImageSpan
+import android.util.LruCache
 import android.widget.TextView
+import androidx.annotation.ColorInt
 import androidx.core.text.HtmlCompat
 import org.scilab.forge.jlatexmath.TeXConstants
 import org.scilab.forge.jlatexmath.TeXFormula
 import org.scilab.forge.jlatexmath.TeXIcon
-import ru.noties.jlatexmath.awt.Graphics
-import kotlin.text.Regex
+import ru.noties.jlatexmath.awt.AndroidGraphics2D
+import timber.log.Timber
+import kotlin.math.roundToInt
+import ru.noties.jlatexmath.awt.Color as TexColor
 
-/** Verbatim port of `android-portal/.../utils/HtmlMathRenderer.kt` from the legacy app. */
+/**
+ * Menampilkan HTML yang berisi rumus LaTeX (`\(…\)`, `\[…\]`, `$$…$$`) pada [TextView].
+ *
+ * HTML di-parse lebih dulu, lalu tiap rumus pada teks polos hasilnya diganti [ImageSpan] yang
+ * menggambar rumus lewat JLaTeXMath. Pencarian rumus ada di [findMathRanges].
+ */
 object HtmlMathRenderer {
 
-    /** Matches a WYSIWYG math-plugin's `data-value="..."` attribute — the raw formula source. */
+    private const val PLACEHOLDER = "\uFFFC"
+
+    /** A WYSIWYG math plugin stores the formula source in `data-value="..."`; this is the attribute's value. */
     private val formulaDataValueRegex = Regex("(?<=data-value=\")(.*?)(?=\")")
 
-    // Patterns: $$...$$, \(...\), \[...\]
-    private val patternBlock = Regex("""\$\$(.+?)\$\$""", RegexOption.DOT_MATCHES_ALL)
-    private val patternInline = Regex("""\\\((.+?)\\\)""", RegexOption.DOT_MATCHES_ALL)
-    private val patternDisplay = Regex("""\\\[(.+?)\\\]""", RegexOption.DOT_MATCHES_ALL)
-
     /**
-     * Wraps any `data-value="..."` formula source in `\( ... \)` inline-math delimiters so
-     * [setTextWithMath] picks it up. Mirrors the `.replace(formulaRegex) { "\\(${it.value}\\)" }`
-     * call duplicated at every legacy ViewHolder call site (e.g. `QuestionTableVh.kt:105-106`).
+     * Wraps any `data-value="..."` formula source in `\( ... \)` so [setTextWithMath] picks it up. Legacy does this at the six question-text
+     * call sites only (`QuestionAdapter`), never for answers; [MathHtmlText] therefore asks for it only for the question text.
      */
     fun preprocessDataValueFormula(html: String): String =
         html.replace(formulaDataValueRegex) { match -> "\\(${match.value}\\)" }
 
-    fun setTextWithMath(textView: TextView, rawHtml: String) {
-        // Parse HTML to Spanned
+    private data class IconKey(val latex: String, val style: Int, val sizePx: Int, val color: Int)
+
+    // Hanya diakses dari main thread. Menjaga rebind (seleksi opsi, drag pasangan) tidak mem-parse
+    // ulang rumus yang sama.
+    private val iconCache = LruCache<IconKey, TeXIcon>(64)
+
+    /**
+     * @param textColor warna rumus. Rumus tidak ikut warna teks TextView, jadi pemanggil yang warna
+     * teksnya berubah-ubah (mis. putih saat opsi terpilih) wajib mengoper warna akhirnya.
+     * @param enableLinks false untuk teks di dalam baris yang bisa diklik: `LinkMovementMethod`
+     * membuat TextView menelan sentuhan sehingga klik baris dan drag-drop tidak sampai.
+     */
+    fun setTextWithMath(
+        textView: TextView,
+        rawHtml: String,
+        @ColorInt textColor: Int = textView.currentTextColor,
+        enableLinks: Boolean = true
+    ) {
         val spanned = HtmlCompat.fromHtml(
             rawHtml,
             HtmlCompat.FROM_HTML_MODE_LEGACY,
-            imageGetter(textView.context),
+            imageGetter(),
             null
         )
 
         val builder = SpannableStringBuilder(spanned)
-        val text = builder.toString()
+        val ranges = findMathRanges(builder.toString())
 
-        val matches = mutableListOf<Match>()
-        findAll(patternBlock, text) { matches.add(it.copy(style = TeXConstants.STYLE_DISPLAY)) }
-        findAll(patternDisplay, text) { matches.add(it.copy(style = TeXConstants.STYLE_DISPLAY)) }
-        findAll(patternInline, text) { matches.add(it.copy(style = TeXConstants.STYLE_TEXT)) }
+        val sizePx = textView.textSize
+        val maxWidthPx = availableWidth(textView)
 
-        // Replace from end to start to keep indices valid
-        matches.sortByDescending { it.start }
-
-        val maxWidthPx = estimateMaxWidth(textView)
-        matches.forEach { m ->
-            val drawable = renderLatexDrawable(textView.context, m.latex, textView, m.style, maxWidthPx)
-            val span = ImageSpan(drawable, ImageSpan.ALIGN_BOTTOM)
-            val placeholder = "￼"
-            builder.replace(m.start, m.end, placeholder)
-            builder.setSpan(span, m.start, m.start + placeholder.length, 0)
+        // Dari belakang ke depan supaya indeks rumus di depannya tetap valid setelah replace.
+        for (range in ranges.asReversed()) {
+            // Rumus yang gagal di-parse dibiarkan sebagai teks sumber supaya terlihat, bukan hilang.
+            val icon = obtainIcon(range, sizePx, textColor) ?: continue
+            builder.replace(range.start, range.end, PLACEHOLDER)
+            builder.setSpan(
+                ImageSpan(TeXIconDrawable(icon, maxWidthPx), ImageSpan.ALIGN_BOTTOM),
+                range.start,
+                range.start + PLACEHOLDER.length,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
         }
 
         textView.text = builder
-        // No `movementMethod` here (legacy sets `LinkMovementMethod` unconditionally, but this app
-        // never renders real clickable spans in question/answer text) — installing it anyway made
-        // the embedded TextView claim touch at the native-view layer before Compose's own gesture
-        // detectors on ancestor composables ever saw the event, breaking the Menjodohkan long-press
-        // drag (confirmed live: long-press produced zero reaction whatsoever).
+        if (enableLinks) textView.movementMethod = LinkMovementMethod.getInstance()
     }
 
-    private fun imageGetter(context: Context): Html.ImageGetter = Html.ImageGetter { _ ->
-        // Minimal placeholder for <img> in HTML. Question image shown in separate ImageView.
+    /** Lebar yang tersedia bagi rumus; sebelum TextView ter-layout dipakai perkiraan dari layar. */
+    fun availableWidth(textView: TextView): Int {
+        val padding = textView.paddingLeft + textView.paddingRight
+        val laidOut = textView.width - padding
+        if (laidOut > 0) return laidOut
+
+        val dm = textView.resources.displayMetrics
+        val marginReserve = (32 * dm.density).toInt()
+        return (dm.widthPixels - padding - marginReserve).coerceAtLeast(1)
+    }
+
+    private fun imageGetter(): Html.ImageGetter = Html.ImageGetter { _ ->
+        // Placeholder kosong untuk <img> di HTML. Gambar soal ditampilkan di ImageView terpisah.
         ColorDrawable(Color.TRANSPARENT).apply {
             setBounds(0, 0, 0, 0)
         }
     }
 
-    private fun estimateMaxWidth(textView: TextView): Int {
-        val dm = textView.resources.displayMetrics
-        val screen = dm.widthPixels
-        val horizontalPadding = textView.paddingLeft + textView.paddingRight
-        val marginReserve = (16 * dm.density).toInt() * 2 // ~32dp
-        return (screen - horizontalPadding - marginReserve).coerceAtLeast(1)
-    }
+    private fun obtainIcon(range: MathRange, sizePx: Float, @ColorInt color: Int): TeXIcon? {
+        val style = if (range.display) TeXConstants.STYLE_DISPLAY else TeXConstants.STYLE_TEXT
+        val key = IconKey(range.latex, style, sizePx.roundToInt(), color)
+        iconCache.get(key)?.let { return it }
 
-    private fun renderLatexDrawable(
-        context: Context,
-        latex: String,
-        textView: TextView,
-        style: Int,
-        maxWidthPx: Int
-    ): Drawable {
         return try {
-            val fontSizeSp = textView.textSize / context.resources.displayMetrics.scaledDensity
-            val formula = TeXFormula(latex)
-            val icon: TeXIcon = formula.createTeXIcon(style, fontSizeSp)
-
-            var bmp = Bitmap.createBitmap(icon.iconWidth, icon.iconHeight, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(bmp)
-            canvas.drawColor(Color.TRANSPARENT)
-            icon.paintIcon(null, canvas as Graphics?, 0, 0)
-
-            // Scale down if wider than max width
-            if (bmp.width > maxWidthPx && bmp.width > 0) {
-                val ratio = maxWidthPx.toFloat() / bmp.width.toFloat()
-                val newW = maxWidthPx
-                val newH = (bmp.height * ratio).toInt().coerceAtLeast(1)
-                bmp = Bitmap.createScaledBitmap(bmp, newW, newH, true)
-            }
-
-            BitmapDrawable(context.resources, bmp).apply {
-                setBounds(0, 0, intrinsicWidth, intrinsicHeight)
+            TeXFormula(range.latex).createTeXIcon(style, sizePx).also { icon ->
+                icon.setForeground(TexColor(color))
+                iconCache.put(key, icon)
             }
         } catch (e: Exception) {
-            // Fallback: show nothing if formula invalid
-            ColorDrawable(Color.TRANSPARENT).apply { setBounds(0, 0, 0, 0) }
+            Timber.w(e, "Rumus LaTeX tidak valid, ditampilkan sebagai teks: %s", range.latex)
+            null
         }
     }
 
-    private data class Match(val start: Int, val end: Int, val latex: String, val style: Int)
+    /**
+     * Menggambar [TeXIcon] langsung ke Canvas (tanpa bitmap) sehingga tetap tajam saat diperkecil
+     * agar muat di [maxWidthPx].
+     */
+    private class TeXIconDrawable(
+        private val icon: TeXIcon,
+        maxWidthPx: Int
+    ) : Drawable() {
 
-    private fun findAll(pattern: Regex, text: String, emit: (Match) -> Unit) {
-        pattern.findAll(text).forEach { mr ->
-            val latex = mr.groupValues.getOrNull(1)
-            if (latex != null) emit(Match(mr.range.first, mr.range.last + 1, latex, TeXConstants.STYLE_TEXT))
+        private val graphics = AndroidGraphics2D()
+        private val scale: Float
+        private val widthPx: Int
+        private val heightPx: Int
+
+        init {
+            val w = icon.iconWidth
+            val h = icon.iconHeight
+            scale = if (w > maxWidthPx && w > 0) maxWidthPx.toFloat() / w else 1f
+            widthPx = (w * scale).roundToInt().coerceAtLeast(1)
+            heightPx = (h * scale).roundToInt().coerceAtLeast(1)
+            setBounds(0, 0, widthPx, heightPx)
         }
+
+        override fun draw(canvas: Canvas) {
+            val save = canvas.save()
+            try {
+                canvas.translate(bounds.left.toFloat(), bounds.top.toFloat())
+                if (scale != 1f) canvas.scale(scale, scale)
+                // setCanvas menangkap matriks canvas saat ini, jadi harus setelah translate/scale.
+                graphics.setCanvas(canvas)
+                icon.paintIcon(null, graphics, 0, 0)
+            } finally {
+                canvas.restoreToCount(save)
+            }
+        }
+
+        override fun getIntrinsicWidth(): Int = widthPx
+
+        override fun getIntrinsicHeight(): Int = heightPx
+
+        override fun setAlpha(alpha: Int) = Unit
+
+        override fun setColorFilter(colorFilter: ColorFilter?) = Unit
+
+        @Deprecated("Deprecated in Java")
+        override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
     }
 }

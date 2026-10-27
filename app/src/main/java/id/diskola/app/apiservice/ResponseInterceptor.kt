@@ -122,7 +122,12 @@ class ResponseInterceptor @Inject constructor(
                 val retryAfterSeconds = response.header("Retry-After")?.toLongOrNull()
 
                 responseBody?.close()
-                throw ApiException(errorBody, responseCode, errorTypes, errorData, errorCode, retryAfterSeconds, validationMessages)
+                // `errors` per field (keys such as `file.0` kept) and `trace_id`, for the screens that show them (Tugas guru/siswa).
+                val parsed = ApiErrorParser.fromMap(contentMap)
+                throw ApiException(
+                    errorBody, responseCode, errorTypes, errorData, errorCode, retryAfterSeconds, validationMessages,
+                    fieldErrors = parsed.fieldErrors, traceId = parsed.traceId,
+                )
             }
         } catch (e: Exception) {
             responseBody?.close()
@@ -144,6 +149,10 @@ class ApiException(
     val retryAfterSeconds: Long? = null,
     /** Per-field validation texts from the body's `errors` map (distinct, first per field). */
     val validationMessages: List<String> = emptyList(),
+    /** `errors` of a 422 per field, in order, values as a list (the backend sends a string or an array); keys like `file.0` are kept. */
+    val fieldErrors: Map<String, List<String>> = emptyMap(),
+    /** `trace_id` of the response (top level, or inside `data`) — what a blocked student reads out to the school. */
+    val traceId: String? = null,
 ) : IOException(message)
 
 //class ResponseInterceptor @Inject constructor(val context: Context, moshi: Moshi) : Interceptor {

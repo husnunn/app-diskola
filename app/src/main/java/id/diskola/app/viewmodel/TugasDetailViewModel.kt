@@ -10,8 +10,11 @@ import id.diskola.app.repository.FileOpenRepository
 import id.diskola.app.repository.LinkPreviewData
 import id.diskola.app.repository.LinkPreviewRepository
 import id.diskola.app.repository.TugasRepository
+import id.diskola.app.utils.AssignmentError
+import id.diskola.app.utils.AssignmentErrors
 import id.diskola.app.utils.session.SessionStore
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +30,7 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import timber.log.Timber
 
 data class SelectedAnswerFile(val uri: Uri, val name: String, val sizeBytes: Long)
 
@@ -99,6 +103,18 @@ class TugasDetailViewModel @Inject constructor(
 
     private val _submitSuccess = MutableStateFlow(false)
     val submitSuccess: StateFlow<Boolean> = _submitSuccess.asStateFlow()
+
+    /** "Kirim Tugas" is on its way: the button shows a spinner and cannot be pressed again (it used to stay live and could send twice). */
+    private val _submitting = MutableStateFlow(false)
+    val submitting: StateFlow<Boolean> = _submitting.asStateFlow()
+
+    /** 403 on sending: the account is blocked; the dialog shows the server's words and the trace id (`Akses diblokir`). */
+    private val _accessBlocked = MutableStateFlow<AssignmentError.Blocked?>(null)
+    val accessBlocked: StateFlow<AssignmentError.Blocked?> = _accessBlocked.asStateFlow()
+
+    fun dismissAccessBlocked() {
+        _accessBlocked.value = null
+    }
 
     /** `uploadDone` is reactive: files picked OR link preview already succeeded — recomputed every
      * time either changes, not cached as a permanent flag. */
@@ -248,15 +264,37 @@ class TugasDetailViewModel @Inject constructor(
     /** "Kirim Tugas" — `fileParts` are built by the screen (needs `Context`/`ContentResolver`). */
     fun submit(fileParts: List<MultipartBody.Part>) {
         val item = _tugas.value ?: return
-        launchWithHandling(customMessage = "Gagal mengirim tugas") {
-            val plain = "text/plain".toMediaTypeOrNull()
-            val data = mutableMapOf<String, RequestBody>()
-            data["checked"] = "1".toRequestBody(plain)
-            val hasAnswer = fileParts.isNotEmpty() || _studentLink.value.isNotBlank()
-            data["uploaded"] = (if (hasAnswer) "1" else "0").toRequestBody(plain)
-            if (_studentLink.value.isNotBlank()) data["link"] = _studentLink.value.toRequestBody(plain)
-            repository.collectAssignment(item.id.toInt(), data, fileParts)
-            _submitSuccess.value = true
+        if (_submitting.value) return
+        _submitting.value = true
+        viewModelScope.launch {
+            try {
+                val plain = "text/plain".toMediaTypeOrNull()
+                val data = mutableMapOf<String, RequestBody>()
+                data["checked"] = "1".toRequestBody(plain)
+                // The link counts as an answer (and is sent) only when it holds something other than spaces; an empty one is never sent.
+                val link = _studentLink.value.trim()
+                data["uploaded"] = (if (fileParts.isNotEmpty() || link.isNotEmpty()) "1" else "0").toRequestBody(plain)
+                if (link.isNotEmpty()) data["link"] = link.toRequestBody(plain)
+                repository.collectAssignment(item.id.toInt(), data, fileParts)
+                _submitSuccess.value = true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "Gagal mengirim tugas")
+                when (val error = AssignmentErrors.classify(e, isUpdate = false)) {
+                    // 422 on a file: "File ke-N: <message>", one line each.
+                    is AssignmentError.Validation ->
+                        emitError(AssignmentErrors.describeFieldErrors(error.fieldErrors).joinToString("\n").ifBlank { error.message ?: AssignmentErrors.DEFAULT_MESSAGE })
+                    is AssignmentError.Blocked -> _accessBlocked.value = error
+                    // The server's own words ("sudah mengumpulkan" on a 400, the connection message offline) — no longer one fixed sentence.
+                    is AssignmentError.Message -> emitError(error.text)
+                    // 401: the session handler signs the user out already.
+                    AssignmentError.Unauthorized -> Unit
+                    AssignmentError.NotFound -> emitError(AssignmentErrors.DEFAULT_MESSAGE)
+                }
+            } finally {
+                _submitting.value = false
+            }
         }
     }
 }

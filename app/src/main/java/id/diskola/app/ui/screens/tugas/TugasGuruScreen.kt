@@ -54,6 +54,7 @@ import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
 import id.diskola.app.ui.theme.extendedColors
+import id.diskola.app.utils.AssignmentAccess
 import id.diskola.app.viewmodel.TugasGuruViewModel
 import id.diskola.app.viewmodel.TugasPenilaianViewModel
 
@@ -76,6 +77,16 @@ fun TugasGuruScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
 
     DetailScaffold(title = "Tugas", onBack = onBack, modifier = modifier) { padding ->
+        // An account without teacher data cannot use the teacher endpoints (spec §2/§6): say so instead of showing a list and a form that fail.
+        if (!viewModel.canManage) {
+            EmptyState(
+                title = AssignmentAccess.NO_TEACHER_DATA_TITLE,
+                description = AssignmentAccess.NO_TEACHER_DATA_BODY,
+                icon = Icons.Rounded.Assignment,
+                modifier = Modifier.padding(padding).fillMaxSize(),
+            )
+            return@DetailScaffold
+        }
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
             UnderlineTabRow(
                 options = TAB_LABELS,

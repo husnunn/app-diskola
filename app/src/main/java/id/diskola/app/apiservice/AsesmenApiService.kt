@@ -25,6 +25,8 @@ import retrofit2.http.Query
  * (`akm/schedules`, `akm/scored`, etc.) but that track was dropped from this app per explicit user
  * decision — see `docs/FLOW_QUESTIONS.md`.
  */
+// Retrofit rejects the wildcard Kotlin writes for `Map<String, Any>` in a parameter (ApiServiceSignatureTest).
+@JvmSuppressWildcards
 interface AsesmenApiService {
 
     @GET("mobile/app/learning/akm/exam-schedules")

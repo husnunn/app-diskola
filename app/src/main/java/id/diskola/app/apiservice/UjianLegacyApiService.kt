@@ -7,6 +7,8 @@ import retrofit2.http.PUT
 import retrofit2.http.Path
 
 /** Placeholder scaffolding: request/response shapes not yet defined, no UI consumer yet. Legacy exam module, separate from Asesmen/AKM. */
+// Retrofit rejects the wildcard Kotlin writes for `Map<String, Any>` in a parameter (ApiServiceSignatureTest).
+@JvmSuppressWildcards
 interface UjianLegacyApiService {
 
     @GET("mobile/app/learning/examinations/students/exams-list")

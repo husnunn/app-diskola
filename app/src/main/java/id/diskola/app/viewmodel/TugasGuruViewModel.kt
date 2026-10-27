@@ -35,6 +35,9 @@ class TugasGuruViewModel @Inject constructor(
 
     private val teacherId: Int get() = sessionStore.teacher?.id ?: 0
 
+    /** False for an account without teacher data: the screen shows why and nothing below is requested (see `AssignmentAccess`). */
+    val canManage: Boolean get() = sessionStore.canManageAssignments
+
     private val _subjectFilter = MutableStateFlow<Int?>(null)
     val subjectFilter: StateFlow<Int?> = _subjectFilter.asStateFlow()
 
@@ -64,6 +67,10 @@ class TugasGuruViewModel @Inject constructor(
      * This was a real, confirmed bug (found via device testing), and `MateriGuruViewModel`/
      * `MateriGuruScreen` had the exact same one — fixed there too, see that file's history. */
     init {
+        if (canManage) loadInitialData()
+    }
+
+    private fun loadInitialData() {
         viewModelScope.launch {
             try {
                 materiRepository.refreshClasses()
@@ -120,8 +127,9 @@ class TugasGuruViewModel @Inject constructor(
     /** Called when returning from the upload form after a successful create/edit. */
     fun onTugasChanged() = refresh()
 
+    /** A refusal such as 400 "Tugas telah dikerjakan" is shown as the server words it, like legacy — a fixed text hid why the task stayed. */
     fun deleteTugas(id: Int) {
-        launchWithHandling(customMessage = "Gagal menghapus tugas. Silakan coba lagi.") {
+        launchWithHandling {
             repository.deleteTugas(id)
         }
     }

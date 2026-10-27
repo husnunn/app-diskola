@@ -10,6 +10,7 @@ import dagger.hilt.components.SingletonComponent
 import id.diskola.app.database.LocalDatabase
 import id.diskola.app.database.MIGRATION_7_8
 import id.diskola.app.database.MIGRATION_8_9
+import id.diskola.app.database.MIGRATION_9_10
 import id.diskola.app.dataclass.localDb.AgendaDao
 import id.diskola.app.dataclass.localDb.AkmAnswerDao
 import id.diskola.app.dataclass.localDb.AkmProblemReportDao
@@ -34,9 +35,9 @@ object DbModule {
     @Provides
     fun instance(@ApplicationContext context: Context): LocalDatabase =
         Room.databaseBuilder(context, LocalDatabase::class.java, "ebede.db")
-            // Exam answers and unsent violations must survive an update: v7 -> v8 -> v9 are explicit. Anything else (the other tables are
+            // Exam answers and unsent violations must survive an update: v7 -> v8 -> v9 -> v10 are explicit. Anything else (the other tables are
             // re-fetchable caches) may be dropped.
-            .addMigrations(MIGRATION_7_8, MIGRATION_8_9)
+            .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
             .fallbackToDestructiveMigration()
             .build()
 

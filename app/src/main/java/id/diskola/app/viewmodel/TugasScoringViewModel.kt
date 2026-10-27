@@ -40,7 +40,13 @@ class TugasScoringViewModel @Inject constructor(
     fun submit(collectedId: Int) {
         val assignmentId = _assignment.value?.id ?: return
         val scoreValue = _score.value.toIntOrNull() ?: return
-        launchWithHandling(customMessage = "Gagal menyimpan nilai") {
+        // A submission whose ids the server could not resolve arrives with `id: null`, read as 0: there is nothing to score, so no request goes out.
+        if (collectedId <= 0 || assignmentId <= 0) {
+            emitError("Data pengumpulan siswa tidak tersedia")
+            return
+        }
+        // The server's own words (legacy showed `e.localizedMessage`), not a fixed "Gagal menyimpan nilai" that hid why the score was refused.
+        launchWithHandling {
             repository.saveScore(collectedId, assignmentId, scoreValue)
             _saveSuccess.value = true
         }

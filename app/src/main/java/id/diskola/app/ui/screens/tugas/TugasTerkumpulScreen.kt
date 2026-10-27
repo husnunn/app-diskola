@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ExpandMore
@@ -119,7 +120,8 @@ fun TugasTerkumpulScreen(
                 contentPadding = PaddingValues(start = ScreenHorizontalPadding, end = ScreenHorizontalPadding, bottom = Spacing.xxxl),
                 verticalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
-                items(assignments, key = { it.id }) { assignment ->
+                // A submission whose id the server left out reads as 0 (@NullToZeroInt): two of them must not share a key (that crashes the list).
+                itemsIndexed(assignments, key = { index, assignment -> if (assignment.id > 0) assignment.id else "baris-$index" }) { _, assignment ->
                     AssignmentScoreRow(
                         assignment = assignment,
                         onOpenReadonly = { detail?.let { onOpenTugasReadonly(it.id) } },
