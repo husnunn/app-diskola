@@ -55,30 +55,48 @@ diuji jalur ini secara langsung) · ⛔ Ditunda/di luar cakupan.
 - Komponen baru yang diekstrak jadi reusable: `ui/components/SimpleDropdown.kt` (sebelumnya privat
   di `UploadMateriScreen.kt`, sekarang dipakai juga oleh `UploadTugasScreen.kt`).
 
-## 4. Kontrak backend baru (2026-10-22) — belum diterapkan di app baru
+## 4. Kontrak backend baru (2026-10-22) — diterapkan di app baru 2026-10-22, form guru mode bebas diuji di perangkat (sisanya belum)
 
-Backend mengubah API form tugas guru (cabang `teacher-data-scope`, payload canonical) dan app lama (`android-portal`; iOS juga) sudah disesuaikan —
-rincian perilaku di `05-pembelajaran-materi-tugas.md` §6.4–§6.5 dan keputusan/asumsi di `FLOW_QUESTIONS.md` (2026-10-22). App baru tidak ada di disk, jadi
-status di bawah diambil dari dokumen ini (§1–§3: `UploadTugasViewModel` memakai kontrak lama — cascade Kelas→Hari→Mapel, payload `school_classes_id`/
-`school_subject_schedules_id`/`grade`/`teacher_id`/`school_id`). **Belum ada yang dikerjakan di app baru.**
+Backend mengubah API form tugas guru (cabang `teacher-data-scope`, payload kanonik); app lama (`android-portal` `d3aa201c`; iOS juga) sudah disesuaikan dan app baru
+**kini mengikutinya** (kode: `utils/AssignmentRules.kt`, `utils/AssignmentErrors.kt`, `apiservice/ApiErrorParser.kt`, `viewmodel/UploadTugasViewModel.kt`,
+`ui/screens/tugas/UploadTugasScreen.kt`, `repository/TugasRepository.kt`; tes: `AssignmentRulesTest` (+`AssignmentFilterTest`), `AssignmentErrorsTest`,
+`ApiErrorParserTest`, `HomeworkModelsParseTest`, `AkmMigrationTest`). Rincian perilaku: `05-pembelajaran-materi-tugas.md` §6.4–§6.5; keputusan: `FLOW_QUESTIONS.md`
+(2026-10-22, "Tugas guru di app baru"). Logika murni diport dari app lama; sumber kode lama yang benar: `DISKOLA MOBILE/android-portal` (klon di `proyek diskola/` basi).
 
-Legenda: ⛔ belum dikerjakan · ❓ menunggu keputusan user (nomor = ❓ di `05` §13).
+Legenda: ✅ dikerjakan (hanya diuji JVM/build) · ⏸ ditunda · ❓→✅ diputuskan user 2026-10-22 ("ikuti app lama").
 
 | Item | Status | Keterangan |
 |---|---|---|
-| Baca `GET mobile/attendance/teacher-data-scope`; cabang `data.restricted` (gagal/hilang → mode assigned) | ⛔ | App baru hanya punya mode assigned. Jangan memakai cache scope presensi (default ALL saat gagal) |
-| Mode bebas: Kelas + Mapel dari `GET .../teachers/subject?take&skip` (tanpa Hari; mapel langsung aktif) | ⛔ | Endpoint baru — `TugasApiService` perlu `assignmentSubject(take, skip)` (`data[]{id,name,icon_image}`) |
-| Payload canonical: assigned → `school_subject_schedule_id`; bebas → `school_class_id` + `school_subject_id`; `title,description,end_at,checked,downloaded,uploaded`; hapus `teacher_id`, `school_id`, `grade`, `school_classes_id`, `school_subject_schedules_id`, `downloded`; `link` hanya bila tidak kosong | ⛔ | `createAssignment`/`updateAssignment`. Mode bebas **tidak boleh** mengirim `school_subject_schedule_id` |
-| `end_at` dikirim `yyyy-MM-dd HH:mm:ss` | ⛔ | Periksa format kirim app baru (app lama dulu `dd-MM-yyyy HH:mm:ss`; spek baru mewajibkan `yyyy-MM-dd HH:mm:ss`) |
-| Penanganan error: 422 per field + draft dipertahankan; 404 saat update (tutup + hapus baris lokal + refresh); 401 → login; 403 dialog "Akses diblokir" + `trace_id`; 413 | ⛔ | `ApiException` app baru perlu membawa `errors` (per field) & `trace_id` |
-| Prefill edit: mapel dari `subjectId`; baris lokal hilang → tutup form (bukan membuat tugas baru) | ⛔ | Di app lama dulu Posting pada baris hilang membuat tugas **baru** |
-| Prefill edit: `end_at` dari `end_at_label` (fallback kosong bila gagal) | ❓ Q18 | Bertentangan keputusan 2026-10-02 #3 (app baru: default sekarang). Bukti baru: label berupa tanggal absolut dan terurai benar di data nyata |
-| Filter "Semua": tidak kirim `school_classes_id`/`school_subject_id` bila 0 | ❓ Q19 | App baru masih mengirim `0` (baris §2 "Filter 'Semua' kirim literal `0`", keputusan #6). App lama kini tidak mengirimnya; request tanpa filter terverifikasi 200 + data |
-| Deskripsi wajib; tanpa default tanggal; Posting tidak menunggu preview link; file soal ≤ 12 MB di klien | ❓ Q16, Q17 | Keputusan implementasi app lama yang belum dikonfirmasi |
-| Refresh daftar guru setelah create (list memuat tugas baru di atas) | ⛔ / periksa | App baru memakai `ensureFirstPage()` per filter — pastikan dipicu setelah form sukses (bug app lama: list tidak refresh) |
-| Sisi siswa: `link` kosong tidak dikirim; 422 per file (`file.N` → "File ke-N: …"); 403 "Akses diblokir" + trace id; 400 "sudah mengumpulkan" | ⛔ | `TugasDetailViewModel` / `TugasApiService.collectAssignment` |
-| Penilaian: id pengumpulan 0/null tidak memanggil API; parsing toleran `id`/`score` null dan `schedule` null | ⛔ | `TugasScoringViewModel`; model `Assignment`/`HomeworkItem` |
-| Multi-kelas (satu request per kelas, hasil per kelas) | ⛔ ditunda (❓ Q20) | Keputusan user: satu kelas dulu |
+| Baca `GET mobile/attendance/teacher-data-scope`; cabang `data.restricted` (gagal/hilang → mode assigned) | ✅ | `TeacherDataScope.restricted/label`, `isRestrictedForForm = restricted != false`; `TugasRepository.fetchTeacherScope()` tanpa cache (cache scope Presensi/Jurnal gagal ⇒ ALL, sebaliknya dari yang dibutuhkan); gagal ⇒ mode jadwal + banner |
+| Mode bebas: Kelas + Mapel dari `GET .../teachers/subject?take&skip` (tanpa Hari) | ✅ | `TugasApiService.teacherAssignmentSubject`; paging 100, berhenti bila < 100 atau tanpa id baru, dedupe, urut nama |
+| Kelas form dari `assignment/teachers/class` | ✅ | **Tidak ditulis ke Room** (`classroom` dipakai bersama Materi dan layar filter); sebelumnya form memakai `mobile/teacher/school-class-room` dan menimpa tabel itu |
+| Payload kanonik (assigned `school_subject_schedule_id`; bebas `school_class_id` + `school_subject_id`; `title,description,end_at,checked,downloaded,uploaded`; `link` hanya bila tidak kosong); kunci lama dibuang | ✅ | `AssignmentPayload.fields`; `restricted == null` ⇒ bentuk assigned; `link`/file/`downloaded` hanya bila "Upload Soal" aktif (dulu dikirim walau tidak dicentang) |
+| `end_at` `yyyy-MM-dd HH:mm:ss` | ✅ | `AssignmentDates.formatWire` (Locale.US); sebelumnya `dd-MM-yyyy HH:mm:ss` |
+| Penanganan error: 422 per field + draft utuh; 404 saat update; 401; 403 "Akses diblokir" + `trace_id`; 413 | ✅ | `ApiException.fieldErrors/traceId` (diisi `ApiErrorParser` di interceptor); `AssignmentErrors.classify/placeFieldErrors`; 422 ⇒ pesan di bawah field (+ dialog "Periksa kembali isian" untuk `file.N` dkk), 404 ⇒ hapus baris + tutup + segarkan, 403 ⇒ dialog + ID, 413 ⇒ "Ukuran file terlalu besar. Maksimal 12 MB", 401 ⇒ penanganan sesi pusat |
+| Prefill edit: mapel dari `subject_id`; Hari + jadwal; baris lokal hilang ⇒ tutup form | ✅ | Kolom baru `homework.schedule_day` (**Room v10, `MIGRATION_9_10` eksplisit** — tanpa migrasi, `fallbackToDestructiveMigration` menghapus seluruh DB termasuk jawaban ujian yang belum terkirim); baris hilang ⇒ toast + tutup (dulu membuka form kosong "Edit Tugas") |
+| Prefill edit: `end_at` dari `end_at_label` | ❓→✅ Q18 | `AssignmentDates.parseEndAtLabel`; gagal ⇒ kosong + toast "Waktu berakhir tidak terbaca, silakan pilih ulang". **Membalik keputusan 2026-10-02 #3** (alasan lama — label relatif — tidak berlaku: label nyata berupa tanggal absolut) |
+| Filter "Semua": tidak kirim bila 0; indeks `filter[n]` berurutan | ❓→✅ Q19 | `AssignmentFilter.teacherListQuery` + 5 tes. **Membalik keputusan 2026-10-02 #6** |
+| Deskripsi wajib; tanpa default tanggal; Posting tidak menunggu preview link; file soal ≤ 12 MB di klien | ❓→✅ Q16, Q17 | `AssignmentPayload.validate`; tombol Posting nonaktif sampai valid; DatePicker hanya hari ini dan sesudahnya |
+| Refresh daftar guru setelah create | ✅ (sudah ada) | `tugasChanged` ⇒ `refresh()`; tidak berubah |
+| Sisi siswa: `link` kosong tidak dikirim; 422 per file (`file.N` → "File ke-N: …"); 403 "Akses diblokir" + trace id; 400 teks server | ✅ | `TugasDetailViewModel.submit`; tombol "Kirim Tugas" kini ber-`loading` (dulu selalu `false`, bisa kirim dua kali); link spasi-saja tidak dihitung sebagai jawaban |
+| Penilaian: id pengumpulan/penugasan ≤ 0 tidak memanggil API; parsing toleran `id`/`score`/`scored`/`uploaded` null, `schedule` null atau `[]`, `data.id` collect null | ✅ | `@NullToZeroInt`, `HomeworkItem.schedule` nullable + adapter `[]` ⇒ null, `TugasScoringViewModel` guard; `LazyColumn` Tugas Terkumpul memakai kunci cadangan agar id 0 ganda tidak crash |
+| Multi-kelas (satu request per kelas, hasil per kelas) | ⏸ ditunda (❓ Q20) | Keputusan user: satu kelas dulu |
 
-Catatan: pola yang berhasil di app lama dan layak ditiru — logika murni (payload + validasi + format/parse tanggal + pemetaan error) dipisah dari UI sehingga
-bisa diuji JVM (`AssignmentPayload`, `AssignmentDates`, `AssignmentErrors`, `ApiErrorParser`), selaras `rules-global.md` §5.2.
+**Diverifikasi di perangkat (2026-10-22; Samsung SM-A505F Android 11, server `dev.api.diskola.id`, akun guru uji SMK DEMO SURABAYA):**
+- `teacher-data-scope` → `{"scope":"all","restricted":false}` ⇒ form mode bebas; kelas dari `teachers/class`, mapel dari `teachers/subject?take=100&skip=0`, semuanya 200.
+- Form: batas waktu kosong di awal, tanggal sebelum hari ini tidak bisa dipilih (hari ini bisa), deskripsi wajib, "Posting Tugas" nonaktif sampai semua terisi.
+- Create: `POST .../teachers/create` multipart dengan kunci `title, description, school_class_id, school_subject_id, end_at (2026-10-26 13:24:00), checked=1, downloaded=0, uploaded=0` — tanpa `link` dan tanpa kunci lama — ⇒ 200 `{"message":"Berhasil membuat Tugas"}`; daftar dimuat ulang dan tugas baru (id 87) tampil. Server mengembalikan `"schedule":{}` untuk tugas mode bebas dan daftar tetap terbaca.
+- Edit: kelas, mapel, judul, deskripsi, dan `end_at` dari `end_at_label` ("26 Oct 2026, 13:24" → 26-10-2026 13:24) terisi benar; `POST .../teachers/update/87` ⇒ 200 `{"message":"Berhasil update Tugas"}`; buka lagi, batas waktu baru terisi; `link` lama ikut terkirim ulang. Tautan bukan-URL memunculkan banner "gagal menampilkan preview url" yang tidak menghalangi Posting.
+- Header `X-App-Platform: android` dan `X-App-Version: 1.0.0` ada di semua request (log `API_REQUEST`); migrasi Room 9→10 jalan pada DB nyata (versi 10, kolom `schedule_day` ada; tabel ujian masih kosong sehingga **pelestarian data belum terbukti**).
+- **Simpan nilai** (Penilaian → Tugas Terkumpul → Beri Nilai): sebelumnya selalu gagal dengan "Gagal menyimpan nilai" karena `saveAssignmentScore` ditolak Retrofit sebelum request dibuat (wildcard pada `@Body Map<String, Any>`; perbaikan `@JvmSuppressWildcards`, lihat `FLOW_QUESTIONS.md` 2026-10-22). Setelah perbaikan: `POST .../teachers/scored/74/student-assignment/2701` body `{"score":80}` ⇒ 200, daftar menampilkan 80 dan tombol "Ubah Nilai". Nilai 80 untuk siswa RIZKY (tugas "UPLOAD SOAL WAJIB MEMBACA MATERI") kini tersimpan di server dev dari uji ini.
+- **Hapus** (`DELETE .../teachers/delete/87`) ⇒ **400 `{"message":"Tugas telah dikerjakan"}`** pada tugas yang baru dibuat, baik dengan batas waktu lampau maupun masa depan — aturan/perilaku backend dev, bukan form. App sebelumnya menutupi alasannya dengan kalimat tetap "Gagal menghapus tugas. Silakan coba lagi."; sekarang pesan server ditampilkan (sama dengan app lama yang memakai `e.message`) — terbukti di perangkat. Tugas uji `UJI-FORM-GURU-BARU` (id 87) **masih ada di server dev** dan tidak bisa dihapus lewat app. Terulang dengan akun guru kedua di Infinix (lihat di bawah): `delete/88` ⇒ 400 yang sama.
+
+**Diverifikasi di Infinix X1102 (tablet 1200×1920, Android 15, tema terang), akun guru kedua "Johan" — 2026-10-23:** scope `{"scope":"assigned","restricted":false}` ⇒ juga form mode bebas (jadi mode assigned tetap belum teruji; nilai `scope` tidak dipakai, hanya `restricted`). Buat tugas dengan mapel bernama panjang ("Dasar-Dasar Program Keahlian Pengembangan Perangkat Lunak dan Gim" — muat satu baris), link `https://example.com` (pratinjau "Example Domain" tampil), "Siswa wajib membaca materi" dan "Siswa wajib mengumpulkan jawaban" dicentang ⇒ multipart `title, description, school_class_id=4969, school_subject_id=34, end_at=2026-10-26 08:34:00, checked=1, downloaded=1, uploaded=1, link=https://example.com` ⇒ 200; server menyimpan `downloded:1`, `uploaded:1`, `uri.link:["https://example.com"]` (id 88). Edit: link dan ketiga centang terisi kembali. Simpan nilai (`Ubah Nilai`, nilai sama 99 untuk satu siswa; tidak ada perubahan data) ⇒ `POST .../scored/54/student-assignment/2297` `{"score":99}` ⇒ 200. Hapus tugas 88 ⇒ 400 "Tugas telah dikerjakan" (sama dengan akun pertama), banner hilang sendiri ±5 dtk. Tugas uji `UJI-INFINIX-GURU` (id 88) juga tertinggal di server dev.
+
+**Akses guru (2026-10-23):** `AssignmentAccess.canManage` (akun `is_teacher` **dengan** record guru, `teacher.id > 0`) menjaga layar Tugas guru, tab Penilaian, dan form; akun tanpa data guru melihat "Tugas guru tidak tersedia" dan tidak memicu request teacher. Akun Infinix ber-role "Janitor" **punya** data guru (`rule.is_teacher:true`, `teacher.id` terisi) sehingga diizinkan backend — bukan celah app. Jalur tanpa data guru hanya diuji JVM (`AssignmentAccessTest`), belum di perangkat.
+
+**Belum diverifikasi:** mode assigned (akun uji berada di mode bebas); 422/403/404/413 — server dev menerima `end_at` lampau dan `link` bukan-URL (200), jadi 422 tak bisa dipicu dari UI, hanya terbukti lewat tes JVM; 401; unggah file soal; cara menghapus file/link lama saat edit; sisi siswa (rumus, "Selesai", kirim tugas); apakah backend masih menerima payload lama (tidak diuji — payload lama diganti seluruhnya).
+
+Catatan: pola yang berhasil di app lama dan ditiru — logika murni (payload + validasi + format/parse tanggal + pemetaan error + penempatan pesan 422) dipisah dari UI sehingga diuji JVM,
+selaras `rules-global.md` §5.2.
+
