@@ -1,230 +1,75 @@
-# API Spesifikasi Mobile — Form Tugas Guru dan Teacher Data Scope
+# Dokumentasi Migrasi Diskola: `android-portal` (XML) → `Diskola-App-New` (Jetpack Compose)
 
-Dokumen ini adalah kontrak implementasi form tambah/edit tugas pada aplikasi mobile.
-Tujuannya menyamakan alur mobile dengan CMS sekolah tanpa memutus aplikasi lama.
+Kumpulan dokumen ini adalah **spesifikasi perilaku** aplikasi Android lama `android-portal`
+(`id.diskola.app` v2.1.40, versionCode 79), disusun langsung dari kode sumbernya per 29-09-2026.
+Tujuannya satu: membangun ulang aplikasi dengan teknologi baru (Jetpack Compose, Material 3, Hilt,
+Navigation Compose, Coroutines/Flow, DataStore, Coil, Credential Manager) **tanpa mengubah alur login
+maupun fitur yang dipakai pengguna sekarang**.
 
-## 1. Aturan Umum
+> Dokumen di `docs/repo lama/` dibuat untuk v2.1.37 dan sebagian sudah basi. Jika berbeda, **yang
+> berlaku adalah dokumen di folder ini**. Setiap dokumen punya bagian "Selisih dengan dokumen lama".
+>
+> **Versi terkini dokumen AKM:** `06` dan bagian terkait di `10` mengikuti android-portal **2.1.41, `versionCode 81`, commit `e0a12b62` (19-10-2026)**, lebih baru dari baseline v2.1.40 di atas.
 
-- Semua endpoint memakai `Authorization: Bearer <token>` dan `Accept: application/json`.
-- Base URL endpoint assignment: `{EXAM_HOST}/api/mobile`.
-- Endpoint scope berada di service presensi: `{PRESENSI_HOST}/api/mobile`.
-- Mobile **wajib bercabang berdasarkan `data.restricted`**, bukan hanya `data.scope`.
-- Satu request create menghasilkan satu tugas untuk satu kelas. Untuk multi-kelas, kirim
-  satu request per kelas dan tampilkan hasil sukses/gagal tiap kelas.
-- Jika request scope gagal, gunakan alur jadwal lama (`assigned`) sebagai fallback aman.
+## Daftar dokumen
 
-## 2. Baca Mode Form
-
-```http
-GET {PRESENSI_HOST}/api/mobile/attendance/teacher-data-scope
-```
-
-Response `200`:
-
-```json
-{
-  "data": {
-    "scope": "assigned",
-    "label": "Cakupan Data Guru (Mapel & Kelas)",
-    "restricted": true
-  }
-}
-```
-
-| Field | Tipe | Nilai | Penggunaan mobile |
-|---|---|---|---|
-| `scope` | string | `all` \| `assigned` | Nilai setting sekolah untuk informasi/debug |
-| `restricted` | boolean | `true` \| `false` | Sumber keputusan UI form |
-
-`restricted` hanya `true` untuk user dengan role tunggal Teacher pada sekolah yang
-memakai scope `assigned`. Guru dengan role tambahan mendapat `false`; user tanpa data
-guru tetap tidak dapat membuat tugas melalui endpoint teacher.
-
-## 3. Endpoint Sumber Pilihan
-
-Semua URL di bagian ini memakai `{EXAM_HOST}`.
-
-### Daftar kelas
-
-```http
-GET /api/mobile/app/learning/assignment/teachers/class
-```
-
-- `restricted=false`: seluruh kelas sekolah selain kelas ALUMNI.
-- `restricted=true`: kelas dari jadwal guru ditambah kelas tempat guru menjadi wali.
-
-Response:
-
-```json
-{
-  "data": [
-    { "id": 21, "name": "VIII A", "grade": 8 }
-  ]
-}
-```
-
-### Daftar mapel bebas
-
-```http
-GET /api/mobile/app/learning/assignment/teachers/subject
-```
-
-- Dipakai langsung ketika `restricted=false`; pilihan mapel tidak bergantung pada hari
-  atau jadwal.
-- Ketika dipanggil pada mode assigned, server hanya mengembalikan mapel yang diampu guru.
-
-Response:
-
-```json
-{
-  "data": [
-    {
-      "id": 18,
-      "name": "Matematika",
-      "icon_image": "https://assets.example/mapel.png"
-    }
-  ]
-}
-```
-
-Query opsional: `take` dan `skip`.
-
-### Hari dan jadwal untuk mode assigned
-
-```http
-GET /api/mobile/app/learning/assignment/teachers/schedule-day
-GET /api/mobile/app/learning/assignment/teachers/schedule?school_class_id=21&day=SENIN
-```
-
-Pada `restricted=true`, endpoint `schedule` hanya mengembalikan jadwal milik guru login.
-Item jadwal berisi `id`, `day`, `class_room`, `time_plot`, `subject`, dan `teacher`.
-
-## 4. Create dan Update Tugas
-
-```http
-POST /api/mobile/app/learning/assignment/teachers/create
-POST /api/mobile/app/learning/assignment/teachers/update/{assignmentId}
-Content-Type: multipart/form-data
-```
-
-### Field umum
-
-| Field | Tipe | Wajib create | Keterangan |
-|---|---|---:|---|
-| `title` | string | ya | Judul tugas |
-| `description` | string | ya di UI | Panduan tugas; mobile mengikuti validasi CMS |
-| `end_at` | datetime | ya di UI | Format `YYYY-MM-DD HH:mm:ss` |
-| `file` | file | tidak | Maksimal 12 MB |
-| `link` / `link[]` | string/array | tidak | Tautan pendukung |
-| `checked` | boolean/int | tidak | Flag tugas dibaca/dicentang |
-| `uploaded` | boolean/int | tidak | Flag siswa wajib mengunggah |
-| `downloaded` | boolean/int | tidak | Alias API untuk kolom legacy `downloded` |
-
-### Payload mode bebas (`restricted=false`)
-
-| Field | Tipe | Wajib | Keterangan |
-|---|---|---:|---|
-| `school_class_id` | integer | ya | ID dari endpoint `class` |
-| `school_subject_id` | integer | ya | ID dari endpoint `subject` |
-
-Jangan mengirim `school_subject_schedule_id`. Server menyimpan relasi jadwal sebagai
-`null` dan menentukan `grade` dari kelas.
-
-```bash
-curl -X POST "{EXAM_HOST}/api/mobile/app/learning/assignment/teachers/create" \
-  -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" \
-  -F "title=Latihan Pecahan" \
-  -F "description=Kerjakan nomor 1-10" \
-  -F "school_class_id=21" \
-  -F "school_subject_id=18" \
-  -F "end_at=2026-10-30 15:00:00"
-```
-
-### Payload mode assigned (`restricted=true`)
-
-| Field | Tipe | Wajib | Keterangan |
-|---|---|---:|---|
-| `school_subject_schedule_id` | integer | ya | ID dari endpoint `schedule` |
-
-Server menentukan kelas, mapel, dan grade dari jadwal. Nilai `school_class_id`,
-`school_subject_id`, atau `grade` yang ikut dikirim tidak menjadi sumber kebenaran.
-
-```bash
-curl -X POST "{EXAM_HOST}/api/mobile/app/learning/assignment/teachers/create" \
-  -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" \
-  -F "title=Latihan Pecahan" \
-  -F "description=Kerjakan nomor 1-10" \
-  -F "school_subject_schedule_id=44" \
-  -F "end_at=2026-10-30 15:00:00"
-```
-
-Create dan update yang berhasil mempertahankan response legacy:
-
-```json
-{ "message": "Berhasil membuat Tugas" }
-```
-
-```json
-{ "message": "Berhasil update Tugas" }
-```
-
-## 5. Kompatibilitas Payload Lama
-
-Backend menerima nama canonical dan alias lama berikut:
-
-| Canonical | Alias lama |
-|---|---|
-| `school_class_id` | `school_classes_id` |
-| `school_subject_schedule_id` | `school_subject_schedules_id` |
-
-- Mobile baru harus memakai nama canonical.
-- Jika canonical dan alias dikirim bersamaan dengan nilai sama, request diterima.
-- Jika nilainya berbeda, server mengembalikan `422` pada key canonical.
-- Payload assigned lama yang mengirim kelas/mapel/grade tetap diterima, tetapi target
-  selalu diturunkan ulang dari jadwal oleh server.
-
-## 6. Error yang Harus Ditangani
-
-| Status | Kondisi | Perilaku mobile |
+| # | Dokumen | Cakupan |
 |---|---|---|
-| `401` | Token tidak valid | Arahkan ke login/session refresh |
-| `404` | Assignment update bukan milik guru/sekolah atau tidak ditemukan | Tutup form dan refresh daftar |
-| `422` | Target tidak lengkap/tidak valid, jadwal guru lain, atau alias konflik | Tampilkan pesan field dari `errors` |
-| `400` | Gagal upload/menyimpan atau akun tidak memiliki data guru | Tampilkan `message`/`error` umum |
+| 00 | `00-README.md` | Indeks, konvensi, cara pakai |
+| 01 | `01-peta-fitur-dan-rencana.md` | Inventaris seluruh modul, peran & syarat akses, urutan migrasi, status di app baru |
+| 02 | `02-auth-login-sesi.md` | Splash/router, onboarding, login NISN, Google SSO, reset password, dialog keamanan, validasi sesi, logout |
+| 02a | `02a-gap-auth-diskola-app-new.md` | Selisih implementasi auth Compose yang sudah ada vs aplikasi lama + urutan perbaikan |
+| 02b | `02b-implementasi-auth-login-logout.md` | Laporan implementasi fase "login inti + logout" per fase kerja, berkas yang dibuat/diubah, dan hasil uji di device fisik |
+| 03 | `03-home-navigasi-akun-notifikasi.md` | Shell Home (tab, drawer, tile menu + syarat tampil), Akun & pengaturan, notifikasi FCM & routing, deep link, perilaku global BasePage |
+| 04 | `04-sosial-feed-chat-pengumuman.md` | Feed sekolah, buat post/ebook, komentar, like, jelajah/hashtag, chat (Socket.IO), pengumuman |
+| 05 | `05-pembelajaran-materi-tugas.md` | Hub pembelajaran, materi (siswa/guru), tugas/PR (siswa/guru), perpustakaan, agenda mingguan, poin |
+| 05a | `05a-gap-pembelajaran-hub-materi.md` | Selisih implementasi Hub + Materi Compose yang sudah ada vs aplikasi lama |
+| 05b | `05b-implementasi-hub-materi.md` | Laporan implementasi fase "Hub + Materi" per fase kerja, bug ditemukan, dan hasil uji di device fisik |
+| 05c | `05c-gap-tugas.md` | Selisih implementasi Tugas Compose yang sudah ada vs aplikasi lama |
+| 05d | `05d-implementasi-tugas.md` | Laporan implementasi fase "Tugas" per fase kerja dan hasil uji di device fisik |
+| 05e | `05e-gap-poin-agenda.md` | Selisih implementasi Poin (siswa+guru) & Agenda Mingguan Compose vs aplikasi lama |
+| 05f | `05f-implementasi-poin-agenda.md` | Laporan implementasi fase "Poin + Agenda Mingguan", temuan teknis, dan hasil uji di device |
+| 05g | `05g-gap-hub-pembelajaran.md` | Selisih Hub Pembelajaran (Home) baru vs `PembelajaranPage` lama: endpoint, data tampil, teks panjang |
+| 05h | `05h-implementasi-hub-pembelajaran.md` | Laporan implementasi penyamaan Hub Pembelajaran dengan aplikasi lama, temuan teknis, dan status uji |
+| 05i | `05i-api-spesifikasi-form-tugas-guru.md` | Kontrak backend form tambah/edit tugas guru: `teacher-data-scope` (`restricted`), endpoint kelas/mapel/jadwal, payload kanonik mode bebas & assigned, alias lama, error 400/401/404/422, state machine |
+| 06 | `06-asesmen-akm-tryout-ujian.md` | Asesmen/AKM (offline, timer, lockdown, pelanggaran, penalty, laporan masalah, label/stempel dibatalkan, rumus LaTeX, tombol "Selesai" di soal terakhir, header `X-App-*`), try out, ujian |
+| 06a | `06a-gap-asesmen.md` | Selisih Asesmen/AKM (ujian sekolah, siswa) app baru vs lama (audit 2026-10-15), bug legacy yang tidak ditiru |
+| 06b | `06b-implementasi-asesmen-a1.md` | Laporan implementasi sub-fase A1 "data aman" (Room, repository, worker, blokir logout), temuan teknis, status uji |
+| 06c | `06c-gap-asesmen-a2.md` | Selisih keamanan ujian (priming, kunci layar, pelanggaran, penalti, laporan masalah) app baru vs lama, bug legacy yang tidak ditiru, celah yang diketahui |
+| 06d | `06d-implementasi-asesmen-a2.md` | Laporan implementasi sub-fase A2 (A2a sesi/kunci layar/priming, A2b pelanggaran/antrean/layanan latar, A2c penalti/laporan), temuan teknis, status uji |
+| 07 | `07-presensi-magang-prokes-verifikasi.md` | Presensi (QR, GPS/geofence, selfie, offsite, jurnal), izin, magang, prokes/screening, verifikasi akun |
+| 07a | `07a-gap-presensi.md` | Selisih implementasi Presensi harian Compose vs aplikasi lama |
+| 07b | `07b-implementasi-presensi.md` | Laporan implementasi fase "Presensi" (harian, Dinas Luar, Izin), temuan teknis, dan hasil uji |
+| 07c | `07c-gap-jurnal.md` | Selisih implementasi Jurnal KBM (daftar, Hadir kelas/QR, form guru & siswa, foto KBM, detail) Compose vs aplikasi lama |
+| 07d | `07d-implementasi-jurnal.md` | Laporan implementasi fase "Jurnal KBM", temuan teknis, dan status pengujian |
+| 08 | `08-keuangan-pembayaran-klaspay-ppob.md` | Pembayaran & SPP, PIN, QR, Klaspay (aktivasi, top up, riwayat, tagihan, promo), PPOB, dana partisipasi |
+| 08a | `08a-gap-pembayaran.md` | Selisih Pembayaran/Klaspay app baru vs lama (hasil audit 2026-10-14), status per bagian, selisih UI yang disengaja |
+| 08b | `08b-implementasi-pembayaran-p1.md` | Laporan implementasi sub-fase P1 (fondasi, hub nyata, aktivasi, PIN, dialog keamanan), temuan teknis, status uji |
+| 09 | `09-marketplace-entrepreneurs-toko.md` | Toko sekolah (pembeli) & kewirausahaan (penjual): produk, keranjang, checkout, pesanan, ulasan, pendapatan |
+| 10 | `10-infrastruktur-api-data-latar.md` | Build & dependency (lama → baru), manifest & permission, indeks endpoint, interceptor, DI, Room, semua key SharedPreferences, worker/service, utilitas, tema |
 
-Contoh `422`:
+## Konvensi
+- **Rujukan kode** ditulis relatif terhadap root `android-portal`, mis.
+  `app/src/main/java/id/diskola/app/pages/login/LoginViewModel.kt:263`. Sebagian dokumen memakai
+  singkatan `@/` = `app/src/main/java/id/diskola/app/` (dijelaskan di awal dokumen).
+- **Teks UI dalam tanda kutip** disalin persis dari kode/`strings.xml`, termasuk salah ketik aslinya.
+  Tombol MaterialButton lama tampil huruf kapital (mis. `"masuk"` tampil **MASUK**).
+- **❓ Perlu keputusan user**: perilaku aneh/bug di aplikasi lama yang *mengubah pengalaman pengguna*
+  bila diperbaiki. Jangan diperbaiki diam-diam; putuskan dulu, lalu catat jawabannya di
+  `docs/FLOW_QUESTIONS.md` (sesuai `docs/rules-global.md` §2).
+- **Checklist paritas** di akhir tiap dokumen dipakai sebagai kriteria "selesai" per fitur: cocokkan
+  langsung dengan aplikasi lama di perangkat, bukan dari ingatan.
 
-```json
-{
-  "message": "The given data was invalid.",
-  "errors": {
-    "school_subject_schedule_id": [
-      "Jadwal mata pelajaran bukan milik guru yang sedang masuk."
-    ]
-  }
-}
-```
+## Cara pakai saat mengerjakan satu fitur
+1. Baca dokumen fitur tersebut dan bagian terkait di `10-infrastruktur-api-data-latar.md`
+   (endpoint, tabel Room, key pref).
+2. Selesaikan semua "❓" yang relevan dengan user, catat di `docs/FLOW_QUESTIONS.md`.
+3. Implementasikan mengikuti `docs/ANDROID_DESIGN_PATTERN.md` dan `docs/rules-global.md`
+   (terutama disiplin fetch: tidak ada fetch ganda saat layar dibuka).
+4. Centang checklist paritas dengan membandingkan langsung ke aplikasi lama.
 
-## 7. State Machine untuk Implementasi Agent Mobile
-
-```text
-open form
-  -> GET teacher-data-scope
-     -> gagal: restricted = true (fallback)
-  -> GET assignment/teachers/class
-  -> if restricted == false
-       -> GET assignment/teachers/subject
-       -> tampilkan kelas + mapel tanpa input hari
-       -> submit school_class_id + school_subject_id
-     else
-       -> tampilkan kelas + hari
-       -> GET schedule berdasarkan kelas + hari
-       -> tampilkan schedule.subject milik guru
-       -> submit school_subject_schedule_id
-  -> HTTP 200: refresh daftar dan tutup form
-  -> HTTP 422: petakan errors ke field canonical dan pertahankan draft
-```
-
-Untuk edit, isi nilai awal dari detail tugas. Tugas tanpa schedule masuk alur bebas;
-tugas dengan schedule masuk alur assigned. Setelah scope selesai dimuat, aturan scope
-aktif tetap menjadi sumber kebenaran saat submit.
+## Batasan dokumen
+- Dibuat dari pembacaan kode statis. Perilaku yang hanya bisa dipastikan saat aplikasi berjalan
+  ditandai "(belum terverifikasi)".
+- Nilai rahasia (URL API, client ID, API key Maps, keystore) sengaja tidak ditulis; hanya **nama
+  key** `local.properties`-nya.
