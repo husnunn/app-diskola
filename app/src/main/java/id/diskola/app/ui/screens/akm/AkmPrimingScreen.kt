@@ -3,6 +3,7 @@ package id.diskola.app.ui.screens.akm
 import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -198,7 +199,7 @@ private fun AkmPrimingStrictPreview() {
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun AkmPrimingCancelledDarkPreview() {
-    DiskolaTheme {
+    DiskolaTheme(darkTheme = isSystemInDarkTheme()) {
         AkmPrimingContent(
             strict = false,
             watermark = AkmRules.AkmWatermark(enabled = true, label = "DIBATALKAN"),

@@ -5,6 +5,7 @@ import android.os.Build
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -273,7 +274,7 @@ private fun ExamPenaltyPreview() {
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ExamReportDarkPreview() {
-    DiskolaTheme {
+    DiskolaTheme(darkTheme = isSystemInDarkTheme()) {
         ExamPenaltyContent(
             cause = null,
             remainingLabel = "0:42",

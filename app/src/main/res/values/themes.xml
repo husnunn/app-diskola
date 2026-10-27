@@ -29,6 +29,8 @@
 
         <!-- Window -->
         <item name="android:windowBackground">@color/ref_background</item>
+        <!-- The app is light-only: opt out of the OEM "force dark" that darkens apps with a light theme (API 29+, ignored below). -->
+        <item name="android:forceDarkAllowed">false</item>
 
         <!-- Material widgets -->
         <item name="materialButtonStyle">@style/Widget.MaterialComponents.Button</item>

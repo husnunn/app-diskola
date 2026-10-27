@@ -1,6 +1,7 @@
 package id.diskola.app.ui.screens.home
 
 import android.content.res.Configuration
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -55,7 +56,7 @@ private val longBanner = HubRules.AttendanceBanner(
 
 @Composable
 private fun PreviewColumn(content: @Composable () -> Unit) {
-    DiskolaTheme {
+    DiskolaTheme(darkTheme = isSystemInDarkTheme()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) { content() }
     }
 }
@@ -65,7 +66,7 @@ private fun PreviewColumn(content: @Composable () -> Unit) {
 @Preview(name = "Header, large font", showBackground = true, widthDp = 360, fontScale = 2f)
 @Composable
 private fun HeaderPreview() {
-    DiskolaTheme { HomeHeader(profile = longProfile, bellCount = 120, loading = false, onRefresh = {}, onBell = {}) }
+    DiskolaTheme(darkTheme = isSystemInDarkTheme()) { HomeHeader(profile = longProfile, bellCount = 120, loading = false, onRefresh = {}, onBell = {}) }
 }
 
 @Preview(name = "Class card, long subject", showBackground = true, widthDp = 360)

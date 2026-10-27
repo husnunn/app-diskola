@@ -2,10 +2,12 @@ package id.diskola.app.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.view.MotionEvent
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,6 +25,9 @@ import id.diskola.app.ui.theme.WindowWidth
 import id.diskola.app.utils.session.SessionEvents
 import id.diskola.app.utils.session.SessionManager
 import javax.inject.Inject
+
+/** The scrim `enableEdgeToEdge()` puts behind a 3-button navigation bar in its light style (white, ~90% opaque); kept so light mode looks as before. */
+private val NAV_BAR_SCRIM = Color.argb(0xE6, 0xFF, 0xFF, 0xFF)
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -43,7 +48,12 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // The app is light-only, so the bars are always light-styled (dark icons). The default style follows the system's dark mode
+        // and would draw white icons on the light app.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(NAV_BAR_SCRIM, NAV_BAR_SCRIM),
+        )
         examSession.attach(this)
         requestNotificationPermissionIfNeeded()
         setContent {

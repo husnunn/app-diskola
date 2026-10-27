@@ -57,18 +57,8 @@ class  App : MultiDexApplication(), Application.ActivityLifecycleCallbacks, Conf
                 .onFailure { Timber.e(it, "Gagal menjadwalkan ulang pengiriman laporan masalah") }
         }
 
-        // Apply saved theme mode at startup (follow system by default)
-        try {
-            val mode = preference.getString("theme_mode").ifBlank { "system" }
-            when (mode) {
-                "light" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-                "dark" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-                else -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
-            }
-            if (preference.getString("theme_mode").isEmpty()) {
-                preference.putString("theme_mode", mode)
-            }
-        } catch (_: Exception) { }
+        // The app is light-only: never follow the system's dark mode (see DiskolaTheme).
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
 
         // listen to phone connectivity
 //        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {

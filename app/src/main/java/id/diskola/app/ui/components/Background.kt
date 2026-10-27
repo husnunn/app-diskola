@@ -2,7 +2,6 @@ package id.diskola.app.ui.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.dp
+import id.diskola.app.ui.theme.LocalDarkTheme
 import id.diskola.app.ui.theme.extendedColors
 
 /**
@@ -28,7 +28,7 @@ fun AmbientGradientBackground(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    val dark = isSystemInDarkTheme()
+    val dark = LocalDarkTheme.current
     val scheme = MaterialTheme.colorScheme
     val extended = MaterialTheme.extendedColors
 

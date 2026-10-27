@@ -4,6 +4,7 @@ import android.content.res.Configuration
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -138,7 +139,7 @@ private fun WatermarkLabelPreview() {
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun AkmStampPreview() {
-    DiskolaTheme {
+    DiskolaTheme(darkTheme = isSystemInDarkTheme()) {
         AkmStamp("DIBATALKAN", modifier = Modifier.fillMaxWidth().height(260.dp)) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("TEST SOAL ASESMEN", style = MaterialTheme.typography.titleLarge)
