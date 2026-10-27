@@ -23,6 +23,27 @@ android {
     }
     val webClientId = properties.getProperty("WEB_CLIENT_ID") ?: ""
 
+    // Release signing: needs all four signing_* keys in local.properties; signing_storeFile is resolved from the repo root.
+    val signingKeys = listOf("signing_storeFile", "signing_storePassword", "signing_keyAlias", "signing_keyPassword")
+    val releaseKeystore = properties.getProperty("signing_storeFile")
+        ?.takeIf { it.isNotBlank() }
+        ?.let { rootProject.file(it) }
+    val canSignRelease = signingKeys.all { !properties.getProperty(it).isNullOrBlank() } && releaseKeystore?.isFile == true
+    if (!canSignRelease) {
+        logger.warn("Release signing disabled: signing_* keys missing in local.properties or keystore file not found. Release output will be unsigned.")
+    }
+
+    signingConfigs {
+        if (canSignRelease) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = properties.getProperty("signing_storePassword")
+                keyAlias = properties.getProperty("signing_keyAlias")
+                keyPassword = properties.getProperty("signing_keyPassword")
+            }
+        }
+    }
+
     defaultConfig {
         applicationId = "id.diskola.app"
         minSdk = 27
@@ -41,6 +62,9 @@ android {
         release {
             isMinifyEnabled = true
             isDebuggable = false
+            if (canSignRelease) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
