@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -93,6 +94,9 @@ fun ResetPasswordScreen(
                         placeholder = "Ketikkan email",
                         keyboardType = androidx.compose.ui.text.input.KeyboardType.Email,
                         capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.None,
+                        autoFocus = true,
+                        imeAction = ImeAction.Done,
+                        onImeAction = { if (email.length > 3 && !loading) viewModel.sendResetLink(email) },
                     )
                     AppButton(
                         text = "kirim sekarang",

@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -103,6 +104,8 @@ fun LoginScreen(
                         label = "NISN / NIS / NIK",
                         placeholder = "Ketikkan NISN/NIS/NIK",
                         keyboardType = KeyboardType.Number,
+                        autoFocus = true,
+                        imeAction = ImeAction.Done,
                     )
 
                     AppTextField(

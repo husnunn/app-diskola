@@ -35,12 +35,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -65,7 +63,6 @@ import id.diskola.app.ui.theme.contentContainer
 import id.diskola.app.utils.session.AuthError
 import id.diskola.app.viewmodel.LoginOutcome
 import id.diskola.app.viewmodel.LoginViewModel
-import kotlinx.coroutines.delay
 
 private const val CONTACT_WHATSAPP_NUMBER = "6287887219649"
 
@@ -81,20 +78,11 @@ fun PasswordScreen(
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var mustChangePasswordDialog by remember { mutableStateOf(false) }
-    val focusRequester = remember { FocusRequester() }
-    val keyboardController = LocalSoftwareKeyboardController.current
 
     val account by viewModel.checkAccountResult.collectAsStateWithLifecycle()
     val loading by viewModel.loading.collectAsStateWithLifecycle()
     val authError by viewModel.authError.collectAsStateWithLifecycle()
     val loginOutcome by viewModel.loginOutcome.collectAsStateWithLifecycle()
-
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-        keyboardController?.show()
-        delay(200)
-        keyboardController?.show()
-    }
 
     LaunchedEffect(loginOutcome) {
         when (loginOutcome) {
@@ -162,7 +150,9 @@ fun PasswordScreen(
                             placeholder = "Masukkan Password",
                             visualTransformation = if (passwordVisible) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(),
                             capitalization = KeyboardCapitalization.None,
-                            modifier = Modifier.focusRequester(focusRequester),
+                            autoFocus = true,
+                            imeAction = ImeAction.Done,
+                            onImeAction = { if (password.isNotBlank() && !loading) viewModel.loginAccount(password) },
                             trailing = {
                                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                     Icon(

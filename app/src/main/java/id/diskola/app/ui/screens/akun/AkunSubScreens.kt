@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -176,9 +177,9 @@ fun AkunPassScreen(onBack: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            PasswordField("Kata sandi lama", old, { old = it }, oldVisible, { oldVisible = !oldVisible })
-            PasswordField("Kata sandi baru", new, { new = it }, newVisible, { newVisible = !newVisible }, placeholder = "Minimal 8 karakter")
-            PasswordField("Konfirmasi kata sandi baru", confirm, { confirm = it }, confirmVisible, { confirmVisible = !confirmVisible }, placeholder = "Ulangi kata sandi baru")
+            PasswordField("Kata sandi lama", old, { old = it }, oldVisible, { oldVisible = !oldVisible }, autoFocus = true, imeAction = ImeAction.Next)
+            PasswordField("Kata sandi baru", new, { new = it }, newVisible, { newVisible = !newVisible }, placeholder = "Minimal 8 karakter", imeAction = ImeAction.Next)
+            PasswordField("Konfirmasi kata sandi baru", confirm, { confirm = it }, confirmVisible, { confirmVisible = !confirmVisible }, placeholder = "Ulangi kata sandi baru", imeAction = ImeAction.Done)
             AppButton(
                 text = "simpan perubahan",
                 onClick = {},
@@ -197,12 +198,16 @@ private fun PasswordField(
     visible: Boolean,
     onToggleVisible: () -> Unit,
     placeholder: String = "",
+    autoFocus: Boolean = false,
+    imeAction: ImeAction = ImeAction.Default,
 ) {
     AppTextField(
         value = value,
         onValueChange = onValueChange,
         label = label,
         placeholder = placeholder,
+        autoFocus = autoFocus,
+        imeAction = imeAction,
         visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
         trailing = {
             IconButton(onClick = onToggleVisible) {

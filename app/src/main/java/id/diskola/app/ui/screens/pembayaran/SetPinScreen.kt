@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -97,6 +98,9 @@ fun SetPinScreen(
                     placeholder = "Masukkan pin baru",
                     keyboardType = KeyboardType.NumberPassword,
                     visualTransformation = PasswordVisualTransformation(),
+                    // not while the link is still being checked: a loading dialog holds the window then
+                    autoFocus = !state.checking,
+                    imeAction = ImeAction.Next,
                 )
                 AppTextField(
                     value = confirmation,
@@ -105,6 +109,8 @@ fun SetPinScreen(
                     placeholder = "Ketik ulang pin baru",
                     keyboardType = KeyboardType.NumberPassword,
                     visualTransformation = PasswordVisualTransformation(),
+                    imeAction = ImeAction.Done,
+                    onImeAction = { if (PaymentRules.canSubmitNewPin(pin, confirmation) && !state.saving) viewModel.save(token, pin, confirmation) },
                 )
                 AppButton(
                     text = "Simpan Perubahan",

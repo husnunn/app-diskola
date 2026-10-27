@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,8 +31,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.runtime.remember
@@ -51,6 +56,7 @@ import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.DiskolaTheme
 import id.diskola.app.ui.theme.Spacing
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
@@ -63,6 +69,9 @@ private val CURSOR_MARGIN = 16.dp
 
 /** Give up waiting for a keyboard (hardware keyboard, no IME) after this long and bring the field into view anyway. */
 private const val KEYBOARD_WAIT_MS = 1_200L
+
+/** How long after an auto-focus the keyboard is asked to show a second time. */
+private const val KEYBOARD_SHOW_RETRY_MS = 200L
 
 /**
  * The design-system text field — empty/focused/error/readonly states, per the DiskolaKit gallery.
@@ -90,14 +99,38 @@ fun AppTextField(
     onClick: (() -> Unit)? = null,
     /** More than 1 turns the field into a growing multi-line box (e.g. "Tujuan Pembelajaran"). */
     minLines: Int = 1,
-    /** The keyboard's action key. [ImeAction.Done] (also on a multi-line field) shows "Selesai" instead of Enter. */
+    /**
+     * The keyboard's action key. [ImeAction.Done] (also on a multi-line field) shows "Selesai" instead of Enter. [ImeAction.Next] shows
+     * "Lanjut" and moves focus to the next field (the platform default, no [onImeAction] needed).
+     */
     imeAction: ImeAction = ImeAction.Default,
     /** What the action key does; for [ImeAction.Done] the default closes the keyboard and drops focus. */
     onImeAction: (() -> Unit)? = null,
     /** Keeps the line the cursor is on in view while typing and when the keyboard opens/closes (long multi-line answers). */
     followCursor: Boolean = false,
+    /**
+     * Takes focus and opens the keyboard once, the first time the field is shown with this set (it may switch from false to true later,
+     * e.g. when a loading dialog goes away). Leaving the screen and coming back, or rotating it, does not do it again. Only for the
+     * first field of a short form: on a long form the keyboard would cover the content and the bottom bar.
+     */
+    autoFocus: Boolean = false,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    var autoFocusDone by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(autoFocus) {
+        if (!autoFocus || autoFocusDone) return@LaunchedEffect
+        // The requester throws while the field is not on screen yet; stay armed so the next try can still succeed.
+        if (runCatching { focusRequester.requestFocus() }.isFailure) return@LaunchedEffect
+        autoFocusDone = true
+        keyboardController?.show()
+        // Some keyboards ignore a show() sent while the window is still taking focus.
+        delay(KEYBOARD_SHOW_RETRY_MS)
+        keyboardController?.show()
+    }
+
     val focused by interactionSource.collectIsFocusedAsState()
     val scheme = MaterialTheme.colorScheme
     val isError = errorText != null
@@ -187,7 +220,7 @@ fun AppTextField(
                         onTextLayout = { textLayout = it },
                         cursorBrush = SolidColor(scheme.primary),
                         interactionSource = interactionSource,
-                        modifier = Modifier.fillMaxWidth().bringIntoViewRequester(cursorInView),
+                        modifier = Modifier.fillMaxWidth().bringIntoViewRequester(cursorInView).focusRequester(focusRequester),
                     )
                 }
                 trailing?.invoke()
@@ -221,6 +254,17 @@ private fun AppTextFieldPreview() {
     DiskolaTheme {
         Column(modifier = Modifier.padding(16.dp)) {
             AppTextField(value = "", onValueChange = {}, label = "NISN / NIS / NIK", placeholder = "Contoh: 0051234567")
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun AppTextFieldAutoFocusPreview() {
+    DiskolaTheme {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            AppTextField(value = "", onValueChange = {}, label = "Kata sandi lama", placeholder = "Fokus otomatis", autoFocus = true, imeAction = ImeAction.Next)
+            AppTextField(value = "", onValueChange = {}, label = "Kata sandi baru", placeholder = "Lanjut dari keyboard", imeAction = ImeAction.Done)
         }
     }
 }
