@@ -6,6 +6,12 @@ import id.diskola.app.dataclass.ResponData.KlaspayWalletResponse
 import id.diskola.app.dataclass.ResponData.ResetPinRequest
 import id.diskola.app.dataclass.ResponData.ResetPinResponse
 import id.diskola.app.dataclass.ResponData.SetPinRequest
+import id.diskola.app.dataclass.ResponData.PaymentChannelResponse
+import id.diskola.app.dataclass.ResponData.PaymentGuideResponse
+import id.diskola.app.dataclass.ResponData.PaymentHistoryDetailResponse
+import id.diskola.app.dataclass.ResponData.PaymentTrxResponse
+import id.diskola.app.dataclass.ResponData.SppHistoryResponse
+import id.diskola.app.dataclass.ResponData.SppPayRequest
 import okhttp3.ResponseBody
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -75,7 +81,7 @@ interface KlaspayApiService {
     suspend fun topupTransaction(@Body request: Map<String, Any>): Map<String, Any>
 
     @GET("payment/channel/guide/{channelMethodName}")
-    suspend fun channelGuide(@Path("channelMethodName") channelMethodName: String): Map<String, Any>
+    suspend fun channelGuide(@Path("channelMethodName") channelMethodName: String): PaymentGuideResponse
 
     @POST("payment/transaction/transfer_inq")
     suspend fun transferInquiry(@Body request: Map<String, Any>): Map<String, Any>
@@ -109,13 +115,13 @@ interface KlaspayApiService {
     suspend fun transactionSpp(@Body request: Map<String, Any>): Map<String, Any>
 
     @GET("payment/channel/spp")
-    suspend fun sppChannels(): Map<String, Any>
+    suspend fun sppChannels(): PaymentChannelResponse
 
     @GET("payment/transaction/history_school")
-    suspend fun schoolTransactionHistory(): Map<String, Any>
+    suspend fun schoolTransactionHistory(): SppHistoryResponse
 
     @POST("payment/transaction/spp_trx")
-    suspend fun sppTransaction(@Body request: Map<String, Any>): Map<String, Any>
+    suspend fun sppTransaction(@Body request: SppPayRequest): PaymentTrxResponse
 
     @POST("payment/transaction/bill_trx")
     suspend fun billTransaction(@Body request: Map<String, Any>): Map<String, Any>
@@ -128,5 +134,5 @@ interface KlaspayApiService {
     ): Map<String, Any>
 
     @GET("payment/transaction/history/id/{id}")
-    suspend fun transactionHistoryDetail(@Path("id") id: String): Map<String, Any>
+    suspend fun transactionHistoryDetail(@Path("id") id: String): PaymentHistoryDetailResponse
 }
