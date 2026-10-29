@@ -6,15 +6,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.Icon
@@ -23,11 +20,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import id.diskola.app.ui.components.CounterBadge
 import id.diskola.app.ui.components.iconFor
+import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.Spacing
 import id.diskola.app.viewmodel.HomeProfile
 
@@ -73,26 +72,29 @@ fun menuTilesFor(profile: HomeProfile): List<MenuTileData> {
 
 /**
  * One menu tile. At least 88 dp high and growing with the label at large font scales; a long label wraps to two lines and is
- * cut with an ellipsis after that. Lock icon top-left, count badge top-right (legacy `pembelajaran_menu_item.xml`).
+ * cut with an ellipsis after that. The icon and label are centred in the card both ways (the card is taller than its content
+ * whenever a neighbour in the row has a longer label). Lock icon top-left, count badge top-right (legacy `pembelajaran_menu_item.xml`).
  */
 @Composable
 fun MenuGridTile(tile: MenuTileData, badge: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val shape = DiskolaExtraShapes.card
     Box(
         modifier = modifier
             .fillMaxHeight()
             .heightIn(min = 88.dp)
-            .background(MaterialTheme.colorScheme.surfaceContainerLowest, RoundedCornerShape(14.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp))
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest, shape)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
             .clickable(onClick = onClick)
             .padding(Spacing.sm),
+        contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs),
+            modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {
             Icon(iconFor(tile.icon), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
-            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 tile.label,
                 style = MaterialTheme.typography.labelLarge,
