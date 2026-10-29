@@ -25,6 +25,7 @@ class AkmMigrationTest {
     private val v8 by lazy { schema(8) }
     private val v9 by lazy { schema(9) }
     private val v10 by lazy { schema(10) }
+    private val v11 by lazy { schema(11) }
 
     @Suppress("UNCHECKED_CAST")
     private fun entity(schema: Map<String, Any?>, table: String): Map<String, Any?> {
@@ -118,5 +119,27 @@ class AkmMigrationTest {
     fun `the third migration spans exactly 9 to 10`() {
         assertEquals(9, MIGRATION_9_10.startVersion)
         assertEquals(10, MIGRATION_9_10.endVersion)
+    }
+
+    // ---- v10 -> v11 (payment tables of Bayar SPP) ----
+
+    @Test
+    fun `payment invoice and guide tables match the schema Room exports`() {
+        assertEquals(createSql(v11, "payment_invoice"), PaymentMigrationSql.INVOICE)
+        assertEquals(createSql(v11, "payment_guide"), PaymentMigrationSql.GUIDE)
+    }
+
+    @Test
+    fun `version 11 only adds tables — every table of version 10 is unchanged`() {
+        @Suppress("UNCHECKED_CAST")
+        val tables = ((v10["database"] as Map<String, Any?>)["entities"] as List<Map<String, Any?>>).map { it["tableName"] as String }
+        assertTrue(tables.contains("akm_answer") && tables.contains("homework"))
+        tables.forEach { table -> assertEquals(table, createSql(v10, table), createSql(v11, table)) }
+    }
+
+    @Test
+    fun `the fourth migration spans exactly 10 to 11`() {
+        assertEquals(10, MIGRATION_10_11.startVersion)
+        assertEquals(11, MIGRATION_10_11.endVersion)
     }
 }
