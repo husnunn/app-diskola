@@ -10,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -161,7 +162,8 @@ private fun androidx.navigation.NavGraphBuilder.authGraph(navController: NavHost
         framedComposable<Route.Auth.Login> { backStackEntry ->
             val parentEntry = remember(backStackEntry) { navController.getBackStackEntry(Route.AuthGraph) }
             val loginViewModel: LoginViewModel = hiltViewModel(parentEntry)
-            var termsAccepted by remember { mutableStateOf(false) }
+            // Saveable like the NISN: coming back from the password screen must not turn "masuk" off again.
+            var termsAccepted by rememberSaveable { mutableStateOf(false) }
             var termsDialogVisible by remember { mutableStateOf(false) }
             val context = LocalContext.current
             val scope = rememberCoroutineScope()

@@ -181,6 +181,15 @@ saling tumpang tindih; topik FCM `ebede-notification-user-*` yang bukan milik Di
 tidak terdaftar di manifest; `LoginAccountRequest` tanpa `device_id`; dan seterusnya — semua sudah
 masuk daftar 02a dengan status ✅.
 
+**2026-10-29 — Back dari layar Password tidak bisa kembali ke Login** (laporan user; ditemukan lewat pembacaan kode, log Samsung tidak terbaca karena perangkat terputus):
+
+| Bug | Penyebab | Perbaikan |
+|---|---|---|
+| Setelah salah password (atau kapan pun) Back dari Password selalu dilempar ke Password lagi | `LoginScreen` memakai `LaunchedEffect(checkAccountResult)` untuk navigasi, tetapi hasil itu juga data yang dibaca layar Password dan tidak pernah dikosongkan; `LoginViewModel` dibagi sepanjang graf, jadi begitu Login tampil lagi efeknya jalan ulang | `LoginViewModel.accountVerified` (+`consumeAccountVerified()`): pemicu sekali pakai, sama pola dengan `loginOutcome`. `checkAccountResult` tetap data; direset ke `null` di awal tiap `checkAccount`, sehingga dialog "Sedang mencari data pengguna..." tetap muncul pada percobaan kedua. |
+| NISN dan kotak Syarat & Ketentuan kosong lagi setelah kembali ke Login (tombol "masuk" mati) | `remember` biasa di `LoginScreen` (`nisn`) dan `AppNavHost` (`termsAccepted`) hilang saat layar keluar komposisi | `rememberSaveable` untuk keduanya (bukan password, aman disimpan) |
+
+Terverifikasi: build + 464 tes JVM lulus. **Belum terverifikasi di perangkat** (butuh keluar dari sesi uji dan mengisi NISN; password tidak diisi oleh agen): NISN → "masuk" → layar Password → Back → harus tetap di Login dengan NISN & centang utuh; salah password → tutup sheet → Back → Login.
+
 ## 5. Pengujian di device fisik
 
 **Perangkat:** Infinix (Android 15, API 35), terhubung lewat `adb` — model debug (`id.diskola.app.debug`)

@@ -80,6 +80,14 @@ class LoginViewModel @Inject constructor(
     private val _checkAccountResult = MutableStateFlow<CheckAccountUserData?>(null)
     val checkAccountResult: StateFlow<CheckAccountUserData?> = _checkAccountResult.asStateFlow()
 
+    /**
+     * "Go to the password screen", raised once per successful `check-account`. [checkAccountResult] is data the password screen keeps
+     * reading, so it cannot double as the trigger: Login would navigate again every time it comes back on screen and Back from the
+     * password screen could never land there.
+     */
+    private val _accountVerified = MutableStateFlow(false)
+    val accountVerified: StateFlow<Boolean> = _accountVerified.asStateFlow()
+
     private val _authError = MutableStateFlow<AuthError?>(null)
     val authError: StateFlow<AuthError?> = _authError.asStateFlow()
 
@@ -92,6 +100,10 @@ class LoginViewModel @Inject constructor(
 
     fun consumeLoginOutcome() {
         _loginOutcome.value = null
+    }
+
+    fun consumeAccountVerified() {
+        _accountVerified.value = false
     }
 
     /** Fetched once when the T&K dialog opens — the legacy app's own anti-pattern was fetching
@@ -168,12 +180,15 @@ class LoginViewModel @Inject constructor(
             return
         }
 
+        // A new attempt starts clean: the account of an earlier one (the user came back from the password screen) must not read as this one's.
+        _checkAccountResult.value = null
         _loading.value = true
         viewModelScope.launch {
             try {
                 val response = authRepository.checkAccount(nisNik, school.uuid)
                 sessionStore.writeCheckAccount(response, school)
                 _checkAccountResult.value = response.data
+                if (response.data != null) _accountVerified.value = true
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

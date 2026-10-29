@@ -23,6 +23,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,7 +62,8 @@ fun LoginScreen(
     termsAccepted: Boolean,
     onTermsAcceptedChange: (Boolean) -> Unit,
 ) {
-    var nisn by remember { mutableStateOf("") }
+    // Saveable: Back from the password screen returns here and must find the NISN still typed.
+    var nisn by rememberSaveable { mutableStateOf("") }
     var schoolSheetVisible by remember { mutableStateOf(false) }
 
     val selectedSchool by viewModel.selectedSchool.collectAsStateWithLifecycle()
@@ -70,9 +72,15 @@ fun LoginScreen(
     val loading by viewModel.loading.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
     val checkAccountResult by viewModel.checkAccountResult.collectAsStateWithLifecycle()
+    val accountVerified by viewModel.accountVerified.collectAsStateWithLifecycle()
 
-    LaunchedEffect(checkAccountResult) {
-        checkAccountResult?.let(onAccountVerified)
+    // One navigation per successful check-account. Keyed on the result itself, this fired again whenever Login came back on screen and
+    // bounced Back from the password screen straight forward again.
+    LaunchedEffect(accountVerified) {
+        if (accountVerified) {
+            checkAccountResult?.let(onAccountVerified)
+            viewModel.consumeAccountVerified()
+        }
     }
 
     // Doc `02-auth-login-sesi.md` §4.1: just non-blank, not a length gate (gap `02a` L1).
