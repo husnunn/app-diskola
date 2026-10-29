@@ -191,6 +191,8 @@ dependencies {
 
     // QR scan for Jurnal "Hadiri kelas" (no preview UI, no camera permission of our own)
     implementation(libs.play.services.code.scanner)
+    // In-app review after paying SPP, like legacy `SuccessPayPage`.
+    implementation(libs.play.review.ktx)
     implementation(libs.play.services.auth)
     implementation(libs.play.services.identity)
 

@@ -30,6 +30,7 @@ playServicesMaps = "19.2.0"
 mapsCompose = "6.4.1"
 camerax = "1.4.2"
 playServicesCodeScanner = "16.1.0"
+playReview = "2.0.2"
 retrofit = "2.11.0"
 roomRuntime = "2.7.2"
 secretsGradlePlugin = "2.0.1"
@@ -119,6 +120,7 @@ play-services-location = { module = "com.google.android.gms:play-services-locati
 play-services-maps = { module = "com.google.android.gms:play-services-maps", version.ref = "playServicesMaps" }
 maps-compose = { module = "com.google.maps.android:maps-compose", version.ref = "mapsCompose" }
 play-services-code-scanner = { module = "com.google.android.gms:play-services-code-scanner", version.ref = "playServicesCodeScanner" }
+play-review-ktx = { module = "com.google.android.play:review-ktx", version.ref = "playReview" }
 androidx-camera-core = { module = "androidx.camera:camera-core", version.ref = "camerax" }
 androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
 androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }

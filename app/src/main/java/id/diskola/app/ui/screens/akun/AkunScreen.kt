@@ -21,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Warning
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -53,6 +52,7 @@ import id.diskola.app.ui.components.iconFor
 import id.diskola.app.ui.navigation.Route
 import id.diskola.app.ui.theme.Spacing
 import id.diskola.app.viewmodel.AkunViewModel
+import id.diskola.app.utils.AppDialogTone
 
 data class AkunSessionInfo(
     val name: String,
@@ -182,18 +182,20 @@ fun AkunScreen(
 
     if (logoutDialog) {
         val scope = rememberCoroutineScope()
-        AlertDialog(
-            onDismissRequest = { logoutDialog = false },
-            title = { Text("Logout") },
-            text = { Text("Anda yakin akan keluar dari aplikasi?") },
-            confirmButton = {
-                AppButton(text = "Logout", variant = ButtonVariant.Text, onClick = {
-                    logoutDialog = false
-                    scope.launch { clearGoogleCredentialState(context) }
-                    viewModel.logout(onComplete = onLoggedOut)
-                })
+        AppDialog(
+            onDismiss = { logoutDialog = false },
+            icon = iconFor("logout"),
+            tone = AppDialogTone.WARNING,
+            title = "Logout",
+            body = "Anda yakin akan keluar dari aplikasi?",
+            primaryButtonText = "Logout",
+            onPrimaryClick = {
+                logoutDialog = false
+                scope.launch { clearGoogleCredentialState(context) }
+                viewModel.logout(onComplete = onLoggedOut)
             },
-            dismissButton = { AppButton(text = "Batal", variant = ButtonVariant.Text, onClick = { logoutDialog = false }) },
+            secondaryButtonText = "Batal",
+            onSecondaryClick = { logoutDialog = false },
         )
     }
 
@@ -212,11 +214,12 @@ fun AkunScreen(
     }
 
     if (termsDialog) {
-        AlertDialog(
-            onDismissRequest = { termsDialog = false },
-            title = { Text("Syarat & Ketentuan") },
-            text = { Text("Lihat kebijakan lengkap di Tentang Diskola.") },
-            confirmButton = { AppButton(text = "Tutup", variant = ButtonVariant.Text, onClick = { termsDialog = false }) },
+        AppDialog(
+            onDismiss = { termsDialog = false },
+            title = "Syarat & Ketentuan",
+            body = "Lihat kebijakan lengkap di Tentang Diskola.",
+            primaryButtonText = "Tutup",
+            onPrimaryClick = { termsDialog = false },
         )
     }
 }

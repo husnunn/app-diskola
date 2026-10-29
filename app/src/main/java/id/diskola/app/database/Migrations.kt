@@ -69,6 +69,21 @@ object HomeworkMigrationSql {
     const val ADD_SCHEDULE_DAY = "ALTER TABLE homework ADD COLUMN schedule_day TEXT NOT NULL DEFAULT ''"
 }
 
+/** v10 -> v11: the two payment tables of Bayar SPP (P2). Only new tables, so nothing already on the phone is touched. */
+object PaymentMigrationSql {
+    const val INVOICE =
+        "CREATE TABLE IF NOT EXISTS `payment_invoice` (`trx_id` TEXT NOT NULL, `type` TEXT NOT NULL, `product_name` TEXT NOT NULL, `channel_method_name` TEXT NOT NULL, `image_url` TEXT NOT NULL, `payment_code` TEXT NOT NULL, `partner_reff2` TEXT NOT NULL, `admin_fee` INTEGER NOT NULL, `amount` INTEGER NOT NULL, `total_amount` INTEGER NOT NULL, `note` TEXT NOT NULL, `created_at` TEXT NOT NULL, `expired_at` TEXT NOT NULL, `paid_at` TEXT NOT NULL, `is_paid` INTEGER NOT NULL, `cancelable` INTEGER NOT NULL, `status` TEXT NOT NULL, PRIMARY KEY(`trx_id`))"
+    const val GUIDE =
+        "CREATE TABLE IF NOT EXISTS `payment_guide` (`channel` TEXT NOT NULL, `sectionsJson` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`channel`))"
+}
+
+val MIGRATION_10_11 = object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(PaymentMigrationSql.INVOICE)
+        db.execSQL(PaymentMigrationSql.GUIDE)
+    }
+}
+
 val MIGRATION_9_10 = object : Migration(9, 10) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL(HomeworkMigrationSql.ADD_SCHEDULE_DAY)

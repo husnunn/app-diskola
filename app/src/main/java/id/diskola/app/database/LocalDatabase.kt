@@ -12,6 +12,8 @@ import id.diskola.app.dataclass.ResponData.MajorItem
 import id.diskola.app.dataclass.ResponData.MapelTable
 import id.diskola.app.dataclass.ResponData.LeaveRequestTable
 import id.diskola.app.dataclass.ResponData.MateriTable
+import id.diskola.app.dataclass.ResponData.PaymentGuideTable
+import id.diskola.app.dataclass.ResponData.PaymentInvoiceTable
 import id.diskola.app.dataclass.ResponData.PoinItemTable
 import id.diskola.app.dataclass.ResponData.PresensiDayTable
 import id.diskola.app.dataclass.ResponData.PresensiRekapTable
@@ -33,6 +35,7 @@ import id.diskola.app.dataclass.localDb.AkmViolationEntity
 import id.diskola.app.dataclass.localDb.HomeworkDao
 import id.diskola.app.dataclass.localDb.MapelDao
 import id.diskola.app.dataclass.localDb.MateriDao
+import id.diskola.app.dataclass.localDb.PaymentDao
 import id.diskola.app.dataclass.localDb.PoinDao
 import id.diskola.app.dataclass.localDb.PresensiDao
 import id.diskola.app.dataclass.localDb.SchoolDao
@@ -42,7 +45,7 @@ import id.diskola.app.dataclass.localDb.User
 import id.diskola.app.dataclass.localDb.UserDao
 
 @Database(
-    version = 10,
+    version = 11,
     exportSchema = true,
     entities = [
         User::class,
@@ -67,6 +70,8 @@ import id.diskola.app.dataclass.localDb.UserDao
         PresensiDayTable::class,
         PresensiRekapTable::class,
         LeaveRequestTable::class,
+        PaymentInvoiceTable::class,
+        PaymentGuideTable::class,
 //        Province::class,
 //        City::class
     ]
@@ -88,6 +93,7 @@ abstract class LocalDatabase : RoomDatabase() {
     abstract fun poinDao(): PoinDao
     abstract fun agendaDao(): AgendaDao
     abstract fun presensiDao(): PresensiDao
+    abstract fun paymentDao(): PaymentDao
 //    abstract fun provinceDao(): ProvinceDao
 //    abstract fun cityDao(): CityDao
 }

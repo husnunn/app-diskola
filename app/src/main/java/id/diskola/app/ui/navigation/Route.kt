@@ -289,11 +289,29 @@ sealed interface Route {
         @Serializable
         data object Riwayat : PembayaranSub
 
+        /** Bayar SPP (doc 08 §9). [showPaid] opens on "Sudah Dibayar" (legacy extra `page=paid`). */
         @Serializable
-        data object Spp : PembayaranSub
+        data class Spp(val showPaid: Boolean = false) : PembayaranSub
 
+        /** "Rincian Pembayaran" of the months picked on [Spp]; shares its ViewModel. */
         @Serializable
-        data class Checkout(val billIds: List<String> = emptyList()) : PembayaranSub
+        data object SppCheckout : PembayaranSub
+
+        /** "Pilih Metode Pembayaran" for those months; shares the [Spp] ViewModel, which also pays. */
+        @Serializable
+        data object SppPaymentMethod : PembayaranSub
+
+        /** "Selesaikan Pembayaran": the guide of an invoice kept on the phone (doc 08 §2.5). */
+        @Serializable
+        data class PaymentGuide(val trxId: String, val partnerReff2: String = "") : PembayaranSub
+
+        /** "Detail Pembayaran" (doc 08 §2.6). [paymentMethod] is shown instead of the stored channel when given. */
+        @Serializable
+        data class PaymentDetail(val trxId: String, val paymentMethod: String = "") : PembayaranSub
+
+        /** "Transaksi Berhasil" after paying from the wallet (doc 08 §2.7). */
+        @Serializable
+        data class PaymentDone(val type: String, val amountLabel: String, val items: List<String> = emptyList()) : PembayaranSub
 
         @Serializable
         data class Pin(val amountLabel: String = "", val purpose: String = "") : PembayaranSub

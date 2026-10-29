@@ -45,8 +45,10 @@ maupun fitur yang dipakai pengguna sekarang**.
 | 08 | `08-keuangan-pembayaran-klaspay-ppob.md` | Pembayaran & SPP, PIN, QR, Klaspay (aktivasi, top up, riwayat, tagihan, promo), PPOB, dana partisipasi |
 | 08a | `08a-gap-pembayaran.md` | Selisih Pembayaran/Klaspay app baru vs lama (hasil audit 2026-10-14), status per bagian, selisih UI yang disengaja |
 | 08b | `08b-implementasi-pembayaran-p1.md` | Laporan implementasi sub-fase P1 (fondasi, hub nyata, aktivasi, PIN, dialog keamanan), temuan teknis, status uji |
+| 08c | `08c-implementasi-pembayaran-p2.md` | Laporan implementasi Pembayaran P2 (komponen bayar, Bayar SPP, gate `payment`) + dialog kustom reusable, keputusan Q4/Q5/Q16, status uji |
 | 09 | `09-marketplace-entrepreneurs-toko.md` | Toko sekolah (pembeli) & kewirausahaan (penjual): produk, keranjang, checkout, pesanan, ulasan, pendapatan |
 | 10 | `10-infrastruktur-api-data-latar.md` | Build & dependency (lama → baru), manifest & permission, indeks endpoint, interceptor, DI, Room, semua key SharedPreferences, worker/service, utilitas, tema |
+| 11 | `11-gap-audit-app-baru-vs-lama.md` | Audit gap berbasis kode per 2026-10-28 (android-portal 2.1.42 vs app baru 2.2.84), fokus Pembelajaran: daftar P0/P1/P2 per fitur, gap lintas fitur, klaim dokumen yang basi, daftar uji perangkat, keputusan produk terbuka, urutan perbaikan |
 
 ## Konvensi
 - **Rujukan kode** ditulis relatif terhadap root `android-portal`, mis.

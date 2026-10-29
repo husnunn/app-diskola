@@ -26,5 +26,8 @@ class FeatureGateRepository @Inject constructor(
     companion object {
         const val PRESENSI = "presensi"
         const val JURNAL_KBM = "jurnal-kbm"
+
+        /** Bayar SPP and Dana Partisipasi (doc `08` §5.6, since 21-10-2026). */
+        const val PAYMENT = "payment"
     }
 }

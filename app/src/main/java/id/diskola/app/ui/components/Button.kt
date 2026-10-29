@@ -26,7 +26,8 @@ import androidx.compose.ui.unit.sp
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.Motion
 
-enum class ButtonVariant { Filled, Tonal, Outlined, Text }
+/** [Danger] is the filled button of a destructive or failed action (the error tone of `AppDialog`). */
+enum class ButtonVariant { Filled, Tonal, Outlined, Text, Danger }
 
 /**
  * The design-system button — 4 [ButtonVariant]s x enabled/pressed/disabled states, per the
@@ -112,6 +113,11 @@ private fun buttonColors(variant: ButtonVariant, enabled: Boolean, pressed: Bool
             !enabled -> ButtonColors(Color.Transparent, scheme.onSurfaceVariant.copy(alpha = 0.55f), BorderStroke(1.5.dp, scheme.outlineVariant))
             pressed -> ButtonColors(scheme.surfaceContainerLow, scheme.primary, BorderStroke(1.5.dp, scheme.primary))
             else -> ButtonColors(Color.Transparent, scheme.primary, BorderStroke(1.5.dp, scheme.outline))
+        }
+        ButtonVariant.Danger -> when {
+            !enabled -> ButtonColors(scheme.surfaceContainerHighest, scheme.onSurfaceVariant.copy(alpha = 0.55f), null)
+            pressed -> ButtonColors(scheme.errorContainer, scheme.onErrorContainer, null)
+            else -> ButtonColors(scheme.error, scheme.onError, null)
         }
         ButtonVariant.Text -> when {
             !enabled -> ButtonColors(Color.Transparent, scheme.onSurfaceVariant.copy(alpha = 0.55f), null)

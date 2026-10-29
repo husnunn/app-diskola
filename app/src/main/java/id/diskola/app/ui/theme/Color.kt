@@ -176,6 +176,15 @@ data class ExtendedColors(
     /** Penalty countdown chip — always reads as an alert, in either theme. */
     val penaltyContainer: Color,
     val onPenaltyContainer: Color,
+    /** The card of `AppDialog`: white in light (legacy `app_dialog_surface`), a raised surface in dark. */
+    val dialogSurface: Color,
+    /** Tone badge / tag of `AppDialog` (legacy `app_dialog_*_container`); error uses the scheme's `errorContainer`. */
+    val infoContainer: Color,
+    val onInfoContainer: Color,
+    val successContainer: Color,
+    val onSuccessContainer: Color,
+    val warningContainer: Color,
+    val onWarningContainer: Color,
 )
 
 val LightExtendedColors = ExtendedColors(
@@ -191,6 +200,13 @@ val LightExtendedColors = ExtendedColors(
     onExamSurface = Color(0xFFFFFFFF),
     penaltyContainer = Color(0xFFFFDAD6),
     onPenaltyContainer = Color(0xFF93000A),
+    dialogSurface = Color(0xFFFFFFFF),
+    infoContainer = Color(0xFFD6F0ED),
+    onInfoContainer = Color(0xFF026068),
+    successContainer = Color(0xFFDCFCE7),
+    onSuccessContainer = Color(0xFF15803D),
+    warningContainer = Color(0xFFFEF3C7),
+    onWarningContainer = Color(0xFFB45309),
 )
 
 val DarkExtendedColors = ExtendedColors(
@@ -206,6 +222,13 @@ val DarkExtendedColors = ExtendedColors(
     onExamSurface = Color(0xFFFFFFFF),
     penaltyContainer = Color(0xFF93000A),
     onPenaltyContainer = Color(0xFFFFDAD6),
+    dialogSurface = Color(0xFF212C2A),
+    infoContainer = Color(0xFF0B3B37),
+    onInfoContainer = Color(0xFF8EE6D9),
+    successContainer = Color(0xFF0E3B24),
+    onSuccessContainer = Color(0xFF86EFAC),
+    warningContainer = Color(0xFF43300B),
+    onWarningContainer = Color(0xFFFCD34D),
 )
 
 val LocalExtendedColors = staticCompositionLocalOf { LightExtendedColors }

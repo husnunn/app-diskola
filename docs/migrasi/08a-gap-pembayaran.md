@@ -17,13 +17,13 @@ tak ada tabel Room pembayaran; tak ada unit test. Perkiraan ±85–90 % pekerjaa
 | Pra-cek aktivasi (email terverifikasi → password default → `payment/check`) | ❌ | ✅ (dialog keamanan bersama) | P1 |
 | ConfirmPin, Lupa pin, SetPin, deep link reset PIN | ❌ | ✅ komponen + tes; pemanggil ConfirmPin datang di P2 | P1 |
 | Q14 (log body/PIN di release) | ❌ | ✅ | P1 |
-| Komponen bayar (PaymentType/Guide/Detail/Success) + SPP | 🧪 | belum | P2 |
+| Komponen bayar (PaymentType/Guide/Detail/Success) + SPP | 🧪 | ✅ kode + tes JVM 2026-10-27 (`08c`); alur ber-wallet aktif belum diuji di perangkat | P2 |
 | Top Up + Transfer Toppers + Riwayat | 🧪 | belum | P3 |
 | Tagihanku + QR Pay + My QR | ❌/🧪 | belum | P4 |
 | PPOB (6 produk) | ❌ | belum | P5 |
 | Dana Partisipasi | ❌ | belum | P6 |
 | Daftar notifikasi & router `PAYMENT/*` | 🧪 | belum | fase Notifikasi |
-| Feature gate `payment` (menu Bayar SPP & Dana Partisipasi, notifikasi `PAYMENT/SPP`, push `new-spp`/`spp`; doc 08 §5.6) | ❌ | belum | ikut P2 (SPP) & P6 (Dana Partisipasi) |
+| Feature gate `payment` (menu Bayar SPP & Dana Partisipasi, notifikasi `PAYMENT/SPP`, push `new-spp`/`spp`; doc 08 §5.6) | ❌ | ✅ menu hub (P2, `08c`); notifikasi/push ikut fase Notifikasi; Dana Partisipasi di P6 | ikut P2 (SPP) & P6 (Dana Partisipasi) |
 
 Baris gate `payment` ditambahkan 22-10-2026 dari perubahan di `android-portal` (21-10-2026). Layar SPP dan Dana Partisipasi di app baru memang belum ada,
 jadi gate dipasang bersamaan dengan layarnya. Menurut `07b`, app baru sudah punya `FeatureGateRepository` (fail-open) dari fase Presensi, sehingga cukup

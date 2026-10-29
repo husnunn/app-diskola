@@ -2,6 +2,7 @@ package id.diskola.app.viewmodel
 
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import id.diskola.app.repository.FeatureGateRepository
 import id.diskola.app.repository.KlaspayRepository
 import id.diskola.app.repository.WalletInfo
 import id.diskola.app.utils.session.SessionStore
@@ -35,6 +36,7 @@ data class PaymentHubUiState(
 class PaymentHubViewModel @Inject constructor(
     private val klaspay: KlaspayRepository,
     private val sessionStore: SessionStore,
+    private val featureGate: FeatureGateRepository,
 ) : BaseViewModel() {
 
     private val _state = MutableStateFlow(
@@ -84,6 +86,29 @@ class PaymentHubViewModel @Inject constructor(
                 _state.update { it.copy(loading = false) }
             }
         }
+    }
+
+    // ---- Feature gate `payment` (doc 08 §5.6): Bayar SPP and Dana Partisipasi only, after the wallet check ----
+
+    private val _featureChecking = MutableStateFlow(false)
+    val featureChecking: StateFlow<Boolean> = _featureChecking.asStateFlow()
+
+    private val _featureUnavailable = MutableStateFlow<FeatureUnavailable?>(null)
+    val featureUnavailable: StateFlow<FeatureUnavailable?> = _featureUnavailable.asStateFlow()
+
+    /** Asks the server once per tap; a failure counts as available (fail-open, like legacy). Nothing of the screen loads behind the sheet. */
+    fun openGated(name: String, onAvailable: () -> Unit) {
+        if (_featureChecking.value) return
+        _featureChecking.value = true
+        viewModelScope.launch {
+            val result = featureGate.check(name)
+            _featureChecking.value = false
+            if (result.available) onAvailable() else _featureUnavailable.value = FeatureUnavailable(name, result.message.orEmpty())
+        }
+    }
+
+    fun dismissFeatureUnavailable() {
+        _featureUnavailable.value = null
     }
 
     private companion object {
