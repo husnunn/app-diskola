@@ -43,6 +43,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -70,6 +72,7 @@ import id.diskola.app.ui.components.AppLoadingDialog
 import id.diskola.app.ui.components.ButtonVariant
 import id.diskola.app.ui.components.DetailScaffold
 import id.diskola.app.ui.components.EmptyState
+import id.diskola.app.ui.components.FeatureUnavailableSheet
 import id.diskola.app.ui.components.LoadingState
 import id.diskola.app.ui.components.UnderlineTabRow
 import id.diskola.app.ui.theme.DiskolaExtraShapes
@@ -86,6 +89,7 @@ import id.diskola.app.viewmodel.PaymentMethodState
 import id.diskola.app.viewmodel.SppBillsState
 import id.diskola.app.viewmodel.SppDialog
 import id.diskola.app.viewmodel.SppEvent
+import id.diskola.app.viewmodel.SppGate
 import id.diskola.app.viewmodel.SppHeader
 import id.diskola.app.viewmodel.SppPaymentViewModel
 import java.time.ZoneId
@@ -119,7 +123,10 @@ fun SppBillsScreen(
     val header by viewModel.header.collectAsStateWithLifecycle()
     val bills by viewModel.bills.collectAsStateWithLifecycle()
     val dialog by viewModel.dialog.collectAsStateWithLifecycle()
+    val gate by viewModel.gate.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableIntStateOf(if (showPaid) 1 else 0) }
+    // the sheet may report its dismissal more than once while it slides away; leaving twice would pop the tab shell too
+    var leaving by remember { mutableStateOf(false) }
 
     OnResume(viewModel::onListResumed)
     LaunchedEffect(viewModel) {
@@ -133,16 +140,37 @@ fun SppBillsScreen(
         }
     }
 
-    SppBillsContent(
-        header = header,
-        bills = bills,
-        tab = tab,
-        onTab = { tab = it },
-        onBack = onBack,
-        onRefresh = viewModel::refresh,
-        onToggle = viewModel::toggle,
-        onPay = viewModel::onPayClicked,
-    )
+    if (gate == SppGate.Open) {
+        SppBillsContent(
+            header = header,
+            bills = bills,
+            tab = tab,
+            onTab = { tab = it },
+            onBack = onBack,
+            onRefresh = viewModel::refresh,
+            onToggle = viewModel::toggle,
+            onPay = viewModel::onPayClicked,
+        )
+    } else {
+        // Blank while the gate asks or says no: an empty month list behind the sheet would read as "no bills".
+        DetailScaffold(title = "Bayar SPP", onBack = onBack) { padding -> Box(modifier = Modifier.padding(padding).fillMaxSize()) }
+    }
+
+    if (gate == SppGate.Checking) AppLoadingDialog(message = "Memeriksa ketersediaan fitur…")
+    (gate as? SppGate.Closed)?.let { closed ->
+        FeatureUnavailableSheet(
+            // Bayar SPP is the student's screen; only a teacher's sheet carries the website button.
+            isTeacher = false,
+            serverMessage = closed.message,
+            onOpenWebsite = {},
+            onDismiss = {
+                if (!leaving) {
+                    leaving = true
+                    onBack()
+                }
+            },
+        )
+    }
 
     if (dialog == SppDialog.PreviousBillPending) {
         AppDialog(

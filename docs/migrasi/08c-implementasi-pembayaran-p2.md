@@ -58,3 +58,16 @@ Hasil: lint `UnusedResources` 0; `assembleDebug`, `processReleaseResources` dan 
 - Ikon launcher kini `drawable/iconeapp.png` (PNG biasa, bukan adaptive icon): di Android 8+ tidak dimasker mengikuti bentuk ikon launcher dan lint menandai `IconLocation` (ikon di `drawable`, bukan `mipmap`).
 - Ikon notifikasi memakai robot template yang berwarna/bergradien; ikon kecil notifikasi seharusnya siluet satu warna.
 
+
+## 6. Guard gate `payment` di layar SPP (2026-10-29)
+Laporan user: klik Bayar Spp / Dana Partisipasi "tidak ada pengecekan fitur". Dicek di perangkat: gate di hub **sudah jalan** (request `check-feature-availability?name=payment` tiap tap), tetapi server dev menjawab `{"available":true,"message":"maintenance"}` (maintenance mati), jadi lolos dan dialog "Memeriksa ketersediaan fitur…" hanya tampil ±0,1–0,3 dtk; Dana Partisipasi lalu langsung ke dialog "dalam pengembangan" (P6). Dua celah nyata ditutup:
+
+| Berkas | Perubahan |
+|---|---|
+| `repository/FeatureGateRepository.kt` | `Timber.w` saat cek gagal (tetap fail-open, tapi tidak lagi bisu). `@Singleton` + `grantPass`/`consumePass`. |
+| `utils/FeaturePass.kt` (+ tes 6) | Catatan "gate baru lolos" sekali pakai, hanya di memori, basi setelah 10 dtk. |
+| `viewmodel/PaymentHubViewModel.kt` | `openGated` memberi pass begitu server bilang tersedia, sebelum navigasi. |
+| `viewmodel/SppPaymentViewModel.kt`, `ui/screens/pembayaran/SppScreens.kt` | Layar SPP punya gate sendiri (`SppGate`: Checking/Open/Closed), padanan `guardFeatureOnCreate` app lama. Ada pass → langsung Open (satu request per navigasi, §17.3). Tidak ada pass (masuk dari notifikasi/push nanti, atau proses mati lalu dipulihkan) → tanya server sendiri; "Memeriksa ketersediaan fitur…", ditutup → `FeatureUnavailableSheet` di atas layar kosong (bukan "Belum Ada Tagihan SPP"), tutup → kembali satu layar. Tagihan & saldo baru diminta setelah Open. |
+
+**Teruji di perangkat (Infinix, dev server, 2026-10-29):** hub → SPP = 1 request gate + tagihan/saldo satu kali. Dengan kode uji sementara (sudah dikembalikan) yang memaksa layar SPP bertanya sendiri: jawaban "maintenance" → sheet, tanpa request `history_school`/`payment/wallet` di belakangnya, "Kembali" mendarat di hub; jawaban tersedia → tagihan dimuat tepat sekali. 464 tes JVM lulus.
+**Belum teruji:** pemulihan nyata setelah proses mati (adb membuka Beranda, bukan layar SPP); jalur notifikasi/push (belum dibangun); Dana Partisipasi memakai pola yang sama saat layarnya dibangun di P6.

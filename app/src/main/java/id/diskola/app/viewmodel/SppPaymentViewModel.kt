@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import id.diskola.app.apiservice.ApiException
 import id.diskola.app.dataclass.ResponData.PaymentChannelItem
+import id.diskola.app.repository.FeatureGateRepository
 import id.diskola.app.repository.KlaspayRepository
 import id.diskola.app.repository.PaymentChannelGroup
 import id.diskola.app.repository.PaymentOutcome
@@ -69,6 +70,16 @@ sealed interface SppDialog {
     data class MethodsFailed(val message: String) : SppDialog
 }
 
+/**
+ * The `payment` feature gate in front of the list (doc 08 §5.6). The hub asks before it navigates and leaves a pass, so coming from the
+ * hub the list is [Open] at once; any other way in (notification, push, a restored back stack) asks here. Nothing loads before [Open].
+ */
+sealed interface SppGate {
+    data object Checking : SppGate
+    data object Open : SppGate
+    data class Closed(val message: String) : SppGate
+}
+
 sealed interface SppEvent {
     data class Toast(val text: String) : SppEvent
     data object OpenCheckout : SppEvent
@@ -91,7 +102,13 @@ class SppPaymentViewModel @Inject constructor(
     private val klaspay: KlaspayRepository,
     private val sessionStore: SessionStore,
     private val pinResults: PinResultChannel,
+    private val featureGate: FeatureGateRepository,
 ) : BaseViewModel() {
+
+    private val _gate = MutableStateFlow<SppGate>(
+        if (featureGate.consumePass(FeatureGateRepository.PAYMENT)) SppGate.Open else SppGate.Checking,
+    )
+    val gate: StateFlow<SppGate> = _gate.asStateFlow()
 
     private val _header = MutableStateFlow(
         sessionStore.student.let { SppHeader(name = it?.name.orEmpty(), nisn = it?.nisn.orEmpty(), className = it?.className.orEmpty(), balance = null) },
@@ -118,10 +135,41 @@ class SppPaymentViewModel @Inject constructor(
     private var pendingFromWallet = false
     private var billsInFlight = false
 
+    /** The list came to the foreground while the gate was still asking; it loads the moment the gate opens. */
+    private var loadWhenOpen = false
+
+    init {
+        if (_gate.value == SppGate.Checking) checkFeature()
+    }
+
+    /** Fail-open like every gate: only an explicit "not available" closes the list. */
+    private fun checkFeature() {
+        viewModelScope.launch {
+            val result = featureGate.check(FeatureGateRepository.PAYMENT)
+            if (!result.available) {
+                _gate.value = SppGate.Closed(result.message.orEmpty())
+                return@launch
+            }
+            _gate.value = SppGate.Open
+            if (loadWhenOpen) {
+                loadWhenOpen = false
+                loadBills()
+                loadBalance()
+            }
+        }
+    }
+
     // ---- Month list ----
 
-    /** The list is shown again (first time, back from checkout or a payment): reload bills and balance and clear the picks, like legacy `onResume`. */
+    /**
+     * The list is shown again (first time, back from checkout or a payment): reload bills and balance and clear the picks, like legacy
+     * `onResume`. Behind a closed or still-asking gate nothing is requested.
+     */
     fun onListResumed() {
+        if (_gate.value != SppGate.Open) {
+            loadWhenOpen = true
+            return
+        }
         loadBills()
         loadBalance()
     }

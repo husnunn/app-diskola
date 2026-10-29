@@ -96,14 +96,22 @@ class PaymentHubViewModel @Inject constructor(
     private val _featureUnavailable = MutableStateFlow<FeatureUnavailable?>(null)
     val featureUnavailable: StateFlow<FeatureUnavailable?> = _featureUnavailable.asStateFlow()
 
-    /** Asks the server once per tap; a failure counts as available (fail-open, like legacy). Nothing of the screen loads behind the sheet. */
+    /**
+     * Asks the server once per tap; a failure counts as available (fail-open, like legacy). Nothing of the screen loads behind the sheet.
+     * An "available" leaves a pass for the screen opened by [onAvailable], so that screen does not ask a second time.
+     */
     fun openGated(name: String, onAvailable: () -> Unit) {
         if (_featureChecking.value) return
         _featureChecking.value = true
         viewModelScope.launch {
             val result = featureGate.check(name)
             _featureChecking.value = false
-            if (result.available) onAvailable() else _featureUnavailable.value = FeatureUnavailable(name, result.message.orEmpty())
+            if (result.available) {
+                featureGate.grantPass(name)
+                onAvailable()
+            } else {
+                _featureUnavailable.value = FeatureUnavailable(name, result.message.orEmpty())
+            }
         }
     }
 
