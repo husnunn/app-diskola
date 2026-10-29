@@ -259,6 +259,8 @@ checkbox otomatis. Error memuat → toast pesan exception.
 | `onklas_lite`, `onklas_pro`, `klastime` | dari `product_school` (default `true`/`false`/`false`) |
 | `user` | JSON `UserTable` (id, uuid, nama, email, nisn_nik, nis_nik, phone, avatar, username, school_id) (`ApiWrapper.kt:129-145`) |
 
+> **Deviasi tampilan (keputusan user 2026-10-29):** kolom "Tampilan" di bawah menjelaskan app lama. Di app baru semua error dan peringatan alur login (Login, Password, SSO) tampil sebagai **dialog tengah `AppDialog` bernada**, bukan bottom sheet: "Login Gagal" = ERROR (merah), "Perangkat Lain Terdeteksi" dan "Ganti Password" = WARNING (kuning). Teks, kondisi, dan tombolnya tidak berubah. Lihat `02b` §4 dan `FLOW_QUESTIONS.md`.
+
 **Penanganan error login** (`LoginViewModel.kt:117-183`):
 | Kondisi | Tampilan |
 |---|---|

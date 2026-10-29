@@ -42,7 +42,6 @@ import id.diskola.app.ui.components.CardVariant
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
 import id.diskola.app.ui.theme.contentContainer
-import id.diskola.app.utils.session.AuthError
 import id.diskola.app.viewmodel.SsoViewModel
 
 /** Result of the Google Credential-Manager sign-in step, handed in from [LoginScreen]. */
@@ -193,12 +192,7 @@ fun SsoScreen(
         AppLoadingDialog(message = if (checkEmailResult == null) "Sedang mencari data pengguna..." else "Proses login akun")
     }
 
-    when (val error = authError) {
-        is AuthError.DeviceConflict -> DeviceConflictDialog(message = error.message, onDismiss = { viewModel.clearAuthError() })
-        is AuthError.InvalidPassword -> LoginFailedSheet(message = error.message, onDismiss = { viewModel.clearAuthError() })
-        is AuthError.Message -> LoginFailedSheet(message = error.message, onDismiss = { viewModel.clearAuthError() })
-        null -> Unit
-    }
+    AuthErrorDialog(error = authError, onDismiss = viewModel::clearAuthError)
 }
 
 /** A minimal school picker for SSO registration — reuses the same local-only cache as

@@ -653,3 +653,11 @@ Sumber kode lama yang benar: `DISKOLA MOBILE/android-portal` (`development` @ `d
 **Deviasi lain (default saya, belum ditanyakan):** status bayar saldo yang gagal tidak lagi berakhir di halaman sukses (semangat Q8); tombol mati "Top Up Saldo" di baris saldo dihilangkan; "Cek Tagihanku" → "Fitur dalam pengembangan" sampai P4; batas waktu tak terbaca → teks mentah (bukan "Invalid date"). Rincian `08c` §3.
 
 **Belum diverifikasi:** alur SPP dengan wallet aktif sampai server (akun uji Infinix belum mengaktifkan wallet; agen tidak mengaktifkan wallet dan tidak melakukan pembayaran sungguhan), gate `available=false`, migrasi Room 10→11 pada DB nyata.
+
+## 2026-10-29 — Dialog error/peringatan alur login: bawah atau tengah?
+
+**Konteks:** di halaman Password, "Login Gagal" muncul sebagai bottom sheet sedangkan "Perangkat Lain Terdeteksi" sebagai dialog tengah (warisan `ErrorUiModel` app lama, doc `02` §4.3). User: "harusnya semua sama, agar selaras — jangan error ada yang di bawah, ada juga yang di tengah."
+
+| # | Pertanyaan | Jawaban | Keputusan final |
+|---|---|---|---|
+| 1 | Seragamkan ke mana: (a) semua dialog tengah, dibedakan nada, atau (b) error di bawah (bottom sheet) dan peringatan di tengah? | **(a) Semua di tengah, beda nada** | Error ("Login Gagal") = `AppDialog` ERROR (merah); peringatan ("Perangkat Lain Terdeteksi", "Ganti Password") = `AppDialog` WARNING (kuning). Berlaku di Login, Password, dan SSO. Deviasi dari app lama; `FeatureUnavailableSheet`, Toast aktivasi Klaspay, dan banner reset password tidak diubah. |

@@ -40,6 +40,8 @@ import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.Spacing
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.sp
+import id.diskola.app.utils.AppDialogTone
+import id.diskola.app.utils.session.AuthError
 import id.diskola.app.viewmodel.LoginViewModel
 
 /** Dialog 7 — Syarat & Ketentuan: scrollable WebView loading `GET policy`'s HTML content. */
@@ -153,11 +155,40 @@ fun GuestConfirmDialog(
     }
 }
 
-/** Dialog — "Perangkat Lain Terdeteksi": `DEVICE_CONFLICT` (409), doc §4.3/§9. */
+/**
+ * Dialog — "Login Gagal": a wrong password or any other failed `check-account`/`login-account`, doc §4.3. The legacy app drew this as a
+ * bottom sheet; the app now shows every login failure and warning as a centred [id.diskola.app.ui.components.AppDialog] (decision
+ * 2026-10-29), told apart by tone: this one is an error (red), [DeviceConflictDialog] a warning (yellow).
+ */
+@Composable
+fun LoginFailedDialog(message: String, onDismiss: () -> Unit) {
+    id.diskola.app.ui.components.AppDialog(
+        onDismiss = onDismiss,
+        tone = AppDialogTone.ERROR,
+        title = "Login Gagal",
+        body = message,
+        primaryButtonText = "Coba Lagi",
+        onPrimaryClick = onDismiss,
+    )
+}
+
+/** What a failed `login-account` shows, for every screen of the login flow, so that Password and SSO cannot drift apart again. */
+@Composable
+fun AuthErrorDialog(error: AuthError?, onDismiss: () -> Unit) {
+    when (error) {
+        is AuthError.DeviceConflict -> DeviceConflictDialog(message = error.message, onDismiss = onDismiss)
+        is AuthError.InvalidPassword -> LoginFailedDialog(message = error.message, onDismiss = onDismiss)
+        is AuthError.Message -> LoginFailedDialog(message = error.message, onDismiss = onDismiss)
+        null -> Unit
+    }
+}
+
+/** Dialog — "Perangkat Lain Terdeteksi": `DEVICE_CONFLICT` (409), doc §4.3/§9. A warning: the account is fine, the user has to act elsewhere. */
 @Composable
 fun DeviceConflictDialog(message: String, onDismiss: () -> Unit) {
     id.diskola.app.ui.components.AppDialog(
         onDismiss = onDismiss,
+        tone = AppDialogTone.WARNING,
         title = "Perangkat Lain Terdeteksi",
         body = message,
         primaryButtonText = "Mengerti",

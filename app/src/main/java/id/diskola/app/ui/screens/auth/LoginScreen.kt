@@ -39,7 +39,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.diskola.app.R
 import id.diskola.app.dataclass.ResponData.CheckAccountUserData
 import id.diskola.app.ui.components.AmbientGradientBackground
-import id.diskola.app.ui.components.AppBottomSheet
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppCard
 import id.diskola.app.ui.components.AppLoadingDialog
@@ -199,11 +198,6 @@ fun LoginScreen(
     }
 
     if (errorMessage.isNotBlank()) {
-        AppBottomSheet(title = "Login Gagal", onDismiss = { viewModel.clearError() }) {
-            Column(modifier = Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
-                Text(errorMessage, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                AppButton(text = "Coba Lagi", onClick = { viewModel.clearError() }, modifier = Modifier.fillMaxWidth())
-            }
-        }
+        LoginFailedDialog(message = errorMessage, onDismiss = viewModel::clearError)
     }
 }

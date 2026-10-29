@@ -190,6 +190,14 @@ masuk daftar 02a dengan status ✅.
 
 Terverifikasi: build + 464 tes JVM lulus. **Belum terverifikasi di perangkat** (butuh keluar dari sesi uji dan mengisi NISN; password tidak diisi oleh agen): NISN → "masuk" → layar Password → Back → harus tetap di Login dengan NISN & centang utuh; salah password → tutup sheet → Back → Login.
 
+**2026-10-29 — Dialog error login tidak seragam (bawah vs tengah)** (laporan user):
+
+| Temuan | Perbaikan |
+|---|---|
+| Di app lama "Login Gagal" = bottom sheet (`ErrorDisplayType.BOTTOM_SHEET`) tetapi "Perangkat Lain Terdeteksi" = dialog tengah; ditiru apa adanya, jadi di halaman Password satu kegagalan muncul di bawah dan yang lain di tengah. Bottom sheet "Login Gagal" juga satu-satunya error di seluruh app yang tidak dialog tengah. | Keputusan user: **semua di tengah, dibedakan nada.** `LoginFailedDialog` (ERROR, "Coba Lagi") menggantikan `LoginFailedSheet` dan sheet inline `LoginScreen`; `DeviceConflictDialog` dan "Ganti Password" diberi nada WARNING; `AuthErrorDialog` satu-satunya pemetaan `AuthError` → dialog, dipakai Password dan SSO (`ui/screens/auth/AuthDialogs.kt`). Nada dilewatkan eksplisit karena `AppDialogTone.fromTitle` (port app lama) tidak mengenali judul-judul ini. |
+
+Terverifikasi: build + 464 tes JVM lulus; tidak ada lagi `LoginFailedSheet`/bottom sheet "Login Gagal". **Belum terverifikasi di perangkat** (butuh keluar dari sesi uji; password tidak diisi oleh agen).
+
 ## 5. Pengujian di device fisik
 
 **Perangkat:** Infinix (Android 15, API 35), terhubung lewat `adb` — model debug (`id.diskola.app.debug`)

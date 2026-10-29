@@ -22,7 +22,6 @@ import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.Chat
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -47,7 +46,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.diskola.app.R
 import id.diskola.app.ui.components.AmbientGradientBackground
-import id.diskola.app.ui.components.AppBottomSheet
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppCard
 import id.diskola.app.ui.components.AppDialog
@@ -60,7 +58,7 @@ import id.diskola.app.ui.components.StatusBadge
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
 import id.diskola.app.ui.theme.contentContainer
-import id.diskola.app.utils.session.AuthError
+import id.diskola.app.utils.AppDialogTone
 import id.diskola.app.viewmodel.LoginOutcome
 import id.diskola.app.viewmodel.LoginViewModel
 
@@ -207,16 +205,12 @@ fun PasswordScreen(
         AppLoadingDialog(message = "Proses login akun")
     }
 
-    when (val error = authError) {
-        is AuthError.DeviceConflict -> DeviceConflictDialog(message = error.message, onDismiss = { viewModel.clearAuthError() })
-        is AuthError.InvalidPassword -> LoginFailedSheet(message = error.message, onDismiss = { viewModel.clearAuthError() })
-        is AuthError.Message -> LoginFailedSheet(message = error.message, onDismiss = { viewModel.clearAuthError() })
-        null -> Unit
-    }
+    AuthErrorDialog(error = authError, onDismiss = viewModel::clearAuthError)
 
     if (mustChangePasswordDialog) {
         AppDialog(
             onDismiss = { mustChangePasswordDialog = false; onLoginSuccess() },
+            tone = AppDialogTone.WARNING,
             title = "Ganti Password",
             body = "Anda masih menggunakan password default. Segera ganti password Anda demi keamanan akun.",
             primaryButtonText = "Mengerti",
@@ -239,13 +233,3 @@ private fun openWhatsAppOrCall(context: Context, phone: String) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun LoginFailedSheet(message: String, onDismiss: () -> Unit) {
-    AppBottomSheet(title = "Login Gagal", onDismiss = onDismiss) {
-        Column(modifier = Modifier.padding(horizontal = Spacing.xl, vertical = Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
-            Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            AppButton(text = "Coba Lagi", onClick = onDismiss, modifier = Modifier.fillMaxWidth())
-        }
-    }
-}
