@@ -1,49 +1,39 @@
 package id.diskola.app.ui.screens.materi
 
 import android.content.Context
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Download
-import androidx.compose.material.icons.rounded.Visibility
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.rounded.AttachFile
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Lightbulb
+import androidx.compose.material.icons.rounded.Link
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppDialog
 import id.diskola.app.ui.components.BannerError
-import id.diskola.app.ui.components.ButtonVariant
 import id.diskola.app.ui.components.DetailScaffold
 import id.diskola.app.ui.components.FileViewerHost
 import id.diskola.app.ui.components.displayNameOf
-import id.diskola.app.ui.components.fileIcon
 import id.diskola.app.ui.components.openLink
 import id.diskola.app.ui.components.LinkPreviewCard
-import id.diskola.app.ui.components.SectionLabel
-import id.diskola.app.ui.theme.DiskolaExtraShapes
+import id.diskola.app.ui.components.LoadingState
+import id.diskola.app.ui.screens.tugas.EmptyNote
+import id.diskola.app.ui.screens.tugas.TextCard
+import id.diskola.app.ui.screens.tugas.TugasFileCard
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
 import id.diskola.app.viewmodel.MateriDetailViewModel
@@ -64,7 +54,7 @@ private fun formatFileSize(raw: String): String {
 
 /**
  * A single material (`MateriDetailPage`, doc `05-pembelajaran-materi-tugas.md` §2.4) — every block
- * below the hero is conditional. id-based: [MateriDetailViewModel] resolves from Room, falling
+ * below the header card is conditional. id-based: [MateriDetailViewModel] resolves from Room, falling
  * back to the detail API, and an invalid/missing id shows "Materi Tidak tersedia" instead of the
  * legacy NPE crash.
  */
@@ -79,7 +69,6 @@ fun MateriDetailScreen(
     viewModel: MateriDetailViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
-    val scheme = MaterialTheme.colorScheme
 
     val materi by viewModel.materi.collectAsStateWithLifecycle()
     val invalid by viewModel.invalid.collectAsStateWithLifecycle()
@@ -105,49 +94,16 @@ fun MateriDetailScreen(
 
     DetailScaffold(title = "Detail Materi", onBack = onBack, modifier = modifier) { padding ->
         val item = materi
-        if (item == null) {
-            Box(modifier = Modifier.padding(padding).fillMaxSize())
-        } else {
-            Column(
+        when {
+            item != null -> Column(
                 modifier = Modifier
                     .padding(padding)
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = ScreenHorizontalPadding)
-                    .padding(bottom = Spacing.xxxl),
+                    .padding(top = Spacing.md, bottom = Spacing.xxxl),
                 verticalArrangement = Arrangement.spacedBy(Spacing.xl),
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                    Text(
-                        item.name.ifBlank { "Tanpa judul" },
-                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Black),
-                        color = scheme.onSurface,
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier.size(36.dp).background(scheme.surfaceContainerLow, CircleShape),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                initialsOf(item.teacher_name),
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Black),
-                                color = scheme.primary,
-                            )
-                        }
-                        Column(modifier = Modifier.padding(start = Spacing.md)) {
-                            Text(
-                                item.teacher_name.ifBlank { "-" },
-                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                color = scheme.onSurface,
-                            )
-                            val meta = listOf(item.created_at_label, item.targetLabel().orEmpty()).filter { it.isNotBlank() }
-                            if (meta.isNotEmpty()) {
-                                Text(meta.joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
-                            }
-                        }
-                    }
-                }
-
                 if (errorMessage.isNotBlank()) {
                     BannerError(message = errorMessage, onDismiss = { viewModel.clearError() })
                 }
@@ -155,27 +111,31 @@ fun MateriDetailScreen(
                     BannerError(message = it, onDismiss = { viewModel.consumeInfoMessage() })
                 }
 
+                MateriHeaderCard(item)
+
+                val hasFile = item.file_name.isNotBlank() && item.file_path.isNotBlank()
+                val hasExplanation = item.explanation_file_path.isNotBlank()
+                // Doc §2.4: every block below the header is shown only when it has content.
                 if (item.description.isNotBlank()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        SectionLabel("DESKRIPSI")
-                        Text(item.description, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+                    MateriSection("Deskripsi", Icons.Rounded.Description) { TextCard(item.description) }
+                }
+
+                if (hasFile) {
+                    MateriSection("File Materi", Icons.Rounded.AttachFile) {
+                        TugasFileCard(
+                            fileName = item.file_name,
+                            fileSize = formatFileSize(item.file_size),
+                            loading = fileLoading,
+                            readLabel = "Lihat",
+                            downloadLabel = "Unduh",
+                            onOpen = { permissionDialogFor = item.file_path to item.file_name },
+                            onDownload = { viewModel.downloadFile(item.file_path, item.file_name) },
+                        )
                     }
                 }
 
-                if (item.file_name.isNotBlank() && item.file_path.isNotBlank()) {
-                    FileCard(
-                        title = "FILE MATERI",
-                        fileName = item.file_name,
-                        fileSize = formatFileSize(item.file_size),
-                        loading = fileLoading,
-                        onOpen = { permissionDialogFor = item.file_path to item.file_name },
-                        onDownload = { viewModel.downloadFile(item.file_path, item.file_name) },
-                    )
-                }
-
                 if (item.link.isNotBlank()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        SectionLabel("TAUTAN TERKAIT")
+                    MateriSection("Tautan Terkait", Icons.Rounded.Link) {
                         LinkPreviewCard(
                             url = item.link,
                             loading = linkPreviewLoading,
@@ -185,23 +145,30 @@ fun MateriDetailScreen(
                     }
                 }
 
-                if (item.explanation_file_path.isNotBlank()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        SectionLabel("PEMBAHASAN")
-                        // Doc §2.4: the pembahasan card's name is the raw path/URL, not a
-                        // formatted file name — that's the legacy behaviour, not a bug we
-                        // introduced, so it's kept as-is rather than "improved".
-                        FileCard(
-                            title = null,
-                            fileName = item.explanation_file_path,
-                            fileSize = null,
+                if (hasExplanation) {
+                    MateriSection("Pembahasan", Icons.Rounded.Lightbulb) {
+                        // The card shows the file's name, not the raw path/URL the legacy card showed (doc §2.4);
+                        // the same name is what "Lihat" and "Unduh" use, as in Detail Tugas.
+                        val explanationName = displayNameOf(item.explanation_file_path)
+                        TugasFileCard(
+                            fileName = explanationName,
+                            fileSize = "",
                             loading = fileLoading,
-                            onOpen = { permissionDialogFor = item.explanation_file_path to displayNameOf(item.explanation_file_path) },
-                            onDownload = { viewModel.downloadFile(item.explanation_file_path, displayNameOf(item.explanation_file_path)) },
+                            readLabel = "Lihat",
+                            downloadLabel = "Unduh",
+                            onOpen = { permissionDialogFor = item.explanation_file_path to explanationName },
+                            onDownload = { viewModel.downloadFile(item.explanation_file_path, explanationName) },
                         )
                     }
                 }
+
+                if (item.description.isBlank() && !hasFile && item.link.isBlank() && !hasExplanation) {
+                    EmptyNote("Materi ini belum memiliki isi", Icons.Rounded.Description)
+                }
             }
+            // The invalid-id dialog below covers this state.
+            invalid -> Box(modifier = Modifier.padding(padding).fillMaxSize())
+            else -> LoadingState(modifier = Modifier.padding(padding).padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md))
         }
     }
 
@@ -229,59 +196,5 @@ fun MateriDetailScreen(
             secondaryButtonText = "Batal",
             onSecondaryClick = { permissionDialogFor = null },
         )
-    }
-}
-
-@Composable
-private fun FileCard(
-    title: String?,
-    fileName: String,
-    fileSize: String?,
-    loading: Boolean,
-    onOpen: () -> Unit,
-    onDownload: () -> Unit,
-) {
-    val scheme = MaterialTheme.colorScheme
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        title?.let { SectionLabel(it) }
-        Column(
-            modifier = Modifier
-                .background(scheme.surfaceContainerLowest, DiskolaExtraShapes.card)
-                .border(1.dp, scheme.outlineVariant, DiskolaExtraShapes.card)
-                .padding(Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier.size(44.dp).background(scheme.primaryContainer, DiskolaExtraShapes.iconBox),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(fileIcon(fileName), contentDescription = null, tint = scheme.onPrimaryContainer)
-                }
-                Column(modifier = Modifier.padding(start = Spacing.md)) {
-                    Text(
-                        if (fileSize.isNullOrBlank()) fileName else "$fileName | $fileSize",
-                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                        color = scheme.onSurface,
-                    )
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                AppButton(
-                    text = "Lihat",
-                    onClick = onOpen,
-                    loading = loading,
-                    leadingIcon = { Icon(Icons.Rounded.Visibility, contentDescription = null) },
-                    modifier = Modifier.weight(1f),
-                )
-                AppButton(
-                    text = "Unduh",
-                    onClick = onDownload,
-                    variant = ButtonVariant.Outlined,
-                    leadingIcon = { Icon(Icons.Rounded.Download, contentDescription = null) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
     }
 }

@@ -639,3 +639,17 @@ Sumber kode lama yang benar: `DISKOLA MOBILE/android-portal` (`development` @ `d
 
 **Belum diverifikasi (jangan diasumsikan selesai):** rumus tergambar dan "Selesai" di layar (butuh akun siswa), form mode assigned, 422/403/404/413 di server (hanya tes JVM; server dev tidak bisa dipancing menolak), unggah file soal, `downloaded=1`, apakah backend masih menerima payload lama (tidak diuji; payload lama diganti seluruhnya). Tes JVM (405 lulus), build, `compileDebugAndroidTestKotlin` dan `minifyReleaseWithR8` dijalankan sebelum uji perangkat.
 
+## 2026-10-27 — Pembayaran P2 (komponen bayar + Bayar SPP + gate `payment`) dan dialog kustom
+
+**Konteks:** user: "lanjut ke gap selanjutnya" → Pembayaran P2 (dijeda setelah P1). Laporan: `docs/migrasi/08c-implementasi-pembayaran-p2.md`.
+
+| # | Temuan | Jawaban user | Keputusan final |
+|---|---|---|---|
+| 1 | Q16 (doc 08 §18): bayar SPP/partisipasi gagal → toast "PIN Tidak Sesuai" untuk semua galat | **Pesan server** | Dialog "Pembayaran Gagal" berisi pesan server (galat jaringan → teks koneksi) |
+| 2 | Q4: cache petunjuk pembayaran terduplikasi setelah 24 jam | **Ganti cache per channel** | Satu baris per channel (`payment_guide`), refetch setelah 24 jam menimpa; offline pakai salinan lama |
+| 3 | Q5: detail menimpa `amount=total_amount`, `expired_at=""`, `cancelable=false` | **Perbaiki mapping** | `PaymentInvoiceRules.mergeDetail` mempertahankan amount, batas waktu, logo, partner reff, cancelable |
+| 4 | (tambahan dari jawaban Q16) dialog yang masih default | **"gunakan dialog custom seperti yang ada di repo lama agar bisa reusable dan tampilan tidak kaku, gunakan skills mobile-ui-promax"** | `AppDialog` ditulis ulang mengikuti `widgets/AppDialog.kt` lama (badge nada, tag, detail, opsi, tombol primer/sekunder, nada dari judul); `AlertDialog` bawaan dan pemilih tanggal/jam ikut diganti |
+
+**Deviasi lain (default saya, belum ditanyakan):** status bayar saldo yang gagal tidak lagi berakhir di halaman sukses (semangat Q8); tombol mati "Top Up Saldo" di baris saldo dihilangkan; "Cek Tagihanku" → "Fitur dalam pengembangan" sampai P4; batas waktu tak terbaca → teks mentah (bukan "Invalid date"). Rincian `08c` §3.
+
+**Belum diverifikasi:** alur SPP dengan wallet aktif sampai server (akun uji Infinix belum mengaktifkan wallet; agen tidak mengaktifkan wallet dan tidak melakukan pembayaran sungguhan), gate `available=false`, migrasi Room 10→11 pada DB nyata.

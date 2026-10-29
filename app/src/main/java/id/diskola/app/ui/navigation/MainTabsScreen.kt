@@ -58,6 +58,7 @@ import id.diskola.app.ui.screens.agenda.AgendaDetailScreen
 import id.diskola.app.ui.screens.agenda.AgendaMingguanScreen
 import id.diskola.app.ui.screens.akun.AkunAboutScreen
 import id.diskola.app.ui.screens.akun.AkunCardScreen
+import id.diskola.app.ui.screens.akun.AkunDeviceInfoScreen
 import id.diskola.app.ui.screens.akun.AkunDevicesScreen
 import id.diskola.app.ui.screens.akun.AkunKontakScreen
 import id.diskola.app.ui.screens.akun.AkunPassScreen
@@ -96,7 +97,6 @@ import id.diskola.app.ui.screens.tugas.TugasScoringScreen
 import id.diskola.app.ui.screens.tugas.TugasSiswaScreen
 import id.diskola.app.ui.screens.tugas.TugasTerkumpulScreen
 import id.diskola.app.ui.screens.tugas.UploadTugasScreen
-import id.diskola.app.ui.screens.pembayaran.CheckoutScreen
 import id.diskola.app.ui.screens.pembayaran.PaymentSuccessScreen
 import id.diskola.app.ui.screens.pembayaran.ConfirmPinScreen
 import id.diskola.app.ui.screens.pembayaran.PembayaranScreen
@@ -105,7 +105,6 @@ import id.diskola.app.utils.PaymentRules
 import id.diskola.app.ui.screens.pembayaran.PinScreen
 import id.diskola.app.ui.screens.pembayaran.QrScreen
 import id.diskola.app.ui.screens.pembayaran.RiwayatScreen
-import id.diskola.app.ui.screens.pembayaran.SppScreen
 import id.diskola.app.ui.screens.pembayaran.TopUpScreen
 import id.diskola.app.ui.screens.pembayaran.TopUpVaScreen
 import id.diskola.app.ui.screens.pembayaran.TransferScreen
@@ -119,6 +118,16 @@ import id.diskola.app.viewmodel.NotifikasiViewModel
 import id.diskola.app.viewmodel.TugasGuruViewModel
 import id.diskola.app.viewmodel.TugasTerkumpulViewModel
 import id.diskola.app.viewmodel.PembayaranViewModel
+import id.diskola.app.ui.screens.pembayaran.SppBillsScreen
+import id.diskola.app.ui.screens.pembayaran.SppCheckoutScreen
+import id.diskola.app.ui.screens.pembayaran.SppPaymentMethodScreen
+import id.diskola.app.ui.screens.pembayaran.PaymentGuideScreen
+import id.diskola.app.ui.screens.pembayaran.PaymentDetailScreen
+import id.diskola.app.ui.screens.pembayaran.PaymentDoneScreen
+import id.diskola.app.viewmodel.SppPaymentViewModel
+import androidx.compose.runtime.mutableStateOf
+import id.diskola.app.ui.components.AppDialog
+import androidx.compose.runtime.setValue
 
 private data class TabItem(
     val route: Route.MainTab,
@@ -137,7 +146,8 @@ private val tabs = listOf(
  * Payment destinations that run on real data. Each payment sub-phase adds its screens here (and to [Route.PembayaranSub]); until then
  * the hub answers "Fitur dalam pengembangan" instead of opening the dummy screens kept for reference.
  */
-private val availablePaymentDestinations: Set<PaymentRules.PaymentDestination> = emptySet()
+/** What the hub may open so far; anything else answers "Fitur dalam pengembangan". P2 brings Bayar SPP. */
+private val availablePaymentDestinations: Set<PaymentRules.PaymentDestination> = setOf(PaymentRules.PaymentDestination.BayarSpp)
 
 /**
  * Bottom-nav shell for Pembelajaran/Pembayaran/Akun (Fase 2 redesign — replaces the old
@@ -260,7 +270,12 @@ fun MainTabsScreen(
                     PembayaranScreen(
                         gate = activationGate,
                         available = availablePaymentDestinations,
-                        onNavigate = { /* nothing is built yet: see availablePaymentDestinations */ },
+                        onNavigate = { destination ->
+                            when (destination) {
+                                PaymentRules.PaymentDestination.BayarSpp -> navController.navigate(Route.PembayaranSub.Spp())
+                                else -> Unit
+                            }
+                        },
                     )
                 }
     
@@ -714,6 +729,9 @@ fun MainTabsScreen(
                 composable<Route.AkunSub.About> {
                     AkunAboutScreen(onBack = { navController.popBackStack() })
                 }
+                composable<Route.AkunSub.DeviceInfo> {
+                    AkunDeviceInfoScreen(onBack = { navController.popBackStack() })
+                }
     
                 // The PIN prompt (doc 08 §2.3). Its callers arrive with the payment sub-phases; the PIN goes back through PinResultChannel.
                 composable<Route.PembayaranSub.ConfirmPin> { backStackEntry ->
@@ -765,16 +783,83 @@ fun MainTabsScreen(
                     val vm: PembayaranViewModel = hiltViewModel(navController.getBackStackEntry(Route.MainTab.Pembayaran))
                     RiwayatScreen(viewModel = vm, onBack = { navController.popBackStack() })
                 }
-                composable<Route.PembayaranSub.Spp> {
-                    val vm: PembayaranViewModel = hiltViewModel(navController.getBackStackEntry(Route.MainTab.Pembayaran))
-                    SppScreen(viewModel = vm, onBack = { navController.popBackStack() }, onBayar = { navController.navigate(Route.PembayaranSub.Checkout()) })
-                }
-                composable<Route.PembayaranSub.Checkout> {
-                    val vm: PembayaranViewModel = hiltViewModel(navController.getBackStackEntry(Route.MainTab.Pembayaran))
-                    CheckoutScreen(
-                        viewModel = vm,
+                // Bayar SPP (doc 08 §9): the list, "Rincian Pembayaran" and "Pilih Metode Pembayaran" share the list entry's ViewModel.
+                composable<Route.PembayaranSub.Spp> { entry ->
+                    val route = entry.toRoute<Route.PembayaranSub.Spp>()
+                    var tagihankuSoon by remember { mutableStateOf(false) }
+                    SppBillsScreen(
+                        viewModel = hiltViewModel<SppPaymentViewModel>(entry),
+                        showPaid = route.showPaid,
                         onBack = { navController.popBackStack() },
-                        onPay = { amountLabel -> navController.navigate(Route.PembayaranSub.Pin(amountLabel = amountLabel, purpose = "checkout")) },
+                        onOpenCheckout = { navController.navigate(Route.PembayaranSub.SppCheckout) },
+                        // Tagihanku arrives with P4.
+                        onOpenTagihanku = { tagihankuSoon = true },
+                    )
+                    if (tagihankuSoon) {
+                        AppDialog(
+                            onDismiss = { tagihankuSoon = false },
+                            title = "Fitur dalam pengembangan",
+                            body = "Menu ini sedang dalam proses pembangunan, ditunggu updatenya yah...",
+                            primaryButtonText = "Ok Deh",
+                            onPrimaryClick = { tagihankuSoon = false },
+                        )
+                    }
+                }
+                composable<Route.PembayaranSub.SppCheckout> { entry ->
+                    val listEntry = remember(entry) { navController.getBackStackEntry<Route.PembayaranSub.Spp>() }
+                    SppCheckoutScreen(
+                        viewModel = hiltViewModel<SppPaymentViewModel>(listEntry),
+                        onBack = { navController.popBackStack() },
+                        onPay = { navController.navigate(Route.PembayaranSub.SppPaymentMethod) },
+                    )
+                }
+                composable<Route.PembayaranSub.SppPaymentMethod> { entry ->
+                    val listEntry = remember(entry) { navController.getBackStackEntry<Route.PembayaranSub.Spp>() }
+                    SppPaymentMethodScreen(
+                        viewModel = hiltViewModel<SppPaymentViewModel>(listEntry),
+                        onBack = { navController.popBackStack() },
+                        onAskPin = { channelName ->
+                            navController.navigate(
+                                Route.PembayaranSub.ConfirmPin(requestKey = SppPaymentViewModel.PIN_REQUEST_KEY, channelName = channelName, forPayment = true),
+                            )
+                        },
+                        // The result replaces checkout and methods; closing it lands on the list, which reloads (legacy onResume).
+                        onPaidFromWallet = { amountLabel, months ->
+                            navController.navigate(Route.PembayaranSub.PaymentDone(type = "SPP", amountLabel = amountLabel, items = months)) {
+                                popUpTo<Route.PembayaranSub.Spp>()
+                            }
+                        },
+                        onInvoiceCreated = { trxId, partnerReff2 ->
+                            navController.navigate(Route.PembayaranSub.PaymentGuide(trxId, partnerReff2)) { popUpTo<Route.PembayaranSub.Spp>() }
+                        },
+                    )
+                }
+                composable<Route.PembayaranSub.PaymentGuide> { entry ->
+                    val route = entry.toRoute<Route.PembayaranSub.PaymentGuide>()
+                    PaymentGuideScreen(
+                        trxId = route.trxId,
+                        partnerReff2 = route.partnerReff2,
+                        onBack = { navController.popBackStack() },
+                        onOpenDetail = { trxId, method -> navController.navigate(Route.PembayaranSub.PaymentDetail(trxId, method)) },
+                        viewModel = hiltViewModel(),
+                    )
+                }
+                composable<Route.PembayaranSub.PaymentDetail> { entry ->
+                    val route = entry.toRoute<Route.PembayaranSub.PaymentDetail>()
+                    PaymentDetailScreen(
+                        trxId = route.trxId,
+                        paymentMethod = route.paymentMethod,
+                        onBack = { navController.popBackStack() },
+                        viewModel = hiltViewModel(),
+                    )
+                }
+                composable<Route.PembayaranSub.PaymentDone> { entry ->
+                    val route = entry.toRoute<Route.PembayaranSub.PaymentDone>()
+                    PaymentDoneScreen(
+                        type = route.type,
+                        amountLabel = route.amountLabel,
+                        items = route.items,
+                        onClose = { navController.popBackStack() },
                     )
                 }
                 composable<Route.PembayaranSub.Pin> { backStackEntry ->

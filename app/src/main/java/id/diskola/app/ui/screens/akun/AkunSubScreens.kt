@@ -35,6 +35,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import id.diskola.app.BuildConfig
 import id.diskola.app.dataclass.mock.MockAkun
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppCard
@@ -273,7 +274,7 @@ fun AkunAboutScreen(onBack: () -> Unit) {
             Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 Image(painter = painterResource(R.drawable.logo_mark), contentDescription = null, modifier = Modifier.size(56.dp))
                 Text("DISKOLA", style = MaterialTheme.typography.titleLarge)
-                StatusBadge(label = "Versi 2.2.0", tone = BadgeTone.Neutral)
+                StatusBadge(label = "Versi ${BuildConfig.VERSION_NAME}", tone = BadgeTone.Neutral)
             }
             AppCard {
                 Column {

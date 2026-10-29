@@ -31,6 +31,7 @@ import androidx.compose.material.icons.rounded.Quiz
 import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.ShoppingBag
+import androidx.compose.material.icons.rounded.Smartphone
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.VolunteerActivism
 import androidx.compose.material.icons.rounded.Warning
@@ -61,6 +62,7 @@ fun iconFor(name: String): ImageVector = when (name) {
     "lock_reset" -> Icons.Rounded.LockReset
     "badge" -> Icons.Rounded.Badge
     "devices" -> Icons.Rounded.Devices
+    "smartphone" -> Icons.Rounded.Smartphone
     "gavel" -> Icons.Rounded.Gavel
     "info" -> Icons.Rounded.Info
     "logout" -> Icons.Rounded.Logout

@@ -74,6 +74,12 @@ import id.diskola.app.ui.theme.Spacing
 import id.diskola.app.utils.PaymentRules
 import id.diskola.app.utils.PaymentRules.PaymentDestination
 import id.diskola.app.viewmodel.PaymentHubViewModel
+import android.content.Intent
+import android.net.Uri
+import id.diskola.app.BuildConfig
+import id.diskola.app.repository.FeatureGateRepository
+import id.diskola.app.ui.components.AppLoadingDialog
+import id.diskola.app.ui.components.FeatureUnavailableSheet
 
 /**
  * Pembayaran tab (legacy `PembayaranPage`): wallet balance, the shortcuts, the Tagihanku card, the school menu and the PPOB grid.
@@ -113,11 +119,18 @@ fun PembayaranScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    val featureChecking by viewModel.featureChecking.collectAsStateWithLifecycle()
+    val featureUnavailable by viewModel.featureUnavailable.collectAsStateWithLifecycle()
+
+    // Wallet first (an inactive wallet never asks the gate), then the `payment` gate for SPP and Dana Partisipasi only (doc 08 §5.6).
+    // The gate comes before "not built yet", so a server in maintenance answers both menus with the same sheet, as in legacy.
     fun open(destination: PaymentDestination) {
         when {
             !state.walletActive -> gate.prompt()
-            destination in available -> onNavigate(destination)
-            else -> comingSoon = true
+            destination == PaymentDestination.BayarSpp || destination == PaymentDestination.DanaPartisipasi ->
+                viewModel.openGated(FeatureGateRepository.PAYMENT) { if (destination in available) onNavigate(destination) else comingSoon = true }
+            destination !in available -> comingSoon = true
+            else -> onNavigate(destination)
         }
     }
 
@@ -174,6 +187,19 @@ fun PembayaranScreen(
     }
 
     if (infoSheet) state.wallet?.let { WalletInfoSheet(it, onDismiss = { infoSheet = false }) }
+    if (featureChecking) AppLoadingDialog(message = "Memeriksa ketersediaan fitur…")
+    featureUnavailable?.let { unavailable ->
+        FeatureUnavailableSheet(
+            isTeacher = state.isTeacher,
+            serverMessage = unavailable.message.ifBlank { "Fitur ini sedang diperbarui. Silakan gunakan website terlebih dahulu." },
+            // Q22 (working assumption): there is no payment page path on the portal, so the website opens at its root.
+            onOpenWebsite = {
+                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(BuildConfig.PORTAL_URL))) }
+                viewModel.dismissFeatureUnavailable()
+            },
+            onDismiss = viewModel::dismissFeatureUnavailable,
+        )
+    }
     if (comingSoon) {
         AppDialog(
             onDismiss = { comingSoon = false },

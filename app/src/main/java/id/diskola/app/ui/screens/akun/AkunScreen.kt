@@ -21,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Warning
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -37,9 +36,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import id.diskola.app.BuildConfig
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppCard
 import id.diskola.app.ui.components.AppDialog
@@ -53,6 +54,7 @@ import id.diskola.app.ui.components.iconFor
 import id.diskola.app.ui.navigation.Route
 import id.diskola.app.ui.theme.Spacing
 import id.diskola.app.viewmodel.AkunViewModel
+import id.diskola.app.utils.AppDialogTone
 
 data class AkunSessionInfo(
     val name: String,
@@ -162,7 +164,9 @@ fun AkunScreen(
                 Column {
                     ListRow(title = "Syarat & ketentuan", leadingIcon = { Icon(iconFor("gavel"), null, tint = MaterialTheme.colorScheme.primary) }, onClick = { termsDialog = true })
                     HorizontalDivider(modifier = Modifier.padding(horizontal = Spacing.lg))
-                    ListRow(title = "Tentang Diskola", subtitle = "Versi 2.2.0", leadingIcon = { Icon(iconFor("info"), null, tint = MaterialTheme.colorScheme.primary) }, onClick = { onNavigate(Route.AkunSub.About) })
+                    ListRow(title = "Tentang Diskola", leadingIcon = { Icon(iconFor("info"), null, tint = MaterialTheme.colorScheme.primary) }, onClick = { onNavigate(Route.AkunSub.About) })
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = Spacing.lg))
+                    ListRow(title = "Tentang Perangkat", subtitle = "Versi aplikasi, Android, dan identitas perangkat", leadingIcon = { Icon(iconFor("smartphone"), null, tint = MaterialTheme.colorScheme.primary) }, onClick = { onNavigate(Route.AkunSub.DeviceInfo) })
                     HorizontalDivider(modifier = Modifier.padding(horizontal = Spacing.lg))
                     ListRow(
                         title = "Keluar",
@@ -176,24 +180,35 @@ fun AkunScreen(
                     )
                 }
             }
+            // App version: the quiet last line of the page, in the scroll, so it never covers a row, the tab bar or a dialog.
+            Spacer(modifier = Modifier.size(Spacing.xl))
+            Text(
+                "Versi ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(modifier = Modifier.size(Spacing.huge))
         }
     }
 
     if (logoutDialog) {
         val scope = rememberCoroutineScope()
-        AlertDialog(
-            onDismissRequest = { logoutDialog = false },
-            title = { Text("Logout") },
-            text = { Text("Anda yakin akan keluar dari aplikasi?") },
-            confirmButton = {
-                AppButton(text = "Logout", variant = ButtonVariant.Text, onClick = {
-                    logoutDialog = false
-                    scope.launch { clearGoogleCredentialState(context) }
-                    viewModel.logout(onComplete = onLoggedOut)
-                })
+        AppDialog(
+            onDismiss = { logoutDialog = false },
+            icon = iconFor("logout"),
+            tone = AppDialogTone.WARNING,
+            title = "Logout",
+            body = "Anda yakin akan keluar dari aplikasi?",
+            primaryButtonText = "Logout",
+            onPrimaryClick = {
+                logoutDialog = false
+                scope.launch { clearGoogleCredentialState(context) }
+                viewModel.logout(onComplete = onLoggedOut)
             },
-            dismissButton = { AppButton(text = "Batal", variant = ButtonVariant.Text, onClick = { logoutDialog = false }) },
+            secondaryButtonText = "Batal",
+            onSecondaryClick = { logoutDialog = false },
         )
     }
 
@@ -212,11 +227,12 @@ fun AkunScreen(
     }
 
     if (termsDialog) {
-        AlertDialog(
-            onDismissRequest = { termsDialog = false },
-            title = { Text("Syarat & Ketentuan") },
-            text = { Text("Lihat kebijakan lengkap di Tentang Diskola.") },
-            confirmButton = { AppButton(text = "Tutup", variant = ButtonVariant.Text, onClick = { termsDialog = false }) },
+        AppDialog(
+            onDismiss = { termsDialog = false },
+            title = "Syarat & Ketentuan",
+            body = "Lihat kebijakan lengkap di Tentang Diskola.",
+            primaryButtonText = "Tutup",
+            onPrimaryClick = { termsDialog = false },
         )
     }
 }

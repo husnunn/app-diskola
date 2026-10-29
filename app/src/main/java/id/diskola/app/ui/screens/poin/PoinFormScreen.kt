@@ -19,16 +19,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
@@ -43,7 +39,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -59,6 +54,8 @@ import id.diskola.app.ui.components.FieldLabel
 import id.diskola.app.ui.components.FormCard
 import id.diskola.app.ui.components.PagedPickerSheet
 import id.diskola.app.ui.components.PickerOption
+import id.diskola.app.ui.components.AppDatePickerDialog
+import id.diskola.app.ui.components.AppTimePickerDialog
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
@@ -290,21 +287,19 @@ fun PoinFormScreen(
                 override fun isSelectableDate(utcTimeMillis: Long): Boolean = utcTimeMillis >= todayUtcMillis
             },
         )
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    state.selectedDateMillis?.let { millis ->
-                        viewModel.onDateSelected(Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate())
-                    }
-                    showDatePicker = false
-                    showTimePicker = true
-                }) { Text("Pilih") }
+        AppDatePickerDialog(
+            state = state,
+            title = "Jadwal Pemanggilan",
+            confirmText = "Pilih",
+            onConfirm = {
+                state.selectedDateMillis?.let { millis ->
+                    viewModel.onDateSelected(Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate())
+                }
+                showDatePicker = false
+                showTimePicker = true
             },
-            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Batal") } },
-        ) {
-            DatePicker(state = state, title = { Text("Jadwal Pemanggilan", modifier = Modifier.padding(Spacing.lg)) })
-        }
+            onDismiss = { showDatePicker = false },
+        )
     }
 
     if (showTimePicker) {
@@ -314,24 +309,16 @@ fun PoinFormScreen(
             initialMinute = (time ?: now).minute,
             is24Hour = true,
         )
-        Dialog(onDismissRequest = { showTimePicker = false }) {
-            Column(
-                modifier = Modifier
-                    .background(MaterialTheme.colorScheme.surfaceContainerLowest, DiskolaExtraShapes.card)
-                    .padding(Spacing.xl),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text("Jadwal Pemanggilan", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = Spacing.lg))
-                TimePicker(state = timeState)
-                Row(modifier = Modifier.padding(top = Spacing.lg)) {
-                    TextButton(onClick = { showTimePicker = false }) { Text("Batal") }
-                    TextButton(onClick = {
-                        viewModel.onTimeSelected(LocalTime.of(timeState.hour, timeState.minute))
-                        showTimePicker = false
-                    }) { Text("Simpan") }
-                }
-            }
-        }
+        AppTimePickerDialog(
+            state = timeState,
+            title = "Jadwal Pemanggilan",
+            confirmText = "Simpan",
+            onConfirm = {
+                viewModel.onTimeSelected(LocalTime.of(timeState.hour, timeState.minute))
+                showTimePicker = false
+            },
+            onDismiss = { showTimePicker = false },
+        )
     }
 
     if (loading) AppLoadingDialog(message = "mengunggah data")

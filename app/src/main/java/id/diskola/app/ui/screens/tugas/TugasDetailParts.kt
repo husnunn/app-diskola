@@ -215,7 +215,10 @@ internal fun EmptyNote(text: String, icon: ImageVector, modifier: Modifier = Mod
     }
 }
 
-/** A file attachment: type icon, name (wraps to 2 lines), size, then "read" and "download" actions. */
+/**
+ * A file attachment: type icon, name (wraps to 2 lines), size, then "read" and "download" actions.
+ * Also used by "Detail Materi", which words the download action differently ([downloadLabel]).
+ */
 @Composable
 internal fun TugasFileCard(
     fileName: String,
@@ -225,6 +228,7 @@ internal fun TugasFileCard(
     onOpen: () -> Unit,
     onDownload: () -> Unit,
     modifier: Modifier = Modifier,
+    downloadLabel: String = "Download",
 ) {
     val scheme = MaterialTheme.colorScheme
     Column(
@@ -264,7 +268,7 @@ internal fun TugasFileCard(
                 modifier = Modifier.weight(1f),
             )
             AppButton(
-                text = "Download",
+                text = downloadLabel,
                 onClick = onDownload,
                 variant = ButtonVariant.Outlined,
                 leadingIcon = { Icon(Icons.Rounded.Download, contentDescription = null) },
