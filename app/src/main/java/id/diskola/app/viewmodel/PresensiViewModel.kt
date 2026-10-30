@@ -62,7 +62,8 @@ class PresensiViewModel @Inject constructor(
     private val _rekap = MutableStateFlow<List<PresensiRekapTable>>(emptyList())
     val rekap: StateFlow<List<PresensiRekapTable>> = _rekap.asStateFlow()
 
-    private val _rekapLoading = MutableStateFlow(false)
+    /** True from the start: the tab asks for the first load from a LaunchedEffect, a frame after it shows, and an empty list in that frame is not an empty result. */
+    private val _rekapLoading = MutableStateFlow(true)
     val rekapLoading: StateFlow<Boolean> = _rekapLoading.asStateFlow()
 
     /** False while a Rekap fetch runs and for 5 s after it (legacy cooldown against rapid year flips). */
