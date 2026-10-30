@@ -47,8 +47,10 @@ import id.diskola.app.ui.components.AppDialog
 import id.diskola.app.ui.components.BannerError
 import id.diskola.app.ui.components.DetailScaffold
 import id.diskola.app.ui.components.EmptyState
+import id.diskola.app.ui.components.LoadingState
 import id.diskola.app.ui.components.SearchableOptionSheet
 import id.diskola.app.ui.components.SelectOption
+import id.diskola.app.ui.components.SkeletonVariant
 import id.diskola.app.ui.components.UnderlineTabRow
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
@@ -156,6 +158,9 @@ private fun ListTugasTab(
                     description = "Silahkan buat tugas untuk siswa",
                     icon = Icons.Rounded.Assignment,
                 )
+            } else if (items.isEmpty()) {
+                // First load with nothing cached yet.
+                LoadingState(variant = SkeletonVariant.TextCard, rows = 4, padding = PaddingValues(horizontal = ScreenHorizontalPadding))
             } else {
                 PullToRefreshBox(isRefreshing = loading, onRefresh = { viewModel.refresh() }, modifier = Modifier.fillMaxSize()) {
                     LazyColumn(
@@ -253,6 +258,9 @@ private fun PenilaianTab(viewModel: TugasPenilaianViewModel, onOpenScoredGroup: 
             description = "Belum ada tugas yang dikumpulkan siswa",
             icon = Icons.Rounded.Assignment,
         )
+    } else if (items.isEmpty()) {
+        // First load with nothing cached yet.
+        LoadingState(variant = SkeletonVariant.TextCard, rows = 4, padding = PaddingValues(horizontal = ScreenHorizontalPadding))
     } else {
         PullToRefreshBox(isRefreshing = loading, onRefresh = { viewModel.refresh() }, modifier = Modifier.fillMaxSize()) {
             LazyColumn(

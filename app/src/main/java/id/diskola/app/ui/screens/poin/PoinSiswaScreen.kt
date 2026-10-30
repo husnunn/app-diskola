@@ -52,7 +52,9 @@ import id.diskola.app.ui.components.BannerError
 import id.diskola.app.ui.components.ButtonVariant
 import id.diskola.app.ui.components.DetailScaffold
 import id.diskola.app.ui.components.EmptyState
+import id.diskola.app.ui.components.LoadingState
 import id.diskola.app.ui.components.PillTabRow
+import id.diskola.app.ui.components.SkeletonVariant
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
@@ -109,7 +111,7 @@ fun PoinSiswaScreen(
                     modifier = Modifier.padding(horizontal = ScreenHorizontalPadding),
                 )
             }
-            PullToRefreshBox(isRefreshing = loading, onRefresh = { viewModel.refresh() }, modifier = Modifier.fillMaxSize()) {
+            PullToRefreshBox(isRefreshing = loading && events.isNotEmpty(), onRefresh = { viewModel.refresh() }, modifier = Modifier.fillMaxSize()) {
                 LazyColumn(
                     contentPadding = PaddingValues(start = ScreenHorizontalPadding, end = ScreenHorizontalPadding, top = Spacing.md, bottom = Spacing.xxxl),
                     verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -127,7 +129,10 @@ fun PoinSiswaScreen(
                         }
                     }
                     if (events.isEmpty()) {
-                        if (!loading) {
+                        if (loading) {
+                            // First load: the LazyColumn's own content padding already insets the cards.
+                            item { LoadingState(variant = SkeletonVariant.TextCard, rows = 3, padding = PaddingValues()) }
+                        } else {
                             item {
                                 EmptyState(
                                     title = "Data Kosong",

@@ -48,6 +48,8 @@ import coil.compose.AsyncImage
 import id.diskola.app.dataclass.ResponData.MapelTable
 import id.diskola.app.ui.components.DetailScaffold
 import id.diskola.app.ui.components.EmptyState
+import id.diskola.app.ui.components.LoadingState
+import id.diskola.app.ui.components.SkeletonVariant
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
@@ -97,12 +99,7 @@ fun MapelScreen(
                     icon = Icons.Rounded.SearchOff,
                 )
             } else if (subjects.isEmpty() && loading) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    Text("Loading...", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                LoadingState(variant = SkeletonVariant.ListCard, rows = 5, padding = PaddingValues(horizontal = ScreenHorizontalPadding))
             } else {
                 PullToRefreshBox(isRefreshing = loading, onRefresh = { viewModel.refreshSubjects(isTeacher = false) }, modifier = Modifier.fillMaxSize()) {
                     LazyColumn(

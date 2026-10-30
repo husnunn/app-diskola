@@ -22,6 +22,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.diskola.app.dataclass.ResponData.MateriTable
 import id.diskola.app.ui.components.DetailScaffold
 import id.diskola.app.ui.components.EmptyState
+import id.diskola.app.ui.components.LoadingState
+import id.diskola.app.ui.components.SkeletonVariant
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
 import id.diskola.app.viewmodel.MateriViewModel
@@ -60,6 +62,14 @@ fun MateriListScreen(
                 description = "Silahkan tunggu guru mengupdate materi",
                 icon = Icons.Rounded.LibraryBooks,
                 modifier = Modifier.padding(padding),
+            )
+        } else if (materials.isEmpty()) {
+            // First load with nothing cached yet.
+            LoadingState(
+                modifier = Modifier.padding(padding),
+                variant = SkeletonVariant.ListCard,
+                rows = 4,
+                padding = PaddingValues(horizontal = ScreenHorizontalPadding),
             )
         } else {
             PullToRefreshBox(isRefreshing = loading, onRefresh = { viewModel.refreshMateri() }, modifier = Modifier.padding(padding).fillMaxSize()) {

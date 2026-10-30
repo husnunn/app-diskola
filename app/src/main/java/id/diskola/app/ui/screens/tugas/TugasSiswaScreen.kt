@@ -27,6 +27,8 @@ import id.diskola.app.dataclass.ResponData.HomeworkTable
 import id.diskola.app.ui.components.BannerError
 import id.diskola.app.ui.components.DetailScaffold
 import id.diskola.app.ui.components.EmptyState
+import id.diskola.app.ui.components.LoadingState
+import id.diskola.app.ui.components.SkeletonVariant
 import id.diskola.app.ui.components.UnderlineTabRow
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
@@ -100,6 +102,9 @@ private fun BacklogTab(viewModel: TugasSiswaViewModel, onOpenTugas: (HomeworkTab
 
     if (items.isEmpty() && !loading) {
         EmptyState(title = "Belum terdapat tugas", description = "", icon = Icons.Rounded.Assignment)
+    } else if (items.isEmpty()) {
+        // First load with nothing cached yet.
+        LoadingState(variant = SkeletonVariant.TextCard, rows = 4, padding = PaddingValues(horizontal = ScreenHorizontalPadding, vertical = Spacing.md))
     } else {
         PullToRefreshBox(isRefreshing = loading, onRefresh = { viewModel.refreshBacklog() }, modifier = Modifier.fillMaxSize()) {
             LazyColumn(
@@ -129,6 +134,9 @@ private fun DoneTab(viewModel: TugasSiswaViewModel, onOpenTugas: (HomeworkTable)
 
     if (items.isEmpty() && !loading) {
         EmptyState(title = "Belum terdapat rekap tugas", description = "", icon = Icons.Rounded.Assignment)
+    } else if (items.isEmpty()) {
+        // First load with nothing cached yet.
+        LoadingState(variant = SkeletonVariant.TextCard, rows = 4, padding = PaddingValues(horizontal = ScreenHorizontalPadding, vertical = Spacing.md))
     } else {
         PullToRefreshBox(isRefreshing = loading, onRefresh = { viewModel.refreshDone() }, modifier = Modifier.fillMaxSize()) {
             LazyColumn(
@@ -158,6 +166,9 @@ private fun ScoredTab(viewModel: TugasSiswaViewModel, onOpenScoreDetail: (Homewo
 
     if (items.isEmpty() && !loading) {
         EmptyState(title = "Belum terdapat rekap tugas", description = "", icon = Icons.Rounded.Assignment)
+    } else if (items.isEmpty()) {
+        // First load with nothing cached yet.
+        LoadingState(variant = SkeletonVariant.TextCard, rows = 4, padding = PaddingValues(horizontal = ScreenHorizontalPadding, vertical = Spacing.md))
     } else {
         PullToRefreshBox(isRefreshing = loading, onRefresh = { viewModel.refreshScored() }, modifier = Modifier.fillMaxSize()) {
             LazyColumn(

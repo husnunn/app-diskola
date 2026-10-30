@@ -61,7 +61,9 @@ import id.diskola.app.ui.components.AutoTimeGate
 import id.diskola.app.ui.components.BannerError
 import id.diskola.app.ui.components.DetailScaffold
 import id.diskola.app.ui.components.EmptyState
+import id.diskola.app.ui.components.LoadingState
 import id.diskola.app.ui.components.MonthYearPickerDialog
+import id.diskola.app.ui.components.SkeletonVariant
 import id.diskola.app.ui.components.UnderlineTabRow
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
@@ -285,7 +287,7 @@ private fun AbsenTab(
                 if (index > 0) listState.scrollToItem(index)
             }
         }
-        PullToRefreshBox(isRefreshing = loading, onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
+        PullToRefreshBox(isRefreshing = loading && days.isNotEmpty(), onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
             LazyColumn(
                 state = listState,
                 contentPadding = PaddingValues(start = ScreenHorizontalPadding, end = ScreenHorizontalPadding, bottom = Spacing.xl),
@@ -293,7 +295,9 @@ private fun AbsenTab(
                 modifier = Modifier.fillMaxSize(),
             ) {
                 if (days.isEmpty()) {
-                    if (!loading) item {
+                    // First load: the LazyColumn's own content padding already insets the rows.
+                    if (loading) item { LoadingState(variant = SkeletonVariant.Rows, rows = 7, padding = PaddingValues()) }
+                    else item {
                         EmptyState(
                             title = "Data kehadiran tidak tersedia",
                             description = "",
@@ -485,14 +489,15 @@ private fun RekapTab(viewModel: PresensiViewModel) {
             }
         }
         TableHeader(listOf("Bulan" to 1.6f, "H" to 0.6f, "T" to 0.6f, "I" to 0.6f, "S" to 0.6f))
-        PullToRefreshBox(isRefreshing = loading, onRefresh = viewModel::refreshRekap, modifier = Modifier.fillMaxSize()) {
+        PullToRefreshBox(isRefreshing = loading && rows.isNotEmpty(), onRefresh = viewModel::refreshRekap, modifier = Modifier.fillMaxSize()) {
             LazyColumn(
                 contentPadding = PaddingValues(start = ScreenHorizontalPadding, end = ScreenHorizontalPadding, top = Spacing.xs, bottom = Spacing.xl),
                 verticalArrangement = Arrangement.spacedBy(Spacing.xs),
                 modifier = Modifier.fillMaxSize(),
             ) {
                 if (rows.isEmpty()) {
-                    if (!loading) item {
+                    if (loading) item { LoadingState(variant = SkeletonVariant.Rows, rows = 6, padding = PaddingValues()) }
+                    else item {
                         EmptyState(
                             title = "Data rekap tidak tersedia",
                             description = "",

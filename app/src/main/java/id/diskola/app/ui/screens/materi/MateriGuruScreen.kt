@@ -45,8 +45,10 @@ import id.diskola.app.ui.components.AppDialog
 import id.diskola.app.ui.components.BannerError
 import id.diskola.app.ui.components.DetailScaffold
 import id.diskola.app.ui.components.EmptyState
+import id.diskola.app.ui.components.LoadingState
 import id.diskola.app.ui.components.SearchableOptionSheet
 import id.diskola.app.ui.components.SelectOption
+import id.diskola.app.ui.components.SkeletonVariant
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
@@ -122,6 +124,9 @@ fun MateriGuruScreen(
                         description = "Silahkan upload materi untuk siswa",
                         icon = Icons.Rounded.UploadFile,
                     )
+                } else if (materials.isEmpty()) {
+                    // First load with nothing cached yet.
+                    LoadingState(variant = SkeletonVariant.ListCard, rows = 4, padding = PaddingValues(horizontal = ScreenHorizontalPadding))
                 } else {
                     PullToRefreshBox(isRefreshing = loading, onRefresh = { viewModel.refresh() }, modifier = Modifier.fillMaxSize()) {
                         LazyColumn(
