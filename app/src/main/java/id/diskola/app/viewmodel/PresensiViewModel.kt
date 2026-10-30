@@ -74,6 +74,10 @@ class PresensiViewModel @Inject constructor(
     private var firstResumeSeen = false
     private var rekapStarted = false
 
+    /** Each load takes a number; only the latest one may lower its loading flag, so a cancelled earlier load cannot drop the flag of the one that replaced it. */
+    private var monthGeneration = 0
+    private var rekapGeneration = 0
+
     init {
         loadMonth(_month.value)
     }
@@ -101,21 +105,25 @@ class PresensiViewModel @Inject constructor(
     private fun loadMonth(month: YearMonth) {
         monthJob?.cancel()
         clearError()
+        val generation = ++monthGeneration
+        // Up before the cache is read: until then an empty month is unknown, not empty (the screen would flash its empty state).
+        _loading.value = true
         monthJob = viewModelScope.launch {
-            _days.value = repository.readMonth(month)
-            refreshGate()
-            _loading.value = true
             try {
-                _days.value = repository.fetchMonth(month)
+                _days.value = repository.readMonth(month)
                 refreshGate()
-                if (_days.value.isEmpty()) emitError("Data kehadiran tidak tersedia")
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Timber.e(e)
-                emitError(AppErrorHandler.getMessage(e))
+                try {
+                    _days.value = repository.fetchMonth(month)
+                    refreshGate()
+                    if (_days.value.isEmpty()) emitError("Data kehadiran tidak tersedia")
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Timber.e(e)
+                    emitError(AppErrorHandler.getMessage(e))
+                }
             } finally {
-                _loading.value = false
+                if (generation == monthGeneration) _loading.value = false
             }
             if (!repository.isStudent) _offsite.value = repository.offsiteAvailability()
         }
@@ -167,26 +175,31 @@ class PresensiViewModel @Inject constructor(
     private fun loadRekap(force: Boolean) {
         rekapJob?.cancel()
         val year = _year.value
+        val generation = ++rekapGeneration
+        // Nothing on screen yet: hold the skeleton while the cache is read. With rows showing, a flag flip here would flash the refresh spinner.
+        if (_rekap.value.isEmpty()) _rekapLoading.value = true
         rekapJob = viewModelScope.launch {
-            val cached = repository.readRekap(year)
-            // Always replace what is shown — never leave the previous year's rows under the new label.
-            _rekap.value = cached
-            if (cached.isNotEmpty() && !force) {
-                _rekapFilterEnabled.value = true
-                return@launch
-            }
-            _rekapLoading.value = true
-            _rekapFilterEnabled.value = false
             try {
-                _rekap.value = repository.fetchRekap(year)
-                if (_rekap.value.isEmpty()) emitError("Data rekap tidak tersedia")
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Timber.e(e)
-                emitError(AppErrorHandler.getMessage(e))
+                val cached = repository.readRekap(year)
+                // Always replace what is shown — never leave the previous year's rows under the new label.
+                _rekap.value = cached
+                if (cached.isNotEmpty() && !force) {
+                    _rekapFilterEnabled.value = true
+                    return@launch
+                }
+                _rekapLoading.value = true
+                _rekapFilterEnabled.value = false
+                try {
+                    _rekap.value = repository.fetchRekap(year)
+                    if (_rekap.value.isEmpty()) emitError("Data rekap tidak tersedia")
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Timber.e(e)
+                    emitError(AppErrorHandler.getMessage(e))
+                }
             } finally {
-                _rekapLoading.value = false
+                if (generation == rekapGeneration) _rekapLoading.value = false
             }
             delay(5_000)
             _rekapFilterEnabled.value = true

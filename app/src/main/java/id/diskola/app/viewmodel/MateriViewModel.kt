@@ -9,13 +9,11 @@ import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -36,14 +34,16 @@ class MateriViewModel @Inject constructor(
     private val _subjectQuery = MutableStateFlow("")
     val subjectQuery: StateFlow<String> = _subjectQuery.asStateFlow()
 
+    /** Typing waits 400 ms for a pause; the empty box (the first value, and clearing the search) does not, or the list would be unknown for that long on every open. */
     @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
-    val subjects: StateFlow<List<MapelTable>> = _subjectQuery
-        .debounce(400)
-        .flatMapLatest { query -> repository.observeSubjects(query) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    private val _subjectsLoading = MutableStateFlow(false)
-    val subjectsLoading: StateFlow<Boolean> = _subjectsLoading.asStateFlow()
+    private val subjectsLoad = ListLoad(
+        viewModelScope,
+        _subjectQuery
+            .debounce { query -> if (query.isEmpty()) 0L else 400L }
+            .flatMapLatest { query -> repository.observeSubjects(query) },
+    )
+    val subjects: StateFlow<List<MapelTable>> = subjectsLoad.items
+    val subjectsLoading: StateFlow<Boolean> = subjectsLoad.loading
 
     private var hasNextSubjectPage = true
     private var loadingMoreSubjects = false
@@ -55,13 +55,12 @@ class MateriViewModel @Inject constructor(
     fun openSubjectPicker(isTeacher: Boolean) {
         if (subjects.value.isNotEmpty()) return
         viewModelScope.launch {
-            _subjectsLoading.value = true
             try {
-                if (isTeacher) repository.ensureTeacherSubjectsFirstPage() else repository.ensureStudentSubjectsFirstPage()
+                subjectsLoad.fetch {
+                    if (isTeacher) repository.ensureTeacherSubjectsFirstPage() else repository.ensureStudentSubjectsFirstPage()
+                }
             } catch (e: Exception) {
                 Timber.e(e)
-            } finally {
-                _subjectsLoading.value = false
             }
         }
     }
@@ -88,13 +87,12 @@ class MateriViewModel @Inject constructor(
 
     fun refreshSubjects(isTeacher: Boolean) {
         viewModelScope.launch {
-            _subjectsLoading.value = true
             try {
-                hasNextSubjectPage = if (isTeacher) repository.refreshTeacherSubjects() else repository.refreshStudentSubjects()
+                subjectsLoad.fetch {
+                    hasNextSubjectPage = if (isTeacher) repository.refreshTeacherSubjects() else repository.refreshStudentSubjects()
+                }
             } catch (e: Exception) {
                 Timber.e(e)
-            } finally {
-                _subjectsLoading.value = false
             }
         }
     }
@@ -104,13 +102,14 @@ class MateriViewModel @Inject constructor(
     private val _currentSubjectId = MutableStateFlow(0)
     private var currentIsTeacher = false
 
+    /** No subject yet means no answer yet (not "empty"): [emptyFlow], so the list stays unknown until a subject is opened. */
     @OptIn(ExperimentalCoroutinesApi::class)
-    val materiOfSubject: StateFlow<List<MateriTable>> = _currentSubjectId
-        .flatMapLatest { id -> if (id > 0) repository.observeMateriBySubject(id) else flowOf(emptyList()) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    private val _materiLoading = MutableStateFlow(false)
-    val materiLoading: StateFlow<Boolean> = _materiLoading.asStateFlow()
+    private val materiLoad = ListLoad(
+        viewModelScope,
+        _currentSubjectId.flatMapLatest { id -> if (id > 0) repository.observeMateriBySubject(id) else emptyFlow() },
+    )
+    val materiOfSubject: StateFlow<List<MateriTable>> = materiLoad.items
+    val materiLoading: StateFlow<Boolean> = materiLoad.loading
 
     private var hasNextMateriPage = true
     private var loadingMoreMateri = false
@@ -119,13 +118,10 @@ class MateriViewModel @Inject constructor(
         currentIsTeacher = isTeacher
         _currentSubjectId.value = subjectId
         viewModelScope.launch {
-            _materiLoading.value = true
             try {
-                repository.ensureSubjectMateriFirstPage(subjectId, isTeacher)
+                materiLoad.fetch { repository.ensureSubjectMateriFirstPage(subjectId, isTeacher) }
             } catch (e: Exception) {
                 Timber.e(e)
-            } finally {
-                _materiLoading.value = false
             }
         }
     }
@@ -149,13 +145,10 @@ class MateriViewModel @Inject constructor(
         val subjectId = _currentSubjectId.value
         if (subjectId <= 0) return
         viewModelScope.launch {
-            _materiLoading.value = true
             try {
-                hasNextMateriPage = repository.refreshSubjectMateri(subjectId, currentIsTeacher)
+                materiLoad.fetch { hasNextMateriPage = repository.refreshSubjectMateri(subjectId, currentIsTeacher) }
             } catch (e: Exception) {
                 Timber.e(e)
-            } finally {
-                _materiLoading.value = false
             }
         }
     }

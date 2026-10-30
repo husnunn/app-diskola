@@ -5,11 +5,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import id.diskola.app.dataclass.ResponData.HomeworkTable
 import id.diskola.app.repository.TugasRepository
 import javax.inject.Inject
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.stateIn
 
 /**
  * The 3-tab student shell (Belum Dikerjakan/Sudah Dikerjakan/Nilai, doc
@@ -22,35 +18,26 @@ class TugasSiswaViewModel @Inject constructor(
     private val repository: TugasRepository,
 ) : BaseViewModel() {
 
-    val backlog: StateFlow<List<HomeworkTable>> =
-        repository.observeBacklog().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    val done: StateFlow<List<HomeworkTable>> =
-        repository.observeDone().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    val scored: StateFlow<List<HomeworkTable>> =
-        repository.observeScored().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    private val _backlogLoading = MutableStateFlow(false)
-    val backlogLoading: StateFlow<Boolean> = _backlogLoading.asStateFlow()
+    private val backlogLoad = ListLoad(viewModelScope, repository.observeBacklog())
+    val backlog: StateFlow<List<HomeworkTable>> = backlogLoad.items
+    val backlogLoading: StateFlow<Boolean> = backlogLoad.loading
     private var hasNextBacklog = true
     private var loadingMoreBacklog = false
 
-    private val _doneLoading = MutableStateFlow(false)
-    val doneLoading: StateFlow<Boolean> = _doneLoading.asStateFlow()
+    private val doneLoad = ListLoad(viewModelScope, repository.observeDone())
+    val done: StateFlow<List<HomeworkTable>> = doneLoad.items
+    val doneLoading: StateFlow<Boolean> = doneLoad.loading
     private var hasNextDone = true
     private var loadingMoreDone = false
 
-    private val _scoredLoading = MutableStateFlow(false)
-    val scoredLoading: StateFlow<Boolean> = _scoredLoading.asStateFlow()
+    private val scoredLoad = ListLoad(viewModelScope, repository.observeScored())
+    val scored: StateFlow<List<HomeworkTable>> = scoredLoad.items
+    val scoredLoading: StateFlow<Boolean> = scoredLoad.loading
     private var hasNextScored = true
     private var loadingMoreScored = false
 
     fun ensureBacklog() = launchWithHandling(showLoading = false) {
-        _backlogLoading.value = true
-        try {
-            repository.ensureBacklogFirstPage()
-        } finally {
-            _backlogLoading.value = false
-        }
+        backlogLoad.fetch { repository.ensureBacklogFirstPage() }
     }
 
     fun loadMoreBacklog() {
@@ -62,21 +49,11 @@ class TugasSiswaViewModel @Inject constructor(
     }
 
     fun refreshBacklog() = launchWithHandling(showLoading = false) {
-        _backlogLoading.value = true
-        try {
-            hasNextBacklog = repository.refreshBacklog()
-        } finally {
-            _backlogLoading.value = false
-        }
+        backlogLoad.fetch { hasNextBacklog = repository.refreshBacklog() }
     }
 
     fun ensureDone() = launchWithHandling(showLoading = false) {
-        _doneLoading.value = true
-        try {
-            repository.ensureDoneFirstPage()
-        } finally {
-            _doneLoading.value = false
-        }
+        doneLoad.fetch { repository.ensureDoneFirstPage() }
     }
 
     fun loadMoreDone() {
@@ -88,21 +65,11 @@ class TugasSiswaViewModel @Inject constructor(
     }
 
     fun refreshDone() = launchWithHandling(showLoading = false) {
-        _doneLoading.value = true
-        try {
-            hasNextDone = repository.refreshDone()
-        } finally {
-            _doneLoading.value = false
-        }
+        doneLoad.fetch { hasNextDone = repository.refreshDone() }
     }
 
     fun ensureScored() = launchWithHandling(showLoading = false) {
-        _scoredLoading.value = true
-        try {
-            repository.ensureScoredFirstPage()
-        } finally {
-            _scoredLoading.value = false
-        }
+        scoredLoad.fetch { repository.ensureScoredFirstPage() }
     }
 
     fun loadMoreScored() {
@@ -114,11 +81,6 @@ class TugasSiswaViewModel @Inject constructor(
     }
 
     fun refreshScored() = launchWithHandling(showLoading = false) {
-        _scoredLoading.value = true
-        try {
-            hasNextScored = repository.refreshScored()
-        } finally {
-            _scoredLoading.value = false
-        }
+        scoredLoad.fetch { hasNextScored = repository.refreshScored() }
     }
 }

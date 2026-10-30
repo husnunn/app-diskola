@@ -45,9 +45,12 @@ class TugasGuruViewModel @Inject constructor(
     val classFilter: StateFlow<Int?> = _classFilter.asStateFlow()
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val tugasList: StateFlow<List<HomeworkTable>> = combine(_subjectFilter, _classFilter) { s, c -> s to c }
-        .flatMapLatest { (subjectId, classId) -> repository.observeTeacherOwn(teacherId, subjectId, classId) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    private val listLoad = ListLoad(
+        viewModelScope,
+        combine(_subjectFilter, _classFilter) { s, c -> s to c }
+            .flatMapLatest { (subjectId, classId) -> repository.observeTeacherOwn(teacherId, subjectId, classId) },
+    )
+    val tugasList: StateFlow<List<HomeworkTable>> = listLoad.items
 
     val classes: StateFlow<List<ClassRoomTable>> =
         materiRepository.observeClasses().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -55,8 +58,7 @@ class TugasGuruViewModel @Inject constructor(
     val subjects: StateFlow<List<MapelTable>> =
         materiRepository.observeSubjects("").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _listLoading = MutableStateFlow(false)
-    val listLoading: StateFlow<Boolean> = _listLoading.asStateFlow()
+    val listLoading: StateFlow<Boolean> = listLoad.loading
 
     private var hasNextPage = true
     private var loadingMore = false
@@ -99,12 +101,7 @@ class TugasGuruViewModel @Inject constructor(
     }
 
     private fun ensureFirstPage() = launchWithHandling(showLoading = false) {
-        _listLoading.value = true
-        try {
-            repository.ensureTeacherOwnFirstPage(teacherId, _subjectFilter.value, _classFilter.value)
-        } finally {
-            _listLoading.value = false
-        }
+        listLoad.fetch { repository.ensureTeacherOwnFirstPage(teacherId, _subjectFilter.value, _classFilter.value) }
     }
 
     fun loadMore() {
@@ -116,12 +113,7 @@ class TugasGuruViewModel @Inject constructor(
     }
 
     fun refresh() = launchWithHandling(showLoading = false) {
-        _listLoading.value = true
-        try {
-            hasNextPage = repository.refreshTeacherOwn(teacherId, _subjectFilter.value, _classFilter.value)
-        } finally {
-            _listLoading.value = false
-        }
+        listLoad.fetch { hasNextPage = repository.refreshTeacherOwn(teacherId, _subjectFilter.value, _classFilter.value) }
     }
 
     /** Called when returning from the upload form after a successful create/edit. */

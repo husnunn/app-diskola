@@ -6,11 +6,7 @@ import id.diskola.app.dataclass.ResponData.HomeworkCollected
 import id.diskola.app.repository.TugasRepository
 import id.diskola.app.utils.session.SessionStore
 import javax.inject.Inject
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.stateIn
 
 /** "Penilaian" tab (doc §6.4's `HomeworkTeacherNilaiPage`) — no filters, just a paged list of
  * tugas groups that have at least one student submission. */
@@ -20,11 +16,9 @@ class TugasPenilaianViewModel @Inject constructor(
     private val sessionStore: SessionStore,
 ) : BaseViewModel() {
 
-    val scoredGroups: StateFlow<List<HomeworkCollected>> =
-        repository.observeScoredGroups().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    private val _listLoading = MutableStateFlow(false)
-    val listLoading: StateFlow<Boolean> = _listLoading.asStateFlow()
+    private val listLoad = ListLoad(viewModelScope, repository.observeScoredGroups())
+    val scoredGroups: StateFlow<List<HomeworkCollected>> = listLoad.items
+    val listLoading: StateFlow<Boolean> = listLoad.loading
 
     private var hasNextPage = true
     private var loadingMore = false
@@ -35,12 +29,7 @@ class TugasPenilaianViewModel @Inject constructor(
         // An account without teacher data is stopped by the screen; it does not ask the teacher endpoints for anything.
         if (sessionStore.canManageAssignments) {
             launchWithHandling(showLoading = false) {
-                _listLoading.value = true
-                try {
-                    repository.ensureScoredGroupsFirstPage()
-                } finally {
-                    _listLoading.value = false
-                }
+                listLoad.fetch { repository.ensureScoredGroupsFirstPage() }
             }
         }
     }
@@ -54,11 +43,6 @@ class TugasPenilaianViewModel @Inject constructor(
     }
 
     fun refresh() = launchWithHandling(showLoading = false) {
-        _listLoading.value = true
-        try {
-            hasNextPage = repository.refreshScoredGroups()
-        } finally {
-            _listLoading.value = false
-        }
+        listLoad.fetch { hasNextPage = repository.refreshScoredGroups() }
     }
 }

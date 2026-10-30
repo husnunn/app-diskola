@@ -40,9 +40,12 @@ class MateriGuruViewModel @Inject constructor(
     val classFilter: StateFlow<Int?> = _classFilter.asStateFlow()
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val materiList: StateFlow<List<MateriTable>> = combine(_subjectFilter, _classFilter) { s, c -> s to c }
-        .flatMapLatest { (subjectId, classId) -> repository.observeTeacherOwnMateri(teacherId, subjectId, classId) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    private val listLoad = ListLoad(
+        viewModelScope,
+        combine(_subjectFilter, _classFilter) { s, c -> s to c }
+            .flatMapLatest { (subjectId, classId) -> repository.observeTeacherOwnMateri(teacherId, subjectId, classId) },
+    )
+    val materiList: StateFlow<List<MateriTable>> = listLoad.items
 
     val classes: StateFlow<List<ClassRoomTable>> =
         repository.observeClasses().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -50,8 +53,7 @@ class MateriGuruViewModel @Inject constructor(
     val subjects: StateFlow<List<MapelTable>> =
         repository.observeSubjects("").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _listLoading = MutableStateFlow(false)
-    val listLoading: StateFlow<Boolean> = _listLoading.asStateFlow()
+    val listLoading: StateFlow<Boolean> = listLoad.loading
 
     private var hasNextPage = true
     private var loadingMore = false
@@ -94,13 +96,10 @@ class MateriGuruViewModel @Inject constructor(
         val subjectId = _subjectFilter.value
         val classId = _classFilter.value
         viewModelScope.launch {
-            _listLoading.value = true
             try {
-                repository.ensureTeacherOwnFirstPage(teacherId, subjectId, classId)
+                listLoad.fetch { repository.ensureTeacherOwnFirstPage(teacherId, subjectId, classId) }
             } catch (e: Exception) {
                 Timber.e(e)
-            } finally {
-                _listLoading.value = false
             }
         }
     }
@@ -121,13 +120,10 @@ class MateriGuruViewModel @Inject constructor(
 
     fun refresh() {
         viewModelScope.launch {
-            _listLoading.value = true
             try {
-                hasNextPage = repository.refreshTeacherOwn(teacherId, _subjectFilter.value, _classFilter.value)
+                listLoad.fetch { hasNextPage = repository.refreshTeacherOwn(teacherId, _subjectFilter.value, _classFilter.value) }
             } catch (e: Exception) {
                 Timber.e(e)
-            } finally {
-                _listLoading.value = false
             }
         }
     }
