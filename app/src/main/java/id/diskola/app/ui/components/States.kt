@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -47,10 +48,16 @@ import kotlinx.coroutines.delay
  * Skeleton shown while a screen's first load is in flight — the shape of what is coming, with a shimmer passing over it, instead of the old
  * grey rows plus a spinner (two signals; the spinner stays for *actions*). It appears only after [SkeletonRules.SHOW_DELAY_MILLIS], so a fast
  * answer never flashes it, then fades in. TalkBack hears "Memuat" once; the blocks themselves are silent. [rows] is how many rows or cards
- * to draw ([SkeletonVariant.Detail] is a single block).
+ * to draw ([SkeletonVariant.Detail] is a single block). [padding] is the skeleton's inset: pass the content's own padding so its edges
+ * line up with the real cards (the default suits a screen without one).
  */
 @Composable
-fun LoadingState(modifier: Modifier = Modifier, rows: Int = 3, variant: SkeletonVariant = SkeletonVariant.ListRow) {
+fun LoadingState(
+    modifier: Modifier = Modifier,
+    rows: Int = 3,
+    variant: SkeletonVariant = SkeletonVariant.ListRow,
+    padding: PaddingValues = PaddingValues(Spacing.lg),
+) {
     var delayPassed by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         delay(SkeletonRules.SHOW_DELAY_MILLIS)
@@ -60,7 +67,7 @@ fun LoadingState(modifier: Modifier = Modifier, rows: Int = 3, variant: Skeleton
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(Spacing.lg)
+            .padding(padding)
             .graphicsLayer { alpha = fade }
             .semantics(mergeDescendants = true) {
                 contentDescription = "Memuat"

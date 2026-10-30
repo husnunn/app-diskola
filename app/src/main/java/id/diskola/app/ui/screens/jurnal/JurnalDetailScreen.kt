@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -108,7 +109,11 @@ fun JurnalDetailScreen(
     ) { padding ->
         val current = detail
         when {
-            current == null && loadError == null -> LoadingState(modifier = Modifier.padding(padding).padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md), variant = SkeletonVariant.Detail)
+            current == null && loadError == null -> LoadingState(
+                modifier = Modifier.padding(padding),
+                padding = PaddingValues(horizontal = ScreenHorizontalPadding, vertical = Spacing.md),
+                variant = SkeletonVariant.Detail,
+            )
             current == null -> Unit
             else -> Column(
                 modifier = Modifier

@@ -219,7 +219,7 @@ private fun SppBillsContent(
             PullToRefreshBox(isRefreshing = bills.loading && bills.loaded, onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
                 val items = if (tab == 0) bills.unpaid else bills.paid
                 when {
-                    !bills.loaded && bills.loading -> LoadingState(rows = 4, variant = SkeletonVariant.Card)
+                    !bills.loaded && bills.loading -> LoadingState(rows = 4, variant = SkeletonVariant.Card, padding = PaddingValues(horizontal = ScreenHorizontalPadding, vertical = Spacing.md))
                     items.isEmpty() -> EmptyState(
                         title = SppRules.EMPTY_TITLE,
                         description = if (tab == 0) SppRules.EMPTY_UNPAID else SppRules.EMPTY_PAID,
@@ -527,7 +527,7 @@ private fun PaymentMethodContent(
             modifier = Modifier.padding(padding).fillMaxSize(),
         ) {
             if (methods.groups.isEmpty() && methods.loading) {
-                LoadingState(rows = 5, variant = SkeletonVariant.ListRow)
+                LoadingState(rows = 5, variant = SkeletonVariant.ListRow, padding = PaddingValues(horizontal = ScreenHorizontalPadding, vertical = Spacing.md))
             } else {
                 LazyColumn(
                     contentPadding = PaddingValues(start = ScreenHorizontalPadding, end = ScreenHorizontalPadding, top = Spacing.md, bottom = Spacing.xxxl),

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -169,7 +170,11 @@ fun MateriDetailScreen(
             }
             // The invalid-id dialog below covers this state.
             invalid -> Box(modifier = Modifier.padding(padding).fillMaxSize())
-            else -> LoadingState(modifier = Modifier.padding(padding).padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md), variant = SkeletonVariant.Detail)
+            else -> LoadingState(
+                modifier = Modifier.padding(padding),
+                padding = PaddingValues(horizontal = ScreenHorizontalPadding, vertical = Spacing.md),
+                variant = SkeletonVariant.Detail,
+            )
         }
     }
 

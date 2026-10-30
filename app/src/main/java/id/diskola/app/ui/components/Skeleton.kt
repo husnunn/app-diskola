@@ -52,6 +52,15 @@ enum class SkeletonVariant {
 
     /** A big title, two meta lines, a paragraph and an attachment block — the detail screens. */
     Detail,
+
+    /** A bordered card with a leading icon or avatar and three text lines — the Mapel and Materi lists. */
+    ListCard,
+
+    /** A bordered card of text only (a title and two lines, one of them a label and a value) — the Tugas and Poin lists. */
+    TextCard,
+
+    /** Flat, compact table-like rows (a date or month and a few small figures) — the Presensi lists. */
+    Rows,
 }
 
 /** The sizes of the skeleton blocks, named here instead of scattered through the variants (they match the content they stand in for). */
@@ -68,6 +77,9 @@ internal object SkeletonSizes {
     val Label = 28.dp
     val Price = 72.dp
     val Border = 1.dp
+    val CardIcon = 46.dp
+    val Figure = 28.dp
+    val RowHeight = 52.dp
 }
 
 /** The sweep shared by every block of one skeleton; null when the user turned animations off (the blocks then stay plain). */
@@ -136,6 +148,9 @@ internal fun SkeletonContent(variant: SkeletonVariant, rows: Int) {
                 SkeletonVariant.ListRow -> repeat(rows) { index -> ListRowSkeleton(quiet = index > 0) }
                 SkeletonVariant.Card -> repeat(rows) { CardSkeleton() }
                 SkeletonVariant.Detail -> DetailSkeleton()
+                SkeletonVariant.ListCard -> repeat(rows) { ListCardSkeleton() }
+                SkeletonVariant.TextCard -> repeat(rows) { TextCardSkeleton() }
+                SkeletonVariant.Rows -> repeat(rows) { RowSkeleton() }
             }
         }
     }
@@ -184,6 +199,68 @@ private fun CardSkeleton() {
     }
 }
 
+/** The bordered shell the real list cards draw, so the skeleton's edges line up with theirs. */
+@Composable
+private fun BorderedCard(content: @Composable () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(DiskolaExtraShapes.card)
+            .background(scheme.surfaceContainerLowest)
+            .border(SkeletonSizes.Border, scheme.outlineVariant, DiskolaExtraShapes.card)
+            .padding(Spacing.lg),
+    ) { content() }
+}
+
+@Composable
+private fun ListCardSkeleton() {
+    BorderedCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SkeletonBlock(Modifier.size(SkeletonSizes.CardIcon), DiskolaExtraShapes.iconBox)
+            Column(
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                modifier = Modifier.weight(1f).padding(horizontal = Spacing.md),
+            ) {
+                SkeletonBlock(Modifier.fillMaxWidth(0.6f).height(SkeletonSizes.TitleBar))
+                SkeletonBlock(Modifier.fillMaxWidth(0.4f).height(SkeletonSizes.SubBar))
+                SkeletonBlock(Modifier.fillMaxWidth(0.25f).height(SkeletonSizes.SubBar))
+            }
+        }
+    }
+}
+
+@Composable
+private fun TextCardSkeleton() {
+    BorderedCard {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            SkeletonBlock(Modifier.fillMaxWidth(0.55f).height(SkeletonSizes.TitleBar))
+            SkeletonBlock(Modifier.fillMaxWidth(0.85f).height(SkeletonSizes.SubBar))
+            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                SkeletonBlock(Modifier.width(SkeletonSizes.Meta).height(SkeletonSizes.SubBar))
+                SkeletonBlock(Modifier.width(SkeletonSizes.Label).height(SkeletonSizes.SubBar))
+            }
+        }
+    }
+}
+
+@Composable
+private fun RowSkeleton() {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(SkeletonSizes.RowHeight)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow, DiskolaExtraShapes.chipBadge)
+            .padding(horizontal = Spacing.md),
+    ) {
+        SkeletonBlock(Modifier.weight(1f).fillMaxWidth(0.4f).height(SkeletonSizes.TitleBar))
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            repeat(3) { SkeletonBlock(Modifier.width(SkeletonSizes.Figure).height(SkeletonSizes.SubBar)) }
+        }
+    }
+}
+
 @Composable
 private fun DetailSkeleton() {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg), modifier = Modifier.fillMaxWidth()) {
@@ -226,4 +303,22 @@ private fun DetailSkeletonPreview() {
 @Composable
 private fun CardSkeletonLargeFontPreview() {
     DiskolaTheme { Box(Modifier.padding(Spacing.lg)) { SkeletonContent(SkeletonVariant.Card, rows = 2) } }
+}
+
+@Preview(name = "ListCard", showBackground = true)
+@Composable
+private fun ListCardSkeletonPreview() {
+    DiskolaTheme { Box(Modifier.padding(Spacing.lg)) { SkeletonContent(SkeletonVariant.ListCard, rows = 3) } }
+}
+
+@Preview(name = "TextCard", showBackground = true)
+@Composable
+private fun TextCardSkeletonPreview() {
+    DiskolaTheme { Box(Modifier.padding(Spacing.lg)) { SkeletonContent(SkeletonVariant.TextCard, rows = 3) } }
+}
+
+@Preview(name = "Rows", showBackground = true)
+@Composable
+private fun RowsSkeletonPreview() {
+    DiskolaTheme { Box(Modifier.padding(Spacing.lg)) { SkeletonContent(SkeletonVariant.Rows, rows = 5) } }
 }

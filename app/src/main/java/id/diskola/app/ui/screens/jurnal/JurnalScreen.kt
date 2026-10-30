@@ -118,7 +118,7 @@ fun JurnalScreen(
                 )
             }
             when {
-                !loaded && loading -> LoadingState(modifier = Modifier.padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md), variant = SkeletonVariant.ListRow)
+                !loaded && loading -> LoadingState(padding = PaddingValues(horizontal = ScreenHorizontalPadding, vertical = Spacing.md), variant = SkeletonVariant.ListRow)
                 !loaded -> ErrorState(
                     description = errorMessage.ifBlank { "Periksa koneksi internet Anda dan coba lagi." },
                     onRetry = {
