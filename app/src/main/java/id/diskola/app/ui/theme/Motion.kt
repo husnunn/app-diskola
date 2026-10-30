@@ -8,6 +8,9 @@ object Motion {
     const val BASE = 250
     const val SLOW = 400
 
+    /** One sweep of the loading skeleton's shimmer; it loops (linear), all blocks of a screen share the same one. */
+    const val SHIMMER = 1200
+
     val EaseIn = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
     val EaseOut = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f)
 

@@ -674,3 +674,20 @@ Sumber kode lama yang benar: `DISKOLA MOBILE/android-portal` (`development` @ `d
 
 **Belum diverifikasi (jangan diasumsikan selesai):** respons server dev untuk `check-account` **tanpa** `nisn_nik` pada akun SSO belum pernah diamati di perangkat; bila ditolak (mis. 422) app menampilkan toast pesan server dan memakai sesi lama, jadi data parsial tetap dan perlu keputusan lain dari backend. Hanya tes JVM yang dijalankan (468 lulus).
 
+## 2026-10-30 — Loading skeleton menggantikan baris abu-abu statis + spinner (tahap 1: komponen + layar P1)
+
+**Konteks:** plan `docs/PLAN_SKELETON_LOADING.md`. `LoadingState` (baris abu-abu statis + spinner 18dp + "Memuat…") memberi dua tanda sekaligus dan tanpa animasi sehingga terlihat macet. Diganti skeleton ber-shimmer. **Menyimpang dari spesifikasi handoff** (`ref/design_handoff_auth_fase1/README.md`, `ANDROID_DESIGN_PATTERN.md`), disetujui user ("lanjutkan sesuai plan"); kedua dokumen diperbarui.
+
+| # | Pertanyaan | Jawaban user | Keputusan final |
+|---|---|---|---|
+| 1 | Lingkup tahap pertama | **Komponen + P1** | `Skeleton.kt` + `LoadingState` baru; layar Jurnal, Tugas detail, Materi detail, SPP memilih varian. P2 (AKM) dan P3 tidak disunting |
+| 2 | Batas waktu sebelum `ErrorState` | **30 dtk, ikut timeout jaringan** | Tanpa timer UI sendiri. Semua titik P1 sudah punya jalur keluar saat gagal (ErrorState/`notFound`/`invalid`/`loaded=true`/dialog) |
+| 3 | Layar P3 | **Daftar saja** (Tugas siswa/guru, Materi, Poin siswa, Presensi) | Dikerjakan di tahap berikutnya; Home dan Notifikasi tidak |
+| 4 | Branch & commit | **Branch sekarang, commit otomatis tiap tahap** | Commit per tahap, stage lewat path eksplisit |
+
+**Penyimpangan dari plan sumber (default saya):** (a) tanpa "tampil minimal 400 ms" — menahan skeleton setelah data siap menambah latensi dan memaksa tiap layar memakai tiga keadaan; kedipan dicegah oleh tunda 200 ms + fade-in 150 ms di dalam `LoadingState`; (b) tanpa fase batas waktu (jawaban #2).
+
+**Yang ikut berubah tanpa disunting:** `LoadingState` dipakai bersama, jadi layar AKM/P2 (`AkmScreen`, `AkmDetailScreen`, `AkmScoreScreens`, `AkmResumeScreen`, `AkmQuestionScreen`) otomatis memakai tampilan `ListRow` baru (tanpa spinner, dengan shimmer).
+
+**Belum diverifikasi di perangkat:** tampilan dan animasi skeleton (server dev menjawab ±300–600 ms sehingga jendela skeleton sempit; gate `payment` dev sedang `maintenance` sehingga layar SPP tidak bisa dibuka — SPP hanya preview + kompilasi), reduce-motion, font 1,5×, TalkBack, dan layar AKM.
+

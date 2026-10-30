@@ -892,7 +892,7 @@ AppTextField(
 ```kotlin
 // WAJIB ada di setiap screen
 when {
-    isLoading -> LoadingState()                                     // skeleton + spinner
+    isLoading -> LoadingState()                                     // skeleton ber-shimmer (tanpa spinner); varian: ListRow/Card/Detail
     errorMessage.isNotBlank() -> ErrorState(message = errorMessage) // dengan tombol retry
     items.isEmpty() -> EmptyState(message = "Tidak ada data")
     else -> /* konten */

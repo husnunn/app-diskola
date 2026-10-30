@@ -458,8 +458,14 @@ body 14sp/400/1.55 `onSurfaceVariant` · tombol primary full-width 52dp + tombol
 baris judul 16sp/900 + `close` 44dp, list opsi radio min-height 48dp
 (`radio_button_checked`/`radio_button_unchecked` 22dp), tombol "Terapkan" 52dp.
 
-**LoadingState** — skeleton row (kotak 44dp r12 + 2 bar 12dp/10dp r6, fill `surfaceContainerHigh`,
-baris berikutnya opacity .7) + baris spinner 18dp/2.5dp + label 12sp.
+**LoadingState** — skeleton ber-shimmer, **tanpa** spinner dan label "Memuat…" (diubah 2026-10-30; semula baris
+spinner 18dp/2.5dp + label 12sp). Bentuknya mengikuti isi yang akan datang, tiga varian: `ListRow` (kotak 44dp r12 +
+2 bar 12dp/10dp r8, baris berikutnya opacity .7), `Card` (kartu berbingkai `outlineVariant`: centang 24dp, bar judul,
+pil, bar harga — tagihan SPP) dan `Detail` (bar judul 20dp, 2 bar meta, paragraf 100/100/90/60 %, blok lampiran 72dp).
+Dasar `surfaceContainerHigh`, kilau `surfaceContainerLowest`; satu sapuan shimmer 1200ms (linear, `Motion.SHIMMER`) dipakai
+bersama semua blok satu layar. Muncul setelah tunda 200ms lalu fade-in `Motion.FAST`, jadi jawaban cepat tidak berkedip.
+Animasi sistem dimatikan ⇒ blok statis. TalkBack membaca "Memuat" sekali; blok tidak bisa difokuskan. Spinner dan
+`AppLoadingDialog` tetap untuk **aksi** (login, kirim, simpan); pull-to-refresh untuk refresh daftar yang sudah tampil.
 
 **EmptyState** — ikon bulat 64dp `surfaceContainerLow` + ikon 30dp `onSurfaceVariant` ·
 judul 14sp/900 · deskripsi 12sp/400/1.5 · **satu aksi pemulihan** outlined 44dp ("Muat ulang").

@@ -1,19 +1,19 @@
 package id.diskola.app.ui.components
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.WifiOff
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -21,62 +21,53 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalAccessibilityManager
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import id.diskola.app.ui.theme.DiskolaExtraShapes
+import id.diskola.app.ui.theme.Motion
 import id.diskola.app.ui.theme.Spacing
 import id.diskola.app.utils.BannerRules
+import id.diskola.app.utils.SkeletonRules
 import kotlinx.coroutines.delay
 
-/** Skeleton rows shown while a screen's first load is in flight. */
+/**
+ * Skeleton shown while a screen's first load is in flight — the shape of what is coming, with a shimmer passing over it, instead of the old
+ * grey rows plus a spinner (two signals; the spinner stays for *actions*). It appears only after [SkeletonRules.SHOW_DELAY_MILLIS], so a fast
+ * answer never flashes it, then fades in. TalkBack hears "Memuat" once; the blocks themselves are silent. [rows] is how many rows or cards
+ * to draw ([SkeletonVariant.Detail] is a single block).
+ */
 @Composable
-fun LoadingState(modifier: Modifier = Modifier, rows: Int = 3) {
-    Column(
+fun LoadingState(modifier: Modifier = Modifier, rows: Int = 3, variant: SkeletonVariant = SkeletonVariant.ListRow) {
+    var delayPassed by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(SkeletonRules.SHOW_DELAY_MILLIS)
+        delayPassed = true
+    }
+    val fade by animateFloatAsState(targetValue = if (delayPassed) 1f else 0f, animationSpec = tween(Motion.FAST), label = "skeletonFade")
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            .padding(Spacing.lg)
+            .graphicsLayer { alpha = fade }
+            .semantics(mergeDescendants = true) {
+                contentDescription = "Memuat"
+                liveRegion = LiveRegionMode.Polite
+            },
     ) {
-        repeat(rows) { index ->
-            val opacity = if (index == 0) 1f else 0.7f
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .background(
-                            MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = opacity),
-                            DiskolaExtraShapes.iconBox,
-                        ),
-                )
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs), modifier = Modifier.weight(1f)) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(0.7f)
-                            .height(12.dp)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = opacity), DiskolaExtraShapes.chipBadge),
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(0.4f)
-                            .height(10.dp)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = opacity), DiskolaExtraShapes.chipBadge),
-                    )
-                }
-            }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.5.dp)
-            Text("Memuat…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        SkeletonContent(variant, rows)
     }
 }
 
