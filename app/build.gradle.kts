@@ -71,6 +71,8 @@ android {
             )
             buildConfigField("String", "API_URL", properties.getProperty("API_URL_PROD", ""))
             buildConfigField("String", "ASSETS_URL", properties.getProperty("ASSETS_URL_PROD", "\"\""))
+            buildConfigField("String", "WEB_CLIENT_ID", properties.getProperty("CLIENT_ID_PROD", ""))
+            buildConfigField("String", "SOCKET_URL", properties.getProperty("SOCKET_URL", ""))
             buildConfigField("String", "PORTAL_URL", "\"https://portal.diskola.id\"")
         }
         debug {
@@ -79,6 +81,8 @@ android {
             isDebuggable = true
             buildConfigField("String", "API_URL", properties.getProperty("API_URL_DEV", ""))
             buildConfigField("String", "ASSETS_URL", properties.getProperty("ASSETS_URL_DEV", "\"\""))
+            buildConfigField("String", "WEB_CLIENT_ID", properties.getProperty("CLIENT_ID_DEV", ""))
+            buildConfigField("String", "SOCKET_URL", properties.getProperty("SOCKET_URL_DEV", ""))
             buildConfigField("String", "PORTAL_URL", "\"https://dev.portal.diskola.id\"")
         }
     }
