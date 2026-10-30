@@ -661,3 +661,16 @@ Sumber kode lama yang benar: `DISKOLA MOBILE/android-portal` (`development` @ `d
 | # | Pertanyaan | Jawaban | Keputusan final |
 |---|---|---|---|
 | 1 | Seragamkan ke mana: (a) semua dialog tengah, dibedakan nada, atau (b) error di bawah (bottom sheet) dan peringatan di tengah? | **(a) Semua di tengah, beda nada** | Error ("Login Gagal") = `AppDialog` ERROR (merah); peringatan ("Perangkat Lain Terdeteksi", "Ganti Password") = `AppDialog` WARNING (kuning). Berlaku di Login, Password, dan SSO. Deviasi dari app lama; `FeatureUnavailableSheet`, Toast aktivasi Klaspay, dan banner reset password tidak diubah. |
+
+## 2026-10-30 — Hub Pembelajaran: `check-account` juga untuk akun tanpa NISN/NIK (login SSO/Google)
+
+**Konteks:** user: di halaman Pembelajaran `check-account` harus dipanggil bersama `current-user`, karena sebagian besar data sesi diambil dari endpoint itu agar sesuai dan realtime.
+
+**Temuan (bukti log Samsung SM-A505F, 08:44–08:47, setelah `login-sso` → `login-sso/school` → `payment/activate`):** empat kali hub dimuat, tiap kali hanya `current-user` + `payment/wallet` + `notification/summary`; **nol** `check-account`. Penyebab: `HomeViewModel.refreshProfile()` keluar diam-diam bila NISN kosong, dan akun Google ini memang tanpa NISN/NIK (`login-sso`: `"nisn": null`; `login-sso/school`: `"nisn_nik": null`) serta tanpa `student` di sesi. Sesi SSO jadi parsial selamanya (`user.uuid` kosong, `schoolId` 0, tanpa data kelas, `userProgress`/`current_subject` tidak pernah dimuat).
+
+**Legacy:** `ApiWrapper.checkAccount(nisn, schoolId)` membuang `nisn_nik` bila kosong dan tetap memanggil dengan `{school_id}` saja (server mengenali user dari bearer token); docs `03` mencatat body `{nisn_nik?, school_id}`. App baru menambahkan penjaga `nisn.isBlank()` yang tidak ada di legacy.
+
+**Keputusan (mengembalikan perilaku legacy, bukan pilihan produk baru):** `CheckAccountRequest.nisn_nik` opsional (Moshi tidak menulis `null`, body = `{"school_id":"…"}`); `HubRules.checkAccountNisn` memilih NIS siswa, lalu NIS/NIK akun, lalu `null`; guard NISN dibuang, guard `school.uuid` tetap tetapi dicatat (`Timber.w`). Urutan hub tetap seperti legacy: `check-account` dulu, lalu `current-user`, bell, agenda, banner paralel.
+
+**Belum diverifikasi (jangan diasumsikan selesai):** respons server dev untuk `check-account` **tanpa** `nisn_nik` pada akun SSO belum pernah diamati di perangkat; bila ditolak (mis. 422) app menampilkan toast pesan server dan memakai sesi lama, jadi data parsial tetap dan perlu keputusan lain dari backend. Hanya tes JVM yang dijalankan (468 lulus).
+

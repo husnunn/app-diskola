@@ -25,8 +25,9 @@ class AuthRepository @Inject constructor(
     private val authApiService: AuthApiService,
     private val deviceIdProvider: DeviceIdProvider,
 ) {
-    suspend fun checkAccount(nisNik: String, schoolUuid: String): CheckAccountApiResponse =
-        authApiService.checkAccount(CheckAccountRequest(school_id = schoolUuid, nisn_nik = nisNik))
+    /** A blank [nisNik] is not sent at all (legacy `ApiWrapper.checkAccount`), so an account without one can still be refreshed. */
+    suspend fun checkAccount(nisNik: String?, schoolUuid: String): CheckAccountApiResponse =
+        authApiService.checkAccount(CheckAccountRequest(school_id = schoolUuid, nisn_nik = nisNik?.takeIf { it.isNotBlank() }))
 
     /** Session guard (legacy `verifyCurrentUserSession`): the server's view of this token's device. */
     suspend fun currentUser(): CurrentUserResponse = authApiService.currentUser()

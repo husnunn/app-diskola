@@ -158,8 +158,13 @@ class HomeViewModel @Inject constructor(
     /** `check-account`; null when it could not run or failed (the stored profile keeps being used, like legacy). */
     private suspend fun refreshProfile(): CheckAccountApiResponse? {
         val school = sessionStore.school
-        val nisn = sessionStore.student?.nis?.takeIf { it.isNotBlank() } ?: sessionStore.user.nisNik
-        if (school.uuid.isBlank() || nisn.isBlank()) return null
+        if (school.uuid.isBlank()) {
+            // Nothing to ask without a school; say so in the log instead of skipping silently.
+            Timber.w("check-account dilewati: sekolah belum tersimpan di sesi")
+            return null
+        }
+        // No NISN/NIK is not a reason to skip (Google sign-in accounts have none): the call goes out with the school alone, like legacy.
+        val nisn = HubRules.checkAccountNisn(sessionStore.student?.nis, sessionStore.user.nisNik)
         return try {
             val response = authRepository.checkAccount(nisn, school.uuid)
             sessionStore.writeCheckAccount(response, SchoolItem(id = school.id, uuid = school.uuid, name = school.name))

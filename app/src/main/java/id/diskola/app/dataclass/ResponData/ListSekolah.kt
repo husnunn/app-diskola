@@ -29,7 +29,8 @@ data class SchoolItem(
 @JsonClass(generateAdapter = true)
 data class CheckAccountRequest(
     val school_id: String,
-    val nisn_nik: String
+    /** Left out of the body when null: an account without NISN/NIK (Google sign-in) is looked up by the token alone, like legacy. */
+    val nisn_nik: String? = null,
 )
 
 @JsonClass(generateAdapter = true)

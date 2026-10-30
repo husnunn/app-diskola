@@ -35,3 +35,7 @@ Lonceng = badge + penguncian Klaspay seperti lama; kartu kelas = persis lama (`c
   verifikasi in_review/rejected, badge > 0 dan "Perangkat Lain Terdeteksi" belum teruji. Daftar cek semula: log tab Pembelajaran (check-account, current-user, setting/me/today, staff/check, staff/agendas/today; wallet+summary bila Klaspay aktif;
   **tanpa** `schedule`), buka-tutup <30 dtk tidak memuat ulang, refresh sekali, header/banner/lonceng/tile, font scale 1,3 dan 2,0. Sisi siswa (kartu kelas, "Check In"/"Isi Jurnal", verifikasi in_review/rejected) dan
   "Perangkat Lain Terdeteksi" butuh akun siswa / perangkat kedua.
+
+## Koreksi 2026-10-30 — `check-account` di hub tanpa NISN/NIK
+Hub memanggil `check-account` tiap muat/resume/refresh, **termasuk** untuk akun tanpa NISN/NIK (login Google), dengan body `{school_id}` saja seperti legacy. Sebelumnya `refreshProfile()` melewatinya bila NISN kosong (terbukti di log Samsung: empat muat hub tanpa `check-account`). `HubRules.checkAccountNisn` + `CheckAccountRequest.nisn_nik` opsional; tes `HubRulesTest` dan `HubModelsParseTest`. Respons server untuk kasus ini belum diamati di perangkat. Rincian: `FLOW_QUESTIONS.md` 2026-10-30.
+

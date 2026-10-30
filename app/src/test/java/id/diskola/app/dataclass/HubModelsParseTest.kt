@@ -1,6 +1,7 @@
 package id.diskola.app.dataclass
 
 import id.diskola.app.dataclass.ResponData.CheckAccountApiResponse
+import id.diskola.app.dataclass.ResponData.CheckAccountRequest
 import id.diskola.app.dataclass.ResponData.CurrentUserResponse
 import id.diskola.app.dataclass.ResponData.KlaspayWalletResponse
 import id.diskola.app.dataclass.ResponData.NotificationSummaryResponse
@@ -124,5 +125,20 @@ class HubModelsParseTest {
         assertNull(data.events!![1].day_off)
         assertNotNull(parse<TodaySettingResponse>("""{"data":{"status":"holiday"}}""").data)
         assertNull(parse<TodaySettingResponse>("""{"data":{"status":"holiday"}}""").data!!.events)
+    }
+
+    // ---- check-account request body ----
+
+    @Test
+    fun checkAccountRequest_withoutNisnLeavesTheKeyOut() {
+        // An account without NISN/NIK (Google sign-in) sends `school_id` alone, like legacy `ApiWrapper.checkAccount`.
+        val json = moshi.adapter(CheckAccountRequest::class.java).toJson(CheckAccountRequest(school_id = "abc123"))
+        assertEquals("""{"school_id":"abc123"}""", json)
+    }
+
+    @Test
+    fun checkAccountRequest_withNisnCarriesIt() {
+        val json = moshi.adapter(CheckAccountRequest::class.java).toJson(CheckAccountRequest(school_id = "abc123", nisn_nik = "20202601"))
+        assertEquals("""{"school_id":"abc123","nisn_nik":"20202601"}""", json)
     }
 }

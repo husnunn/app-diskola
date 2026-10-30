@@ -95,6 +95,16 @@ object HubRules {
         else -> count.toString()
     }
 
+    // ---- check-account ----
+
+    /**
+     * The `nisn_nik` the hub's `check-account` carries: the student's NIS, else the account's NIS/NIK, else null. A Google (SSO) account
+     * may have neither; legacy then still asked, with `school_id` alone (`ApiWrapper.checkAccount` drops an empty `nisn_nik`) and the
+     * server finds the user by the bearer token. Skipping the call for them left their session half-filled for good.
+     */
+    fun checkAccountNisn(studentNis: String?, userNisNik: String?): String? =
+        studentNis?.takeIf { it.isNotBlank() } ?: userNisNik?.takeIf { it.isNotBlank() }
+
     // ---- Session guard ----
 
     /** Another device holds this account: only when the server enforces it and names a different device. */

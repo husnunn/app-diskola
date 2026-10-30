@@ -20,6 +20,23 @@ class HubRulesTest {
 
     private fun progress(status: String, message: String = "") = UserProgressData(status = status, message = message)
 
+    // ---- check-account identifier ----
+
+    @Test
+    fun `check-account identifier is the student NIS first, then the account NIS or NIK`() {
+        assertEquals("20202601", HubRules.checkAccountNisn(studentNis = "20202601", userNisNik = "3578xxxx"))
+        assertEquals("3578xxxx", HubRules.checkAccountNisn(studentNis = "", userNisNik = "3578xxxx"))
+        assertEquals("3578xxxx", HubRules.checkAccountNisn(studentNis = null, userNisNik = "3578xxxx"))
+        assertEquals("3578xxxx", HubRules.checkAccountNisn(studentNis = "   ", userNisNik = "3578xxxx"))
+    }
+
+    @Test
+    fun `an account with no NIS or NIK (Google sign-in) still gets a check-account, without an identifier`() {
+        assertNull(HubRules.checkAccountNisn(studentNis = null, userNisNik = null))
+        assertNull(HubRules.checkAccountNisn(studentNis = "", userNisNik = ""))
+        assertNull(HubRules.checkAccountNisn(studentNis = " ", userNisNik = "  "))
+    }
+
     // ---- verify state ----
 
     @Test
