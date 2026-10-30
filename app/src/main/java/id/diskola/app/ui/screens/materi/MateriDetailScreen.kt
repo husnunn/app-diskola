@@ -27,6 +27,7 @@ import id.diskola.app.ui.components.AppDialog
 import id.diskola.app.ui.components.BannerError
 import id.diskola.app.ui.components.DetailScaffold
 import id.diskola.app.ui.components.FileViewerHost
+import id.diskola.app.ui.components.SkeletonVariant
 import id.diskola.app.ui.components.displayNameOf
 import id.diskola.app.ui.components.openLink
 import id.diskola.app.ui.components.LinkPreviewCard
@@ -168,7 +169,7 @@ fun MateriDetailScreen(
             }
             // The invalid-id dialog below covers this state.
             invalid -> Box(modifier = Modifier.padding(padding).fillMaxSize())
-            else -> LoadingState(modifier = Modifier.padding(padding).padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md))
+            else -> LoadingState(modifier = Modifier.padding(padding).padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md), variant = SkeletonVariant.Detail)
         }
     }
 

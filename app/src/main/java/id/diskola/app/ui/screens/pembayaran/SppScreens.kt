@@ -74,6 +74,7 @@ import id.diskola.app.ui.components.DetailScaffold
 import id.diskola.app.ui.components.EmptyState
 import id.diskola.app.ui.components.FeatureUnavailableSheet
 import id.diskola.app.ui.components.LoadingState
+import id.diskola.app.ui.components.SkeletonVariant
 import id.diskola.app.ui.components.UnderlineTabRow
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.DiskolaTheme
@@ -218,7 +219,7 @@ private fun SppBillsContent(
             PullToRefreshBox(isRefreshing = bills.loading && bills.loaded, onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
                 val items = if (tab == 0) bills.unpaid else bills.paid
                 when {
-                    !bills.loaded && bills.loading -> LoadingState(rows = 4)
+                    !bills.loaded && bills.loading -> LoadingState(rows = 4, variant = SkeletonVariant.Card)
                     items.isEmpty() -> EmptyState(
                         title = SppRules.EMPTY_TITLE,
                         description = if (tab == 0) SppRules.EMPTY_UNPAID else SppRules.EMPTY_PAID,
@@ -526,7 +527,7 @@ private fun PaymentMethodContent(
             modifier = Modifier.padding(padding).fillMaxSize(),
         ) {
             if (methods.groups.isEmpty() && methods.loading) {
-                LoadingState(rows = 5)
+                LoadingState(rows = 5, variant = SkeletonVariant.ListRow)
             } else {
                 LazyColumn(
                     contentPadding = PaddingValues(start = ScreenHorizontalPadding, end = ScreenHorizontalPadding, top = Spacing.md, bottom = Spacing.xxxl),

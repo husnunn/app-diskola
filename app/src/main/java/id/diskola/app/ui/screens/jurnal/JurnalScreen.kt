@@ -54,6 +54,7 @@ import id.diskola.app.ui.components.DetailScaffold
 import id.diskola.app.ui.components.EmptyState
 import id.diskola.app.ui.components.ErrorState
 import id.diskola.app.ui.components.LoadingState
+import id.diskola.app.ui.components.SkeletonVariant
 import id.diskola.app.ui.components.StatusBadge
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
@@ -117,7 +118,7 @@ fun JurnalScreen(
                 )
             }
             when {
-                !loaded && loading -> LoadingState(modifier = Modifier.padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md))
+                !loaded && loading -> LoadingState(modifier = Modifier.padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md), variant = SkeletonVariant.ListRow)
                 !loaded -> ErrorState(
                     description = errorMessage.ifBlank { "Periksa koneksi internet Anda dan coba lagi." },
                     onRetry = {

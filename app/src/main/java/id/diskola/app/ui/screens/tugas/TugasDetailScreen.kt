@@ -48,6 +48,7 @@ import id.diskola.app.ui.components.BannerError
 import id.diskola.app.ui.components.BadgeTone
 import id.diskola.app.ui.components.DetailScaffold
 import id.diskola.app.ui.components.FileViewerHost
+import id.diskola.app.ui.components.SkeletonVariant
 import id.diskola.app.ui.components.displayNameOf
 import id.diskola.app.ui.components.openLink
 import id.diskola.app.ui.components.LinkPreviewCard
@@ -194,7 +195,7 @@ fun TugasDetailScreen(
             // handled by the dialog below
             Box(modifier = Modifier.padding(padding).fillMaxSize())
         } else if (current == null) {
-            LoadingState(modifier = Modifier.padding(padding).padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md))
+            LoadingState(modifier = Modifier.padding(padding).padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md), variant = SkeletonVariant.Detail)
         } else {
             Column(
                 modifier = Modifier

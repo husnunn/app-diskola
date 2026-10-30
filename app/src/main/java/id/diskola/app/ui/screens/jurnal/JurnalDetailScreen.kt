@@ -48,6 +48,7 @@ import id.diskola.app.ui.components.DetailScaffold
 import id.diskola.app.ui.components.FieldLabel
 import id.diskola.app.ui.components.FormCard
 import id.diskola.app.ui.components.LoadingState
+import id.diskola.app.ui.components.SkeletonVariant
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
@@ -107,7 +108,7 @@ fun JurnalDetailScreen(
     ) { padding ->
         val current = detail
         when {
-            current == null && loadError == null -> LoadingState(modifier = Modifier.padding(padding).padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md))
+            current == null && loadError == null -> LoadingState(modifier = Modifier.padding(padding).padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md), variant = SkeletonVariant.Detail)
             current == null -> Unit
             else -> Column(
                 modifier = Modifier
