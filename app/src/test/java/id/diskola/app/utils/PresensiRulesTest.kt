@@ -1,7 +1,9 @@
 package id.diskola.app.utils
 
+import id.diskola.app.utils.PresensiRules.CardTone
 import id.diskola.app.utils.PresensiRules.LeaveBlock
 import id.diskola.app.utils.PresensiRules.MasukStatus
+import id.diskola.app.utils.PresensiRules.Proximity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -72,6 +74,143 @@ class PresensiRulesTest {
     @Test
     fun masuk_zeroRadiusCannotBeCheckedAndIsPermissive() {
         assertEquals(MasukStatus.Ready("Absen Masuk"), masuk(radius = 0f, distance = 5000f))
+    }
+
+    // ---- Proximity (status card) ----
+
+    @Test
+    fun proximity_insideAndOutside() {
+        assertEquals(Proximity.Inside(45f, 100f), PresensiRules.proximity(restricted = true, radius = 100f, distanceMeters = 45f))
+        assertEquals(Proximity.Outside(240f, 100f), PresensiRules.proximity(restricted = true, radius = 100f, distanceMeters = 240f))
+    }
+
+    @Test
+    fun proximity_exactlyOnTheRadiusIsInside() {
+        assertEquals(Proximity.Inside(100f, 100f), PresensiRules.proximity(true, 100f, 100f))
+    }
+
+    @Test
+    fun proximity_withoutEnforcementIsUnrestrictedWhateverTheDistance() {
+        assertEquals(Proximity.Unrestricted, PresensiRules.proximity(restricted = false, radius = 100f, distanceMeters = 5000f))
+        assertEquals(Proximity.Unrestricted, PresensiRules.proximity(restricted = false, radius = 0f, distanceMeters = null))
+    }
+
+    @Test
+    fun proximity_cannotBeJudgedWithoutAFixOrARadius() {
+        assertEquals(Proximity.Unknown, PresensiRules.proximity(true, 100f, null))
+        assertEquals(Proximity.Unknown, PresensiRules.proximity(true, 0f, 5000f))
+    }
+
+    /** The card must never say "outside" while the button is open, or the other way round. */
+    @Test
+    fun proximity_outsideMatchesTheOutsideRadiusStatus() {
+        for (restricted in listOf(true, false)) for (radius in listOf(0f, 100f)) for (distance in listOf(null, 20f, 100f, 500f)) {
+            val outsideCard = PresensiRules.proximity(restricted, radius, distance) is Proximity.Outside
+            val outsideStatus = masuk(restricted = restricted, radius = radius, distance = distance) == MasukStatus.OutsideRadius
+            assertEquals("restricted=$restricted radius=$radius distance=$distance", outsideStatus, outsideCard)
+        }
+    }
+
+    @Test
+    fun formatDistance_wholeMetersBelowOneKilometer() {
+        assertEquals("0 m", PresensiRules.formatDistance(0f))
+        assertEquals("85 m", PresensiRules.formatDistance(84.6f))
+        assertEquals("999 m", PresensiRules.formatDistance(999.4f))
+        assertEquals("0 m", PresensiRules.formatDistance(-3f))
+    }
+
+    @Test
+    fun formatDistance_kilometersWithDecimalComma() {
+        assertEquals("1,2 km", PresensiRules.formatDistance(1234f))
+        assertEquals("12,3 km", PresensiRules.formatDistance(12_300f))
+    }
+
+    /** The server's default-ish radius is 9999 m; "10,0 km" read like a typo on the card. */
+    @Test
+    fun formatDistance_aRoundKilometerDropsTheDecimal() {
+        assertEquals("1 km", PresensiRules.formatDistance(999.6f))
+        assertEquals("10 km", PresensiRules.formatDistance(9999f))
+        assertEquals("12 km", PresensiRules.formatDistance(12_000f))
+        assertEquals("1,5 km", PresensiRules.formatDistance(1500f))
+    }
+
+    // ---- Status card ----
+
+    private fun card(
+        status: MasukStatus,
+        locationOff: Boolean = false,
+        proximity: Proximity = Proximity.Unknown,
+    ) = PresensiRules.masukCard(status, locationOff, proximity)
+
+    @Test
+    fun card_loadingHasNoTextYet() {
+        assertNull(card(MasukStatus.Loading))
+    }
+
+    @Test
+    fun card_readyInsideRadiusIsSuccessWithTheDistance() {
+        val card = card(MasukStatus.Ready("Absen Masuk"), proximity = Proximity.Inside(45f, 100f))!!
+        assertEquals(CardTone.Success, card.tone)
+        assertEquals("Anda berada di wilayah absensi", card.title)
+        assertEquals("45 m dari titik sekolah · radius 100 m", card.detail)
+    }
+
+    @Test
+    fun card_outsideRadiusIsErrorWithTheDistance() {
+        val card = card(MasukStatus.OutsideRadius, proximity = Proximity.Outside(1234f, 100f))!!
+        assertEquals(CardTone.Error, card.tone)
+        assertEquals("Anda berada di luar wilayah absensi", card.title)
+        assertEquals("1,2 km dari titik sekolah · radius 100 m", card.detail)
+    }
+
+    @Test
+    fun card_readyWithoutEnforcementKeepsTheLegacyLine() {
+        val card = card(MasukStatus.Ready("Absen Masuk"), proximity = Proximity.Unrestricted)!!
+        assertEquals(CardTone.Neutral, card.tone)
+        assertEquals("Absensi bisa dilakukan dimanapun", card.title)
+        assertNull(card.detail)
+    }
+
+    @Test
+    fun card_readyThatCannotBeJudgedStaysNeutral() {
+        assertEquals(CardTone.Neutral, card(MasukStatus.Ready("Absen Masuk"), proximity = Proximity.Unknown)!!.tone)
+    }
+
+    @Test
+    fun card_waitingForLocationOffersTheSettingsButtonOnlyWhenLocationIsOff() {
+        val waiting = card(MasukStatus.WaitingLocation)!!
+        assertEquals(CardTone.Info, waiting.tone)
+        assertEquals("Mengambil lokasi…", waiting.title)
+        assertFalse(waiting.offersEnableLocation)
+
+        val off = card(MasukStatus.WaitingLocation, locationOff = true)!!
+        assertEquals(CardTone.Warning, off.tone)
+        assertEquals("Lokasi perangkat nonaktif", off.title)
+        assertTrue(off.offersEnableLocation)
+    }
+
+    @Test
+    fun card_locationOffOnlyMattersWhileWaiting() {
+        assertFalse(card(MasukStatus.Ready("Absen Masuk"), locationOff = true, proximity = Proximity.Inside(1f, 50f))!!.offersEnableLocation)
+    }
+
+    @Test
+    fun card_failuresAreErrorsAndTheServerTextIsShownAsSent() {
+        assertEquals(CardTone.Error, card(MasukStatus.CheckFailed)!!.tone)
+        assertEquals(CardTone.Error, card(MasukStatus.ScheduleNotSet)!!.tone)
+        assertEquals("Jadwal presensi belum diatur", card(MasukStatus.ScheduleNotSet)!!.title)
+        assertEquals(CardTone.Error, card(MasukStatus.Mock)!!.tone)
+        val server = card(MasukStatus.ServerMessage("Sudah absen hari ini"))!!
+        assertEquals(CardTone.Info, server.tone)
+        assertEquals("Sudah absen hari ini", server.title)
+    }
+
+    @Test
+    fun scheduleSource_isWordedLikeLegacyAndBlankStaysBlank() {
+        assertEquals("Pengaturan jam", PresensiRules.scheduleSourceLabel("settings"))
+        assertEquals("Kalender", PresensiRules.scheduleSourceLabel(" Calendar "))
+        assertEquals("Workgroup", PresensiRules.scheduleSourceLabel("Workgroup"))
+        assertEquals("", PresensiRules.scheduleSourceLabel("  "))
     }
 
     @Test

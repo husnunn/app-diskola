@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -75,9 +76,17 @@ class PresensiMasukViewModel @Inject constructor(
         .combine(_checkLoading) { restricted, loading -> !loading && restricted && schoolLat == 0.0 && schoolLng == 0.0 }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
+    /** Straight-line distance to the school, null until there is a fix (or when the school has no coordinates). */
+    private fun distanceToSchool(loc: Location?): Float? = loc?.takeIf { schoolLat != 0.0 || schoolLng != 0.0 }
+        ?.let { distanceMeters(it.latitude, it.longitude, schoolLat, schoolLng) }
+
+    /** What the status card and the map's distance pill show; the radius rule itself stays in [status]. */
+    val distance: StateFlow<Float?> = _location
+        .map(::distanceToSchool)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     val status: StateFlow<MasukStatus> = combine(_check, _checkLoading, _checkFailed, _restricted, _location) { check, loading, failed, restricted, loc ->
-        val distance = loc?.takeIf { schoolLat != 0.0 || schoolLng != 0.0 }
-            ?.let { distanceMeters(it.latitude, it.longitude, schoolLat, schoolLng) }
+        val distance = distanceToSchool(loc)
         PresensiRules.masukStatus(
             loading = loading,
             checkFailed = failed,

@@ -1,7 +1,9 @@
 package id.diskola.app.utils
 
+import id.diskola.app.utils.location.MockLocationGuard
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
  * The daily-presensi decisions that are pure logic (no Android, no I/O), kept here so they can be
@@ -76,6 +78,76 @@ object PresensiRules {
         isMock -> MasukStatus.Mock
         restricted && radius > 0f && distanceMeters != null && distanceMeters > radius -> MasukStatus.OutsideRadius
         else -> MasukStatus.Ready(buttonLabel)
+    }
+
+    /** How the user stands against the school radius, for the status card; display only — [masukStatus] still decides the button. */
+    sealed interface Proximity {
+        /** Radius is enforced but cannot be judged: no fix yet, or the radius is ≤ 0 (permissive, like [masukStatus]). */
+        data object Unknown : Proximity
+
+        /** `absence_setting` is off: attendance works anywhere. */
+        data object Unrestricted : Proximity
+        data class Inside(val meters: Float, val radius: Float) : Proximity
+        data class Outside(val meters: Float, val radius: Float) : Proximity
+    }
+
+    /** Same comparison as [masukStatus]: exactly on the radius is still inside. */
+    fun proximity(restricted: Boolean, radius: Float, distanceMeters: Float?): Proximity = when {
+        !restricted -> Proximity.Unrestricted
+        radius <= 0f || distanceMeters == null -> Proximity.Unknown
+        distanceMeters > radius -> Proximity.Outside(distanceMeters, radius)
+        else -> Proximity.Inside(distanceMeters, radius)
+    }
+
+    /** Whole meters below 1 km ("85 m"), otherwise kilometers with one decimal and a comma ("1,2 km"); a round figure drops the decimal ("10 km"). */
+    fun formatDistance(meters: Float): String {
+        val whole = Math.round(meters.coerceAtLeast(0f))
+        if (whole < 1000) return "$whole m"
+        val km = String.format(Locale("id"), "%.1f", whole / 1000f)
+        return "${km.removeSuffix(",0")} km"
+    }
+
+    enum class CardTone { Neutral, Info, Success, Warning, Error }
+
+    /** What the status card of the Masuk screen says; the screen only picks colours and an icon for [tone]. */
+    data class MasukCard(
+        val tone: CardTone,
+        val title: String,
+        val detail: String? = null,
+        /** Shows the "Aktifkan lokasi" button inside the card. */
+        val offersEnableLocation: Boolean = false,
+    )
+
+    /** Wording of every state is the legacy one (`PresensiMasukPage`); only the distance line and the two [MasukStatus.Ready] titles are new. null = still loading. */
+    fun masukCard(status: MasukStatus, locationOff: Boolean, proximity: Proximity): MasukCard? = when (status) {
+        MasukStatus.Loading -> null
+        MasukStatus.CheckFailed -> MasukCard(CardTone.Error, "Gagal memuat data presensi")
+        is MasukStatus.ServerMessage -> MasukCard(CardTone.Info, status.text)
+        MasukStatus.ScheduleNotSet -> MasukCard(CardTone.Error, "Jadwal presensi belum diatur")
+        MasukStatus.WaitingLocation ->
+            if (locationOff) MasukCard(CardTone.Warning, "Lokasi perangkat nonaktif", offersEnableLocation = true)
+            else MasukCard(CardTone.Info, "Mengambil lokasi…")
+        MasukStatus.Mock -> MasukCard(CardTone.Error, MockLocationGuard.MESSAGE)
+        MasukStatus.OutsideRadius -> MasukCard(
+            CardTone.Error,
+            "Anda berada di luar wilayah absensi",
+            (proximity as? Proximity.Outside)?.let { distanceLine(it.meters, it.radius) },
+        )
+        is MasukStatus.Ready -> when (proximity) {
+            is Proximity.Inside -> MasukCard(CardTone.Success, "Anda berada di wilayah absensi", distanceLine(proximity.meters, proximity.radius))
+            Proximity.Unrestricted -> MasukCard(CardTone.Neutral, "Absensi bisa dilakukan dimanapun")
+            else -> MasukCard(CardTone.Neutral, "Lokasi Anda sudah ditemukan")
+        }
+    }
+
+    private fun distanceLine(meters: Float, radius: Float) = "${formatDistance(meters)} dari titik sekolah · radius ${formatDistance(radius)}"
+
+    /** `schedule.source` of the check response as the legacy screen worded it; blank gives no source at all. */
+    fun scheduleSourceLabel(source: String): String = when (source.trim().lowercase(Locale.ROOT)) {
+        "" -> ""
+        "settings" -> "Pengaturan jam"
+        "calendar" -> "Kalender"
+        else -> source.trim()
     }
 
     // ---- Dinas Luar ----

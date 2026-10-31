@@ -84,6 +84,8 @@ fun PresensiOffsiteScreen(
 
     var locationDenied by remember { mutableStateOf(false) }
     var confirmVisible by remember { mutableStateOf(false) }
+    // The map sits inside the scrolling form: left alone, the form takes every vertical drag and the map only pans sideways.
+    var mapTouched by remember { mutableStateOf(false) }
 
     val locationPermissions = rememberMultiplePermissionsState(
         listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
@@ -151,20 +153,22 @@ fun PresensiOffsiteScreen(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(rememberScrollState(), enabled = !mapTouched)
                 .padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
             if (errorMessage.isNotBlank()) BannerError(message = errorMessage, onDismiss = { viewModel.clearError() })
 
-            AttendanceMap(
-                schoolLat = 0.0,
-                schoolLng = 0.0,
-                radiusMeters = 0f,
-                showRadius = false,
-                userLat = location?.latitude,
-                userLng = location?.longitude,
-            )
+            Box(modifier = Modifier.reportTouch { mapTouched = it }) {
+                AttendanceMap(
+                    schoolLat = 0.0,
+                    schoolLng = 0.0,
+                    radiusMeters = 0f,
+                    showRadius = false,
+                    userLat = location?.latitude,
+                    userLng = location?.longitude,
+                )
+            }
 
             FormCard {
                 FieldLabel("Alamat lokasi", required = true)
