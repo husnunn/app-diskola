@@ -29,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,6 +61,7 @@ import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
 import id.diskola.app.viewmodel.JurnalFormResult
 import id.diskola.app.viewmodel.JurnalFormViewModel
+import id.diskola.app.utils.JurnalRules
 import id.diskola.app.viewmodel.PagedPicker
 
 private enum class Picker { CLASS, SUBJECT, TEACHER }
@@ -85,7 +87,7 @@ fun JurnalFormScreen(
     val context = LocalContext.current
     val isTeacher = viewModel.isTeacher
 
-    val assigned by viewModel.assigned.collectAsStateWithLifecycle()
+    val restricted by viewModel.restricted.collectAsStateWithLifecycle()
     val captureRequired by viewModel.captureRequired.collectAsStateWithLifecycle()
     val plots by viewModel.plots.collectAsStateWithLifecycle()
     val selectedPlots by viewModel.selectedPlots.collectAsStateWithLifecycle()
@@ -99,6 +101,10 @@ fun JurnalFormScreen(
     val preparing by viewModel.preparing.collectAsStateWithLifecycle()
     val result by viewModel.result.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
+
+    val scrollState = rememberScrollState()
+    // The error banner is the first thing in the scrolling column while "Proses" sits in the fixed bar: bring the banner into view.
+    LaunchedEffect(errorMessage) { if (errorMessage.isNotBlank()) scrollState.animateScrollTo(0) }
 
     var picker by remember { mutableStateOf<Picker?>(null) }
     var showFullPhoto by remember { mutableStateOf(false) }
@@ -120,9 +126,19 @@ fun JurnalFormScreen(
         else Toast.makeText(context, "Izin kamera diperlukan untuk mengambil foto", Toast.LENGTH_LONG).show()
     }
     val cameraGranted = permissions.permissions.any { it.permission == Manifest.permission.CAMERA && it.status.isGranted }
+    val locationGranted = permissions.permissions.any {
+        (it.permission == Manifest.permission.ACCESS_FINE_LOCATION || it.permission == Manifest.permission.ACCESS_COARSE_LOCATION) && it.status.isGranted
+    }
+    var locationAsked by rememberSaveable { mutableStateOf(false) }
     fun takePhoto() {
-        if (cameraGranted) viewModel.prepareCapture { spot -> onTakePhoto(spot.address.orEmpty(), spot.lat, spot.lng) }
-        else permissions.launchMultiplePermissionRequest()
+        // Legacy asked camera and location on every "Ambil Foto". Here the camera alone used to skip the location question for good, so the
+        // stamp had no address or coordinates; ask once per visit for what is missing (a refusal is fine, the camera still opens).
+        if (!cameraGranted || (!locationGranted && !locationAsked)) {
+            locationAsked = true
+            permissions.launchMultiplePermissionRequest()
+        } else {
+            viewModel.prepareCapture { spot -> onTakePhoto(spot.address.orEmpty(), spot.lat, spot.lng) }
+        }
     }
 
     DetailScaffold(
@@ -148,14 +164,22 @@ fun JurnalFormScreen(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
             if (errorMessage.isNotBlank()) BannerError(message = errorMessage, onDismiss = viewModel::clearError)
-            if (isTeacher && assigned) {
+            if (isTeacher && restricted) {
                 Text(
                     "Hanya menampilkan kelas/mapel/jam dari jadwal Anda",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (!isTeacher) {
+                // The server only accepts a student's journal for a plot/subject/class combination in a teacher's schedule (422 otherwise).
+                Text(
+                    "Pilih mata pelajaran dan guru sesuai jadwal kelas Anda pada jam ini.",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -336,7 +360,9 @@ private fun <T> PickerSheet(
     val items by picker.items.collectAsStateWithLifecycle()
     val query by picker.query.collectAsStateWithLifecycle()
     val loading by picker.loading.collectAsStateWithLifecycle()
-    val options = items.map(toOption)
+    val error by picker.error.collectAsStateWithLifecycle()
+    // The list endpoints ignore `name`, so what was typed narrows the rows already loaded.
+    val options = items.map(toOption).filter { JurnalRules.matchesQuery(it.title, it.subtitle, query) }
     PagedPickerSheet(
         title = title,
         query = query,
@@ -345,10 +371,11 @@ private fun <T> PickerSheet(
         selectedId = selectedId,
         loading = loading,
         onSelect = { option ->
-            items.getOrNull(options.indexOfFirst { it.id == option.id })?.let(onSelect)
+            items.firstOrNull { toOption(it).id == option.id }?.let(onSelect)
             onDismiss()
         },
         onLoadMore = picker::loadMore,
         onDismiss = onDismiss,
+        emptyText = error ?: "Data tidak ditemukan",
     )
 }

@@ -91,7 +91,6 @@ fun JurnalScreen(
     val isStudent = viewModel.isStudent
 
     var methodRow by remember { mutableStateOf<JurnalRow?>(null) }
-    var startRow by remember { mutableStateOf<JurnalRow?>(null) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -154,7 +153,7 @@ fun JurnalScreen(
                                 } else {
                                     TeacherRowCard(
                                         row = row,
-                                        onMulai = { startRow = row },
+                                        onMulai = { viewModel.startClass(row) },
                                         onDetail = { onOpenDetail(row.attendanceId ?: 0, row.createdAt, row.timeLabel) },
                                         onIsiJurnal = { onOpenForm(row.plotId, row.timeLabel) },
                                     )
@@ -193,21 +192,6 @@ fun JurnalScreen(
         )
     }
 
-    startRow?.let { row ->
-        AppDialog(
-            onDismiss = { startRow = null },
-            title = "Mulai kelas",
-            body = "Presensi Anda sebagai pengajar akan dicatat untuk ${row.subjectName} ${row.className} (${row.timeLabel}). Mulai sekarang?",
-            primaryButtonText = "Ya, Mulai",
-            onPrimaryClick = {
-                startRow = null
-                viewModel.startClass(row)
-            },
-            secondaryButtonText = "Batal",
-            onSecondaryClick = { startRow = null },
-        )
-    }
-
     if (busy) AppLoadingDialog(message = "memproses")
 
     notice?.let { current ->
@@ -220,7 +204,6 @@ fun JurnalScreen(
                 viewModel.dismissNotice()
                 current.openRow?.let { onOpenDetail(it.attendanceId ?: 0, it.createdAt, it.timeLabel) }
             },
-            dismissible = current.openRow == null,
         )
     }
 }

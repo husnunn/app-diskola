@@ -2,6 +2,7 @@ package id.diskola.app.ui.screens.jurnal
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,10 +18,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,13 +61,13 @@ import id.diskola.app.utils.resolveAssetUrl
 import id.diskola.app.viewmodel.EditableStudent
 import id.diskola.app.viewmodel.JurnalDetailViewModel
 
-private val TEACHER_SESSION_STATUSES = listOf(JurnalRules.SESSION_DONE, JurnalRules.SESSION_ASSIGNMENT, JurnalRules.SESSION_NOT_DONE)
 private val STUDENT_LEGEND = listOf("hadir" to "H", "izin" to "I", "sakit" to "S", "alpha" to "A")
 
 /**
  * "Detail Kelas" (doc `07` §9). A teacher whose class has started edits tujuan, status sesi and each student's
  * H/I/S/A and saves it in one call; everyone else sees it read-only. Leaving with unsaved edits asks first.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun JurnalDetailScreen(
     attendanceId: Int,
@@ -78,6 +81,7 @@ fun JurnalDetailScreen(
     val detail by viewModel.detail.collectAsStateWithLifecycle()
     val loadError by viewModel.loadError.collectAsStateWithLifecycle()
     val loading by viewModel.loading.collectAsStateWithLifecycle()
+    val saving by viewModel.saving.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
     val isStarted by viewModel.isStarted.collectAsStateWithLifecycle()
     val canEdit by viewModel.canEdit.collectAsStateWithLifecycle()
@@ -89,6 +93,9 @@ fun JurnalDetailScreen(
 
     var editObjective by remember { mutableStateOf(false) }
     var confirmDiscard by remember { mutableStateOf(false) }
+    // The discard question is also asked before a refresh would replace the edits (legacy did, for pull-to-refresh as well as back).
+    var discardForRefresh by remember { mutableStateOf(false) }
+    var showPhoto by remember { mutableStateOf(false) }
 
     LaunchedEffect(attendanceId) { viewModel.start(attendanceId, createdAt) }
 
@@ -103,7 +110,7 @@ fun JurnalDetailScreen(
         modifier = modifier,
         actions = {
             if (viewModel.isTeacher && canEdit) {
-                TextButton(onClick = viewModel::save, enabled = !loading, modifier = Modifier.heightIn(min = 48.dp)) { Text("Simpan") }
+                TextButton(onClick = viewModel::save, enabled = !saving && !loading, modifier = Modifier.heightIn(min = 48.dp)) { Text("Simpan") }
             }
         },
     ) { padding ->
@@ -115,14 +122,25 @@ fun JurnalDetailScreen(
                 variant = SkeletonVariant.Detail,
             )
             current == null -> Unit
-            else -> Column(
+            else -> PullToRefreshBox(
+                isRefreshing = loading,
+                onRefresh = {
+                    if (dirty) {
+                        discardForRefresh = true
+                        confirmDiscard = true
+                    } else {
+                        viewModel.load()
+                    }
+                },
+                modifier = Modifier.padding(padding).fillMaxSize(),
+            ) {
+              Column(
                 modifier = Modifier
-                    .padding(padding)
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md),
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-            ) {
+              ) {
                 if (errorMessage.isNotBlank()) BannerError(message = errorMessage, onDismiss = viewModel::clearError)
 
                 SubjectHeader(current)
@@ -161,7 +179,7 @@ fun JurnalDetailScreen(
                             )
                         }
                         RadioOptions(
-                            options = TEACHER_SESSION_STATUSES,
+                            options = JurnalRules.TEACHER_SESSION_STATUSES,
                             selected = sessionStatus.takeIf { it.isNotBlank() },
                             onSelect = viewModel::onSessionStatus,
                             enabled = canEdit,
@@ -182,12 +200,15 @@ fun JurnalDetailScreen(
                                 .fillMaxWidth()
                                 .heightIn(max = 220.dp)
                                 .clip(DiskolaExtraShapes.card)
-                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, DiskolaExtraShapes.card),
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, DiskolaExtraShapes.card)
+                                .clickable { showPhoto = true },
                         )
+                        Text("Ketuk foto untuk melihat penuh", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
                 AttendanceList(students = students, editable = canEdit, onStatus = viewModel::onStudentStatus)
+              }
             }
         }
     }
@@ -226,21 +247,51 @@ fun JurnalDetailScreen(
 
     if (confirmDiscard) {
         AppDialog(
-            onDismiss = { confirmDiscard = false },
+            onDismiss = {
+                confirmDiscard = false
+                discardForRefresh = false
+            },
             title = "Buang perubahan?",
             body = "Perubahan jurnal yang belum disimpan akan hilang.",
             primaryButtonText = "Buang",
             onPrimaryClick = {
                 confirmDiscard = false
                 viewModel.discard()
-                onBack()
+                if (discardForRefresh) {
+                    discardForRefresh = false
+                    viewModel.load()
+                } else {
+                    onBack()
+                }
             },
             secondaryButtonText = "Batal",
-            onSecondaryClick = { confirmDiscard = false },
+            onSecondaryClick = {
+                confirmDiscard = false
+                discardForRefresh = false
+            },
         )
     }
 
-    if (loading && detail != null) AppLoadingDialog(message = "Menyimpan jurnal ...")
+    if (showPhoto) {
+        detail?.takeIf { it.capture_photo_url.isNotBlank() }?.let { current ->
+            AppDialog(
+                onDismiss = { showPhoto = false },
+                title = "Foto Suasana KBM",
+                body = "",
+                primaryButtonText = "Tutup",
+                onPrimaryClick = { showPhoto = false },
+            ) {
+                AsyncImage(
+                    model = resolveAssetUrl(current.capture_photo_url),
+                    contentDescription = "Foto suasana KBM",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp).clip(DiskolaExtraShapes.card),
+                )
+            }
+        }
+    }
+
+    if (saving) AppLoadingDialog(message = "Menyimpan jurnal ...")
 
     if (saved) {
         AppDialog(

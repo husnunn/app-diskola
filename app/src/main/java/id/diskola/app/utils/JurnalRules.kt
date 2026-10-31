@@ -225,12 +225,18 @@ object JurnalRules {
 
     // ---- Errors ----
 
-    /** Doc `07` §14.3 (`journalErrorMessage`). [scopeAssigned] = the teacher is limited to their own schedule. */
-    fun journalErrorMessage(code: Int?, message: String?, scopeAssigned: Boolean, fallback: String): String {
+    /**
+     * 401, 403 and server errors say nothing about the journal itself, so they go through the app-wide message (a lapsed session reads
+     * "Sesi Anda sudah habis…") instead of the interceptor's raw "Unauthorized".
+     */
+    fun usesGenericError(code: Int?): Boolean = code == 401 || code == 403 || (code ?: 0) >= 500
+
+    /** Doc `07` §14.3 (`journalErrorMessage`). [scopeRestricted] = the teacher is limited to their own schedule. */
+    fun journalErrorMessage(code: Int?, message: String?, scopeRestricted: Boolean, fallback: String): String {
         val text = message?.takeIf { it.isNotBlank() && it != "null" }
         return when (code) {
             307 -> text ?: "Jurnal telah dibuat untuk jadwal ini"
-            422 -> if (text != null && text.contains("validasi", ignoreCase = true) && scopeAssigned) {
+            422 -> if (text != null && text.contains("validasi", ignoreCase = true) && scopeRestricted) {
                 "Kombinasi kelas/mapel/jam tidak ada di jadwal Anda"
             } else {
                 text ?: fallback
@@ -257,6 +263,15 @@ object JurnalRules {
     const val SESSION_DONE = "Terlaksana"
     const val SESSION_ASSIGNMENT = "Penugasan"
     const val SESSION_NOT_DONE = "Tidak Terlaksana"
+
+    /**
+     * What the teacher may save on a session. A student can mark a lesson "Penugasan", but `journal/save` refuses it for the session
+     * (dev, 2026-10-31: 422 "Isian session status yang dipilih tidak valid."), so the Detail offers two, like legacy.
+     */
+    val TEACHER_SESSION_STATUSES = listOf(SESSION_DONE, SESSION_NOT_DONE)
+
+    /** A session status the server sent, as the Detail radios can show it: anything outside [TEACHER_SESSION_STATUSES] reads as "not chosen yet". */
+    fun normalizeSessionStatus(raw: String?): String = raw.orEmpty().trim().takeIf { it in TEACHER_SESSION_STATUSES }.orEmpty()
     val STUDENT_STATUSES = listOf("hadir", "izin", "sakit", "alpha")
 
     /** Unknown or missing student statuses read as `alpha` (legacy normalised at bind time). */
@@ -271,4 +286,37 @@ object JurnalRules {
 
     /** Editing needs a started class and a real schedule id (legacy `canEdit()`). */
     fun canEditDetail(isTeacher: Boolean, isStarted: Boolean, scheduleId: Int): Boolean = isTeacher && isStarted && scheduleId > 0
+
+    // ---- Pickers ----
+
+    /**
+     * Whether a picker row matches what was typed. The list endpoints ignore `name` (dev, 2026-10-31: `name=Matematika` returned the
+     * same ten subjects), so the sheet filters the rows it has, like legacy did from its local cache. Blank matches everything.
+     */
+    fun matchesQuery(title: String, subtitle: String, query: String): Boolean {
+        val q = query.trim()
+        return q.isEmpty() || title.contains(q, ignoreCase = true) || subtitle.contains(q, ignoreCase = true)
+    }
+
+    // ---- Foto suasana KBM: where the watermark says the photo was taken ----
+
+    /**
+     * How old the device's last known position may be and still be stamped on a photo. Legacy took `lastLocation` whatever its age; a
+     * missing line is better than a wrong place, but a fix from the same classroom a few minutes ago is still the right place.
+     */
+    const val LAST_KNOWN_MAX_AGE_MILLIS = 10 * 60_000L
+
+    /** Two fixes this close are the same place, so an address found for one is good for the other (the retake in the same room). */
+    const val SAME_SPOT_METERS = 100.0
+
+    private const val EARTH_RADIUS_METERS = 6_371_000.0
+
+    fun isUsableLastKnown(ageMillis: Long): Boolean = ageMillis in 0..LAST_KNOWN_MAX_AGE_MILLIS
+
+    /** Flat-earth distance: exact enough for "within 100 m", and plain maths so it runs in a JVM test. */
+    fun sameSpot(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Boolean {
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLng = Math.toRadians(lng2 - lng1) * Math.cos(Math.toRadians((lat1 + lat2) / 2))
+        return EARTH_RADIUS_METERS * Math.sqrt(dLat * dLat + dLng * dLng) <= SAME_SPOT_METERS
+    }
 }

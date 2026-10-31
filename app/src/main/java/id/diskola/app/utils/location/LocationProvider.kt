@@ -6,6 +6,7 @@ import android.content.IntentSender
 import android.location.Geocoder
 import android.location.Location
 import android.os.Build
+import android.os.SystemClock
 import androidx.core.location.LocationManagerCompat
 import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.CurrentLocationRequest
@@ -28,6 +29,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 
 /**
@@ -72,6 +74,27 @@ class LocationProvider @Inject constructor(
         } finally {
             token.cancel()
         }
+    }
+
+    /**
+     * A brand-new fix if one arrives within [freshWaitMillis]; otherwise the position the device already knows, if [usable] accepts its age
+     * (milliseconds). Legacy asked `lastLocation` first, so indoors — where a new high-accuracy fix often takes longer than a few seconds — it
+     * still had a position; with only [freshLocation] the answer was nothing.
+     */
+    suspend fun freshOrRecentLocation(freshWaitMillis: Long, usable: (ageMillis: Long) -> Boolean): Location? {
+        withTimeoutOrNull(freshWaitMillis) { freshLocation() }?.let { return it }
+        val known = lastKnownLocation() ?: return null
+        val ageMillis = (SystemClock.elapsedRealtimeNanos() - known.elapsedRealtimeNanos) / 1_000_000
+        return known.takeIf { usable(ageMillis) }
+    }
+
+    /** The position the device already knows (from any app); instant, never starts the GPS. The caller decides whether it is recent enough. */
+    @SuppressLint("MissingPermission")
+    suspend fun lastKnownLocation(): Location? = try {
+        fused.lastLocation.awaitOrNull()
+    } catch (e: SecurityException) {
+        Timber.e(e)
+        null
     }
 
     /** Continuous high-accuracy fixes (Masuk sekolah's live map). Collecting starts them, cancelling stops them. */

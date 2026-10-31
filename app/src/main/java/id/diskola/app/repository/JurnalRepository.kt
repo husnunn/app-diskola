@@ -50,16 +50,25 @@ class JurnalRepository @Inject constructor(
 
     suspend fun schedule(date: LocalDate = LocalDate.now()): List<JurnalPlot> = api.schedule(date.toString()).data.orEmpty()
 
-    /** Read on every form open (the spec says so); a failure falls back to the last known value. */
-    suspend fun teacherScopeAssigned(): Boolean = try {
-        val assigned = api.teacherDataScope().data?.isAssigned == true
-        preference.putString(KEY_SCOPE, if (assigned) "assigned" else "all")
-        assigned
+    /**
+     * Whether the teacher's classes and subjects are limited to their own schedule. `restricted` decides — not `scope` — as in the Tugas form:
+     * dev showed `assigned/restricted=false` and the lists then returned every class (19) and subject, so the old "assigned" reading put
+     * a "limited to your schedule" hint on a form that was not limited. Missing is read as limited. Read on every open; a failure keeps the
+     * last known value.
+     */
+    suspend fun teacherScopeRestricted(): Boolean = try {
+        val restricted = api.teacherDataScope().data?.isRestrictedForForm == true
+        preference.putBoolean(KEY_RESTRICTED, restricted)
+        restricted
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        preference.getString(KEY_SCOPE) == "assigned"
+        cachedScopeRestricted()
     }
+
+    /** The values of the last open, so a form is right from its first frame (legacy seeded both from prefs; the network answer replaces them). */
+    fun cachedScopeRestricted(): Boolean = preference.getBoolean(KEY_RESTRICTED)
+    fun cachedCaptureRequired(): Boolean = preference.getBoolean(KEY_CAPTURE)
 
     suspend fun captureRequired(): Boolean = try {
         val required = api.captureScope().data?.required == true
@@ -68,7 +77,7 @@ class JurnalRepository @Inject constructor(
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        preference.getBoolean(KEY_CAPTURE)
+        cachedCaptureRequired()
     }
 
     suspend fun plots(): List<PlotItem> = api.listPlot().data.orEmpty()
@@ -156,17 +165,18 @@ class JurnalRepository @Inject constructor(
     private suspend fun <T> translate(block: suspend () -> T): T = try {
         block()
     } catch (e: ApiException) {
-        val assigned = preference.getString(KEY_SCOPE) == "assigned"
+        val restricted = cachedScopeRestricted()
         if (e.responseCode == 307) {
             throw JournalExistsException(
-                JurnalRules.journalErrorMessage(307, e.message, assigned, "Jurnal telah dibuat untuk jadwal ini"),
+                JurnalRules.journalErrorMessage(307, e.message, restricted, "Jurnal telah dibuat untuk jadwal ini"),
                 JurnalRules.existingJournalIds(e.data),
             )
         }
+        if (JurnalRules.usesGenericError(e.responseCode)) throw e
         val message = JurnalRules.journalErrorMessage(
             code = e.responseCode,
             message = e.validationMessages.joinToString("\n").ifBlank { e.message.orEmpty() },
-            scopeAssigned = assigned,
+            scopeRestricted = restricted,
             fallback = "Terjadi kesalahan, silakan coba lagi",
         )
         throw IllegalStateException(message)
@@ -180,7 +190,7 @@ class JurnalRepository @Inject constructor(
     }
 
     private companion object {
-        const val KEY_SCOPE = "teacher_master_data_scope"
+        const val KEY_RESTRICTED = "jurnal_teacher_scope_restricted"
         const val KEY_CAPTURE = "journal_capture_required"
     }
 }

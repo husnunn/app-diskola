@@ -194,7 +194,8 @@ fun VerifikasiJurnalScreen(
         )
     }
 
-    if (pickStatus) {
+    // Like legacy: the status dialog stays open until the server accepts, so a failed send can be tried again without picking anew.
+    if (pickStatus && !done) {
         AppDialog(
             onDismiss = { pickStatus = false },
             title = "Pilih status pembelajaran",
@@ -205,7 +206,6 @@ fun VerifikasiJurnalScreen(
                 if (status == null) {
                     chooseError = true
                 } else {
-                    pickStatus = false
                     viewModel.submit(attendanceId, status)
                 }
             },
@@ -218,6 +218,8 @@ fun VerifikasiJurnalScreen(
                     chooseError = false
                 })
                 if (chooseError) Text("Pilih status pembelajaran", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                // The banner behind the dialog is hidden by it, so the reason of a failed send is repeated here.
+                if (errorMessage.isNotBlank()) Text(errorMessage, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             }
         }
     }

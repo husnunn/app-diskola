@@ -21,7 +21,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 
 /** A result dialog (success or failure) the list screen shows once; [openRow] = open that class's detail on "Ok". */
@@ -134,11 +133,12 @@ class JurnalViewModel @Inject constructor(
         }
     }
 
+    /** A new fix within 4 s, else the recent position the device knows (legacy asked `lastLocation` first); null when not permitted. */
     private suspend fun bestEffortLocation(): Location? {
         val granted = listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
             .any { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }
         if (!granted) return null
-        return withTimeoutOrNull(LOCATION_TIMEOUT_MS) { locationProvider.freshLocation() ?: locationProvider.currentLocation() }
+        return locationProvider.freshOrRecentLocation(LOCATION_TIMEOUT_MS, JurnalRules::isUsableLastKnown)
     }
 
     private companion object {

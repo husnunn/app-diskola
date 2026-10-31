@@ -71,6 +71,10 @@ class JurnalDetailViewModel @Inject constructor(
     private val _canEdit = MutableStateFlow(false)
     val canEdit: StateFlow<Boolean> = _canEdit.asStateFlow()
 
+    /** The save is in flight ("Menyimpan jurnal ..."); [loading] is only the (re)load of the page, which has its own indicator. */
+    private val _saving = MutableStateFlow(false)
+    val saving: StateFlow<Boolean> = _saving.asStateFlow()
+
     fun start(attendanceId: Int, createdAt: String) {
         if (started) return
         started = true
@@ -87,6 +91,8 @@ class JurnalDetailViewModel @Inject constructor(
                 val detail = repository.scheduleDetail(attendanceId) ?: throw IllegalStateException("Jurnal tidak ditemukan")
                 _detail.value = detail
                 scheduleId = detail.school_subject_schedule_id ?: 0
+                // Legacy refuses here; without a schedule id the preview call below would ask the server for journal 0.
+                if (isTeacher && scheduleId <= 0) throw IllegalStateException("ID jadwal mata pelajaran tidak tersedia")
                 if (isTeacher) loadTeacher(detail) else loadReadOnly(detail)
                 _canEdit.value = JurnalRules.canEditDetail(isTeacher, _isStarted.value, scheduleId)
                 rememberInitial()
@@ -94,7 +100,9 @@ class JurnalDetailViewModel @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 Timber.e(e)
-                _loadError.value = AppErrorHandler.getMessage(e)
+                val message = AppErrorHandler.getMessage(e)
+                // A refresh that fails keeps what is on screen and says why; only a first load that fails blocks with the retry dialog.
+                if (_detail.value == null) _loadError.value = message else emitError(message)
             } finally {
                 _loading.value = false
             }
@@ -106,8 +114,8 @@ class JurnalDetailViewModel @Inject constructor(
         if (preview?.school_subject_schedule_id != null && preview.school_subject_schedule_id > 0) scheduleId = preview.school_subject_schedule_id
         _isStarted.value = preview?.is_started == true
         _objective.value = preview?.learning_objective ?: detail.learning_objective
-        // "Penugasan" is kept (legacy dropped it and cleared the radio).
-        _sessionStatus.value = preview?.session_status.orEmpty()
+        // Only the two the server accepts on save; a "Penugasan" it sends back reads as not chosen, like legacy.
+        _sessionStatus.value = JurnalRules.normalizeSessionStatus(preview?.session_status)
         _students.value = preview?.students.orEmpty().map {
             EditableStudent(it.student_id, it.name, it.nisn, JurnalRules.normalizeStudentStatus(it.status), it.status_source, it.is_overridable != false)
         }
@@ -188,7 +196,7 @@ class JurnalDetailViewModel @Inject constructor(
             return
         }
         viewModelScope.launch {
-            _loading.value = true
+            _saving.value = true
             clearError()
             try {
                 repository.save(scheduleId, _objective.value, _sessionStatus.value, _students.value.map { it.id to it.status })
@@ -200,7 +208,7 @@ class JurnalDetailViewModel @Inject constructor(
                 Timber.e(e)
                 emitError(AppErrorHandler.getMessage(e))
             } finally {
-                _loading.value = false
+                _saving.value = false
             }
         }
     }

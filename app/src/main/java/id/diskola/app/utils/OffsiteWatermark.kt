@@ -30,6 +30,25 @@ object OffsiteWatermark {
     private const val DIR = "offsite_photos"
     private val TIME_FORMAT = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale("id", "ID"))
 
+    /**
+     * `inSampleSize` for decoding: the largest power of two that still leaves the long side at or above [maxSide] (the picture is then
+     * scaled down to exactly [maxSide]). The old rule took the smallest power of two that got under the cap, so a 4000 px photo for a
+     * 1600 px cap was decoded at 1000 px.
+     */
+    fun sampleSize(longSide: Int, maxSide: Int): Int {
+        var sample = 1
+        while (longSide / (sample * 2) >= maxSide) sample *= 2
+        return sample
+    }
+
+    /** [width]×[height] scaled down, keeping the ratio, so the long side is [maxSide]; unchanged when it already fits. */
+    fun scaledSize(width: Int, height: Int, maxSide: Int): Pair<Int, Int> {
+        val longSide = maxOf(width, height)
+        if (longSide <= maxSide) return width to height
+        val factor = maxSide.toFloat() / longSide
+        return Math.round(width * factor) to Math.round(height * factor)
+    }
+
     /** (1) address ≤ 200 chars or `-`, (2) `%.6f, %.6f`, (3) `dd MMM yyyy HH:mm`. */
     fun lines(address: String, lat: Double, lng: Double, time: LocalDateTime = LocalDateTime.now()): List<String> = listOf(
         address.trim().take(200).ifBlank { "-" },
@@ -63,8 +82,7 @@ object OffsiteWatermark {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(source.path, bounds)
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null
-            var sample = 1
-            while (maxOf(bounds.outWidth, bounds.outHeight) / sample > maxSide) sample *= 2
+            val sample = sampleSize(maxOf(bounds.outWidth, bounds.outHeight), maxSide)
             val decoded = BitmapFactory.decodeFile(source.path, BitmapFactory.Options().apply { inSampleSize = sample })
                 ?: return@runCatching null
 
@@ -77,7 +95,9 @@ object OffsiteWatermark {
             val upright = if (degrees == 0f) decoded else Bitmap.createBitmap(
                 decoded, 0, 0, decoded.width, decoded.height, Matrix().apply { postRotate(degrees) }, true,
             )
-            val stamped = stamp(upright.copy(Bitmap.Config.ARGB_8888, true), lines)
+            val (fitWidth, fitHeight) = scaledSize(upright.width, upright.height, maxSide)
+            val fitted = if (fitWidth == upright.width && fitHeight == upright.height) upright else Bitmap.createScaledBitmap(upright, fitWidth, fitHeight, true)
+            val stamped = stamp(fitted.copy(Bitmap.Config.ARGB_8888, true), lines)
 
             val dir = File(context.cacheDir, DIR).apply { mkdirs() }
             val out = File(dir, "${prefix}_${System.currentTimeMillis()}.jpg")

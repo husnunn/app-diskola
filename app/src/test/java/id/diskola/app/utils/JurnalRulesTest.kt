@@ -209,6 +209,69 @@ class JurnalRulesTest {
         assertFalse(JurnalRules.canEditDetail(false, true, 5))
         assertFalse(JurnalRules.canEditDetail(true, true, 0))
     }
+
+    // ---- pickers and session status ----
+
+    @Test
+    fun pickerSearch_matchesTitleOrSubtitleIgnoringCaseAndBlankMatchesAll() {
+        assertTrue(JurnalRules.matchesQuery("Bahasa Indonesia", "", ""))
+        assertTrue(JurnalRules.matchesQuery("Bahasa Indonesia", "", "  "))
+        assertTrue(JurnalRules.matchesQuery("Bahasa Indonesia", "", "indo"))
+        assertTrue(JurnalRules.matchesQuery("Guru DEV", "20202620", "2020"))
+        assertFalse(JurnalRules.matchesQuery("IPS", "", "Matematika"))
+        assertFalse(JurnalRules.matchesQuery("Johan", "191926", "Mukhlish"))
+    }
+
+    @Test
+    fun teacherSessionStatus_hasTwoChoicesAndForeignValuesReadAsNotChosen() {
+        assertEquals(listOf("Terlaksana", "Tidak Terlaksana"), JurnalRules.TEACHER_SESSION_STATUSES)
+        assertEquals("Terlaksana", JurnalRules.normalizeSessionStatus(" Terlaksana "))
+        assertEquals("Tidak Terlaksana", JurnalRules.normalizeSessionStatus("Tidak Terlaksana"))
+        assertEquals("", JurnalRules.normalizeSessionStatus("Penugasan"))
+        assertEquals("", JurnalRules.normalizeSessionStatus(null))
+    }
+
+    @Test
+    fun sessionAndServerFailuresUseTheGenericMessage() {
+        assertTrue(JurnalRules.usesGenericError(401))
+        assertTrue(JurnalRules.usesGenericError(403))
+        assertTrue(JurnalRules.usesGenericError(500))
+        assertTrue(JurnalRules.usesGenericError(503))
+        assertFalse(JurnalRules.usesGenericError(307))
+        assertFalse(JurnalRules.usesGenericError(400))
+        assertFalse(JurnalRules.usesGenericError(404))
+        assertFalse(JurnalRules.usesGenericError(422))
+        assertFalse(JurnalRules.usesGenericError(null))
+    }
+
+    // ---- Foto suasana KBM: watermark location ----
+
+    @Test
+    fun lastKnown_usableOnlyWhenRecentAndNotFromTheFuture() {
+        assertTrue(JurnalRules.isUsableLastKnown(0))
+        assertTrue(JurnalRules.isUsableLastKnown(JurnalRules.LAST_KNOWN_MAX_AGE_MILLIS))
+        assertFalse(JurnalRules.isUsableLastKnown(JurnalRules.LAST_KNOWN_MAX_AGE_MILLIS + 1))
+        assertFalse(JurnalRules.isUsableLastKnown(-1))
+    }
+
+    @Test
+    fun sameSpot_theRetakeInTheSameClassroom() {
+        // SMK Demo Surabaya, and a fix ~10 m and ~60 m away
+        val lat = -7.297312
+        val lng = 112.758362
+        assertTrue(JurnalRules.sameSpot(lat, lng, lat, lng))
+        assertTrue(JurnalRules.sameSpot(lat, lng, lat + 0.00009, lng))
+        assertTrue(JurnalRules.sameSpot(lat, lng, lat, lng + 0.00054))
+    }
+
+    @Test
+    fun sameSpot_anotherPlaceKeepsItsOwnAddress() {
+        val lat = -7.297312
+        val lng = 112.758362
+        assertFalse(JurnalRules.sameSpot(lat, lng, lat + 0.0012, lng)) // ~133 m north
+        assertFalse(JurnalRules.sameSpot(lat, lng, lat, lng + 0.01)) // ~1.1 km east
+        assertFalse(JurnalRules.sameSpot(lat, lng, -6.2088, 106.8456)) // Jakarta
+    }
 }
 
 private object JurnalRows {

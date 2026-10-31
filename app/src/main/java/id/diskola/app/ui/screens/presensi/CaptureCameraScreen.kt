@@ -36,8 +36,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppLoadingDialog
@@ -60,13 +62,15 @@ data class CaptureCameraConfig(
     val filePrefix: String,
     /** True: address/coordinates lines are left out when unknown (Jurnal). False: always three lines (Dinas Luar). */
     val optionalLines: Boolean,
+    /** A line shown at the top of the viewfinder (legacy: "Foto suasana kelas saat KBM berlangsung"). */
+    val hint: String? = null,
 ) {
     companion object {
         /** Dinas Luar (doc `07` §6.3): front camera, no flip, 2560 px. */
         val OffsiteSelfie = CaptureCameraConfig(false, false, 2560, null, "OFFSITE", false)
 
         /** Jurnal KBM (doc `07` §8.3): back camera + flip, ≤ 1600 px and ≤ 2 MB. */
-        val JurnalScene = CaptureCameraConfig(true, true, 1600, 2L * 1024 * 1024, "kbm_capture", true)
+        val JurnalScene = CaptureCameraConfig(true, true, 1600, 2L * 1024 * 1024, "kbm_capture", true, "Foto suasana kelas saat KBM berlangsung")
     }
 }
 
@@ -119,6 +123,16 @@ fun CaptureCameraScreen(
 
         IconButton(onClick = onClose, modifier = Modifier.statusBarsPadding().padding(Spacing.sm).align(Alignment.TopStart)) {
             Icon(Icons.Rounded.Close, contentDescription = "Tutup kamera", tint = Color.White)
+        }
+        config.hint?.let { hint ->
+            Text(
+                hint,
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White,
+                textAlign = TextAlign.Center,
+                // Between the close and flip buttons: each is 48 dp plus its 8 dp margin.
+                modifier = Modifier.statusBarsPadding().padding(top = Spacing.xxl, start = 56.dp, end = 56.dp).align(Alignment.TopCenter),
+            )
         }
         if (config.allowFlip) {
             IconButton(onClick = { useBack = !useBack }, modifier = Modifier.statusBarsPadding().padding(Spacing.sm).align(Alignment.TopEnd)) {

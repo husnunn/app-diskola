@@ -32,6 +32,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 
+/** How long a new location fix (and then the reverse geocode) is waited for before the form goes on without it. */
+private const val FIX_WAIT_MILLIS = 4_000L
+
 /** Server-paged, searchable list behind one picker sheet (20 per page, 500 ms search debounce). */
 class PagedPicker<T>(
     private val scope: CoroutineScope,
@@ -47,6 +50,10 @@ class PagedPicker<T>(
 
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
+
+    /** Why the list could not be loaded, for the sheet itself — a banner on the form sits behind the open sheet. */
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
 
     private var hasNext = true
     private var loadingMore = false
@@ -70,6 +77,7 @@ class PagedPicker<T>(
         job = scope.launch {
             if (delayMs > 0) delay(delayMs)
             _loading.value = true
+            _error.value = null
             try {
                 val page = fetch(0, _query.value)
                 if (mine != generation) return@launch
@@ -79,6 +87,11 @@ class PagedPicker<T>(
                 throw e
             } catch (e: Exception) {
                 Timber.e(e)
+                // Rows of the previous query would pass for the answer to this one.
+                if (mine == generation) {
+                    _items.value = emptyList()
+                    _error.value = AppErrorHandler.getMessage(e)
+                }
                 onError(e)
             } finally {
                 if (mine == generation) _loading.value = false
@@ -131,10 +144,11 @@ class JurnalFormViewModel @Inject constructor(
     private var started = false
     private var fixedPlotId = 0
 
-    private val _assigned = MutableStateFlow(false)
-    val assigned: StateFlow<Boolean> = _assigned.asStateFlow()
+    // Seeded from the last open (like legacy) so the hint and the "*" are right from the first frame; start() replaces them with the server's.
+    private val _restricted = MutableStateFlow(repository.cachedScopeRestricted())
+    val restricted: StateFlow<Boolean> = _restricted.asStateFlow()
 
-    private val _captureRequired = MutableStateFlow(false)
+    private val _captureRequired = MutableStateFlow(repository.cachedCaptureRequired())
     val captureRequired: StateFlow<Boolean> = _captureRequired.asStateFlow()
 
     private val _plots = MutableStateFlow<List<PlotItem>>(emptyList())
@@ -179,7 +193,7 @@ class JurnalFormViewModel @Inject constructor(
         fixedPlotId = plotId
         if (!isTeacher) _selectedPlots.value = listOf(plotId)
         viewModelScope.launch {
-            _assigned.value = repository.teacherScopeAssigned()
+            _restricted.value = repository.teacherScopeRestricted()
             _captureRequired.value = repository.captureRequired()
             if (isTeacher) {
                 try {
@@ -205,8 +219,16 @@ class JurnalFormViewModel @Inject constructor(
     fun onSubjectSelected(item: JurnalSubjectItem) { _selectedSubject.value = item }
     fun onTeacherSelected(item: JurnalTeacherItem) { _selectedTeacher.value = item }
     fun onStatusSelected(value: String) { _studentStatus.value = value }
-    fun onPhotoCaptured(path: String) { _photo.value = File(path) }
-    fun removePhoto() { _photo.value = null }
+    fun onPhotoCaptured(path: String) {
+        // A retake replaces the file: the stamped copy it replaces would otherwise stay in the cache for good.
+        _photo.value?.takeIf { it.path != path }?.delete()
+        _photo.value = File(path)
+    }
+
+    fun removePhoto() {
+        _photo.value?.delete()
+        _photo.value = null
+    }
 
     /** Hour chips must be consecutive; a refused tap changes nothing and says so. */
     fun onChipTapped(index: Int) {
@@ -219,12 +241,18 @@ class JurnalFormViewModel @Inject constructor(
     /** Where the photo was taken, for the watermark. Every part is optional and a slow fix never blocks the camera. */
     data class CaptureSpot(val address: String?, val lat: Double?, val lng: Double?)
 
+    /** The last place that got an address, so a retake in the same room is stamped like the first photo even when the geocoder is slow. */
+    private data class RememberedSpot(val lat: Double, val lng: Double, val address: String)
+
+    private var rememberedSpot: RememberedSpot? = null
+
     fun prepareCapture(onReady: (CaptureSpot) -> Unit) {
         viewModelScope.launch {
             _preparing.value = true
             val spot = try {
                 val fix = bestEffortLocation()
-                val address = fix?.let { withTimeoutOrNull(4_000L) { locationProvider.addressOf(it.latitude, it.longitude) } }
+                val address = fix?.let { addressFor(it) }
+                if (fix != null && address != null) rememberedSpot = RememberedSpot(fix.latitude, fix.longitude, address)
                 CaptureSpot(address, fix?.latitude, fix?.longitude)
             } catch (e: CancellationException) {
                 throw e
@@ -282,7 +310,7 @@ class JurnalFormViewModel @Inject constructor(
         }
         send {
             // Coordinates are best effort; a mock location is not sent at all.
-            val fix = bestEffortLocation()?.takeUnless(MockLocationGuard::isMock)
+            val fix = bestEffortLocation()
             repository.createStudentJournal(
                 plotIds = listOf(fixedPlotId),
                 subjectId = _selectedSubject.value!!.id,
@@ -300,11 +328,14 @@ class JurnalFormViewModel @Inject constructor(
             _submitting.value = true
             try {
                 call()
+                // Sent: the stamped copy has done its job.
+                _photo.value?.delete()
                 _result.value = JurnalFormResult.Created("Jurnal kelas berhasil diproses")
             } catch (e: CancellationException) {
                 throw e
             } catch (e: JournalExistsException) {
-                _result.value = JurnalFormResult.Exists(e.message.orEmpty(), e.attendanceIds)
+                // Legacy: without an id to open there is nothing to open — the server's message, and the form stays.
+                if (e.attendanceIds.isEmpty()) emitError(e.message.orEmpty()) else _result.value = JurnalFormResult.Exists(e.message.orEmpty(), e.attendanceIds)
             } catch (e: Exception) {
                 Timber.e(e)
                 emitError(AppErrorHandler.getMessage(e))
@@ -314,10 +345,24 @@ class JurnalFormViewModel @Inject constructor(
         }
     }
 
+    private fun locationGranted(): Boolean = listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+        .any { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }
+
+    /**
+     * What a submit sends and what the photo is stamped with: a new fix if one comes within 4 s, else the position the device already knows
+     * when it is recent ([JurnalRules.isUsableLastKnown]) — legacy asked `lastLocation` first. Indoors a new high-accuracy fix can take longer
+     * than 4 s, and without the fallback the watermark kept only its time line and the submit carried no coordinates. A mock position is
+     * never used (the photo is evidence, like the submit). null when location is not permitted or unknown.
+     */
     private suspend fun bestEffortLocation(): Location? {
-        val granted = listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
-            .any { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }
-        if (!granted) return null
-        return withTimeoutOrNull(4_000L) { locationProvider.freshLocation() ?: locationProvider.currentLocation() }
+        if (!locationGranted()) return null
+        return locationProvider.freshOrRecentLocation(FIX_WAIT_MILLIS, JurnalRules::isUsableLastKnown)?.takeUnless(MockLocationGuard::isMock)
+    }
+
+    /** The address of [fix]; when the geocoder gives none in time, the one remembered for this same spot. */
+    private suspend fun addressFor(fix: Location): String? {
+        withTimeoutOrNull(FIX_WAIT_MILLIS) { locationProvider.addressOf(fix.latitude, fix.longitude) }?.let { return it }
+        val remembered = rememberedSpot ?: return null
+        return remembered.address.takeIf { JurnalRules.sameSpot(remembered.lat, remembered.lng, fix.latitude, fix.longitude) }
     }
 }
