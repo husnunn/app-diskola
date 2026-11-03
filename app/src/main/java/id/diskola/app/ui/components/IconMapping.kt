@@ -15,6 +15,7 @@ import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.EventNote
 import androidx.compose.material.icons.rounded.Gavel
+import androidx.compose.material.icons.rounded.Grading
 import androidx.compose.material.icons.rounded.HelpOutline
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.HowToReg
@@ -52,6 +53,7 @@ fun iconFor(name: String): ImageVector = when (name) {
     "event_note" -> Icons.Rounded.EventNote
     "quiz" -> Icons.Rounded.Quiz
     "workspace_premium" -> Icons.Rounded.WorkspacePremium
+    "grading" -> Icons.Rounded.Grading
     "business_center" -> Icons.Rounded.BusinessCenter
     "menu_book" -> Icons.Rounded.MenuBook
     "code" -> Icons.Rounded.Code

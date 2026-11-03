@@ -23,8 +23,8 @@ SharedPreferences; di-refresh setiap tab Beranda tampil (dokumen 02 §9, 03 §3.
 
 | Peran | Penanda | Keterangan |
 |---|---|---|
-| Siswa | `is_student=true` | Menu: Materi, Tugas, Presensi, Jurnal, Asesmen, Poin, Magang |
-| Guru / staf | `is_teacher=true` | Menu: Materi, Tugas, Presensi, Jurnal, Agenda Mingguan, Poin; banner absensi kantor; presensi dinas luar |
+| Siswa | `is_student=true` | Menu: Materi, Tugas, Presensi, Jurnal, Asesmen, Poin, Magang, E-Raport |
+| Guru / staf | `is_teacher=true` | Menu: Materi, Tugas, Presensi, Jurnal, Agenda Mingguan, Poin, E-Raport; banner absensi kantor; presensi dinas luar |
 | Tamu (Guest) | bukan siswa/guru (mis. login Google tanpa data sekolah) | Semua menu **terkunci** (`is_having_class=false`); popup "Anda Masuk sebagai Tamu"; tombol "Verifikasi Data" |
 | Belum punya kelas | `is_having_class=false` | Semua menu terkunci: dialog "Fitur ini terkunci" |
 
@@ -75,6 +75,7 @@ tapi titik masuknya dikomentari/tidak ada) · 🧩 **Stub** (layar ada tapi isin
 | Tugas/PR (siswa & guru) | Siswa, guru | Menu "Tugas" | ✅ | 05 (+ 05c §4: kontrak form guru baru 2026-10-22, belum di app baru) |
 | Agenda Mingguan | Guru | Menu "Agenda Mingguan" | ✅ | 05 |
 | Poin (guru & siswa) | Siswa, guru | Menu "Poin", notifikasi | ✅ | 05 |
+| E-Raport | Siswa, guru | Menu "E-Raport" | ⏳ Tile saja (sejak 2026-11-02): klik membuka dialog "Fitur dalam pengembangan"; isi fitur belum dibangun | 03 §3.7 |
 | Perpustakaan | — | Tidak ada pemanggil | ⛔ | 05 |
 | Asesmen/AKM (ujian sekolah) | Siswa | Menu "Asesmen" | ✅ | 06 |
 | Try Out | Siswa | Hanya sebagai tujuan "kembali" dari layar AKM | 🟡 | 06 §19 |

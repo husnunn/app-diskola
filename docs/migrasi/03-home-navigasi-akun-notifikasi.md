@@ -330,12 +330,16 @@ isi badge dari `GET mobile/attendance/staff/agendas/today` (`agenda_enabled ? su
 
 | Peran (pref) | Urutan menu yang tampil |
 |---|---|
-| Siswa (`is_student`) | Materi, Tugas, Presensi, Jurnal, Asesmen, Poin, Magang |
-| Guru (`is_teacher`, bukan siswa) | Materi, Tugas, Presensi, Jurnal, Agenda Mingguan, Poin |
+| Siswa (`is_student`) | Materi, Tugas, Presensi, Jurnal, Asesmen, Poin, Magang, E-Raport |
+| Guru (`is_teacher`, bukan siswa) | Materi, Tugas, Presensi, Jurnal, Agenda Mingguan, Poin, E-Raport |
 | Tamu / lainnya | Materi, Tugas, Presensi, Jurnal, Poin (semua terkunci karena `is_having_class=false`) |
 
+**E-Raport (ditambahkan 2026-11-02 di app lama dan app baru, belum ada di kode asli di atas):** tile paling akhir untuk siswa dan
+guru, belum dibangun: kliknya hanya membuka dialog "Fitur dalam pengembangan". Di app lama ia ditambahkan sesudah `Agenda Mingguan`
+disisipkan (`PembelajaranPage.kt`, label `E-Raport`, ikon `ic_eraport`), jadi posisinya siswa 7 dan guru 6.
+
 **Aksi klik — ditentukan oleh POSISI, bukan label** (`PembelajaranPage.kt:601-767`). Jika
-`!is_having_class` → semua posisi 0–6 membuka dialog terkunci:
+`!is_having_class` → semua posisi 0–7 membuka dialog terkunci:
 
 | Posisi | Label (siswa / guru / tamu) | Ikon | Tujuan | Extras | Syarat tambahan |
 |---|---|---|---|---|---|
@@ -346,9 +350,10 @@ isi badge dari `GET mobile/attendance/staff/agendas/today` (`agenda_enabled ? su
 | 4 | Asesmen / Agenda Mingguan / Poin | `ic_test` / `ic_agenda` / `ic_council` | siswa → `AkmPage`; guru → `AgendaMingguanPage`; lainnya → `PoinPage` | — (AkmPage **tanpa** `isSchoolScope`) | `is_having_class` |
 | 5 | Poin / Poin / — | `ic_council` | siswa → `PoinStudentPage`; lainnya → `PoinPage` | — | `is_having_class` |
 | 6 | Magang / — / — | `ic_announcement` | `MagangPage` | — | `is_having_class` |
-| ≥ 7 | — | — | dialog "dalam pengembangan" | — | — |
+| terakhir (siswa 7, guru 6) | E-Raport | `ic_eraport` | dialog "dalam pengembangan" (app lama: dicegat lewat `eRaportPosition` **sebelum** `when(pos)`, karena posisi 6 milik guru di sana masih `MagangPage`) | — | `is_having_class`; tanpa kelas → dialog terkunci |
+| ≥ 8 | — | — | dialog "dalam pengembangan" | — | — |
 
-⚠️ Jika pref basi membuat `is_student && is_teacher` sama-sama true, daftar berisi 8 item dan label tidak cocok
+⚠️ Jika pref basi membuat `is_student && is_teacher` sama-sama true, daftar berisi 9 item dan label tidak cocok
 dengan tujuan (posisi 4 "Agenda Mingguan" → AkmPage, dst.) — ❓ Q4.
 
 **Dialog:**

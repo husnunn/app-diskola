@@ -781,3 +781,19 @@ Pola kondisi: `kosong && !loading → EmptyState`, `kosong → LoadingState`, se
 **Diverifikasi di device (31 Okt, build dengan semua perbaikan; 506 tes JVM lulus, +6; uji mutasi: sampleSize dan matchesQuery dirusak → 3 tes gagal, lalu dikembalikan):** form siswa (hint baru, pencarian pemilih menyaring, error di atas), watermark Samsung (foto pertama dan ambil ulang sama-sama lengkap; kegagalan aslinya **tidak bisa diulang** di sini, jadi perbaikan lokasi belum terbukti menyembuhkannya), form guru tanpa banner, Mulai kelas tanpa konfirmasi (+ tutup di luar), Detail dua pilihan status, pull-to-refresh dengan "Buang perubahan?", Simpan sukses dengan "Terlaksana". Data uji yang tertinggal di server dev: jurnal siswa app lama (jam 1, kelas 10 UMUM); sesi guru jam 2 dan jam 4 untuk DEVELOPER MOBILE (attendance 858 dan 859, keduanya dimulai; 859 disimpan "Terlaksana"); gagal/ditolak: jurnal siswa baru, jam 1 dan duplikat guru, simpan "Penugasan".
 
 **Belum teruji (jangan diasumsikan selesai):** Verifikasi/Masuk Kelas siswa, QR fisik, dan jalur "Hadiri kelas" (jam 1 kelas siswa tidak bisa diisi siapa pun sehingga semua jam sesudahnya terkunci; `current_subject` tetap `{}` walau sesi dibuat dan dimulai, jadi kartu Hub "Check In/Isi Jurnal" dan nilai bawaan `attendance_id` (legacy 0, baru null) tidak teramati); jalur 307; pull-to-refresh tanpa perubahan; foto Detail (belum ada foto di sesi uji); font 1,5× dan TalkBack; sisi guru app lama (hanya dari kode). **Catatan data:** server menampilkan semua siswa kelas sebagai "hadir / Absen mandiri" di Detail sesi baru walau "Kehadiran" server H 0; legacy memakai pemetaan yang sama, tidak diubah.
+
+## 2026-11-02 — Menu E-Raport di Hub Pembelajaran (siswa dan guru), app baru dan app lama
+
+**Konteks:** permintaan user "tambahkan menu E-Raport di menu pembelajaran role guru dan siswa, di repo baru dan repo lama, tapi ketika diklik 'Fitur dalam pengembangan'". Fiturnya belum ada di kedua app; yang diminta hanya tile dan dialog.
+
+**Diputuskan:**
+1. **Posisi paling akhir di kedua app** (siswa sesudah Magang, guru sesudah Poin). App lama merutekan klik menurut posisi indeks; menyisipkan di tengah akan menggeser Agenda Mingguan, Poin, dan Magang.
+2. **App lama (`android-portal`, `PembelajaranPage.kt`):** item `E-Raport` ditambahkan hanya bila `is_student || is_teacher`, sesudah penyisipan Agenda Mingguan. Posisi guru 6 bentrok dengan cabang `6 -> MagangPage`, jadi klik dicegat lebih dulu lewat `eRaportPosition` (diisi dari label saat daftar dibangun) sebelum `when (pos)`. Ikon baru `ic_eraport` (vector, ilustrasi datar di kotak mint 150 × 150, setara PNG ikon menu lain; dicek lewat render SVG, bukan di device).
+3. **App baru:** `MenuKey.E_RAPORT`, ikon `grading`, `implemented = false`; klik jatuh ke cabang `else` yang sudah ada dan membuka `comingSoonDialog` ("Fitur dalam pengembangan"). Tes `HomeMenuGridTest` (4 tes) mengunci urutan, posisi terakhir, dan tamu tanpa E-Raport.
+4. **Tanpa kelas:** tile terkunci seperti menu lain dan klik membuka dialog terkunci, bukan "dalam pengembangan" (selaras dengan ikon gembok). Akun guru yang bukan role "Teacher" (`StaffMenuAccess.PRESENSI_ONLY`) mendapat tile terkunci dengan pesan "hanya untuk akun dengan peran Guru". Tamu dan staf terbatas tidak mendapat E-Raport.
+
+**Sengaja tidak dilakukan:** label "SOON" di app lama (kolom `soon` ada tetapi tidak dipakai menu lain; tidak diminta); `docs-new` (terakhir diubah 24 Okt dan bukan repo git, dokumen yang aktif adalah `docs/` ini).
+
+**Diverifikasi:** tes JVM app baru `HomeMenuGridTest` 4 dari 4 lulus; kedua app compile (`compileDebugKotlin` app lama exit 0, app baru exit 0).
+
+**Belum teruji (jangan diasumsikan selesai):** tampilan tile dan ikon di device (Hub 3 kolom: siswa 8 tile, baris terakhir berisi 2; guru 7 tile, baris terakhir berisi 1), dialog saat diklik di kedua app, dan perilaku akun guru dengan role non-Teacher di app lama.

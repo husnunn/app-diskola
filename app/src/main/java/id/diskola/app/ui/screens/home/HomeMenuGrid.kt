@@ -33,11 +33,14 @@ import id.diskola.app.viewmodel.HomeProfile
 /** Doc §1.8: routing keyed by role/feature identity, not grid position — the legacy app's
  * position-based routing silently breaks for a user who is somehow both `is_student` and
  * `is_teacher` (doc §1.8's ❓, not reproduced here since `MenuKey` never relies on position). */
-enum class MenuKey { MATERI, TUGAS, PRESENSI, JURNAL, AGENDA_MINGGUAN, ASESMEN, POIN, MAGANG }
+enum class MenuKey { MATERI, TUGAS, PRESENSI, JURNAL, AGENDA_MINGGUAN, ASESMEN, POIN, MAGANG, E_RAPORT }
 
 data class MenuTileData(val key: MenuKey, val icon: String, val label: String, val implemented: Boolean, val locked: Boolean)
 
-/** Doc §1.5's exact per-role item list (identical to legacy `PembelajaranPage.kt:212-260`); every tile locks without a class. */
+/**
+ * Doc §1.5's per-role item list (legacy `PembelajaranPage.kt:212-260`); every tile locks without a class. Students and teachers also get
+ * a last "E-Raport" tile that is not built yet: [MenuTileData.implemented] is false, so a tap opens "Fitur dalam pengembangan".
+ */
 fun menuTilesFor(profile: HomeProfile): List<MenuTileData> {
     val locked = !profile.isHavingClass
     fun tile(key: MenuKey, icon: String, label: String, implemented: Boolean) =
@@ -51,6 +54,7 @@ fun menuTilesFor(profile: HomeProfile): List<MenuTileData> {
             tile(MenuKey.ASESMEN, "quiz", "Asesmen", true),
             tile(MenuKey.POIN, "workspace_premium", "Poin", true),
             tile(MenuKey.MAGANG, "business_center", "Magang", false),
+            tile(MenuKey.E_RAPORT, "grading", "E-Raport", false),
         )
         profile.isTeacher -> listOf(
             tile(MenuKey.MATERI, "auto_stories", "Materi", true),
@@ -59,6 +63,7 @@ fun menuTilesFor(profile: HomeProfile): List<MenuTileData> {
             tile(MenuKey.JURNAL, "edit_note", "Jurnal", true),
             tile(MenuKey.AGENDA_MINGGUAN, "event_note", "Agenda Mingguan", true),
             tile(MenuKey.POIN, "workspace_premium", "Poin", true),
+            tile(MenuKey.E_RAPORT, "grading", "E-Raport", false),
         )
         else -> listOf(
             tile(MenuKey.MATERI, "auto_stories", "Materi", true),
