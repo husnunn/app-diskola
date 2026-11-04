@@ -42,6 +42,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import id.diskola.app.dataclass.ResponData.ScheduleDetailData
+import id.diskola.app.ui.components.ImagePreviewDialog
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppDialog
 import id.diskola.app.ui.components.AppLoadingDialog
@@ -273,21 +274,9 @@ fun JurnalDetailScreen(
     }
 
     if (showPhoto) {
+        // Full screen with pinch-zoom, as legacy's PhotoView dialog: the watermark on the photo has to be readable.
         detail?.takeIf { it.capture_photo_url.isNotBlank() }?.let { current ->
-            AppDialog(
-                onDismiss = { showPhoto = false },
-                title = "Foto Suasana KBM",
-                body = "",
-                primaryButtonText = "Tutup",
-                onPrimaryClick = { showPhoto = false },
-            ) {
-                AsyncImage(
-                    model = resolveAssetUrl(current.capture_photo_url),
-                    contentDescription = "Foto suasana KBM",
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp).clip(DiskolaExtraShapes.card),
-                )
-            }
+            ImagePreviewDialog(model = resolveAssetUrl(current.capture_photo_url), onDismiss = { showPhoto = false })
         }
     }
 

@@ -214,7 +214,6 @@ fun JurnalScreen(
 private fun StudentRowCard(row: JurnalRow, onHadiri: () -> Unit, onIsiJurnal: () -> Unit) {
     val ui = JurnalRules.studentUi(row)
     RowCard(row) {
-        if (row.status == JurnalRules.EMPTY) StatusBadge("Kosong", BadgeTone.Neutral)
         ui.statusText?.let { StatusBadge(it, toneOf(it)) }
         if (ui.presentLabel) StatusBadge("Anda Hadir Dikelas Ini", BadgeTone.Success)
         when (ui.action) {

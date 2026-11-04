@@ -4,6 +4,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,6 +44,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import id.diskola.app.dataclass.ResponData.PoinFormMode
+import id.diskola.app.ui.components.ImagePreviewDialog
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppDialog
 import id.diskola.app.ui.components.AppLoadingDialog
@@ -100,6 +102,7 @@ fun PoinFormScreen(
 
     var showPicker by remember { mutableStateOf(false) }
     var showPhotoSource by remember { mutableStateOf(false) }
+    var showPhotoPreview by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var cameraUri by remember { mutableStateOf<android.net.Uri?>(null) }
@@ -117,7 +120,7 @@ fun PoinFormScreen(
     val typeLabel = when (mode) {
         PoinFormMode.VIOLATION -> "Pilih Jenis Pelanggaran"
         PoinFormMode.ACHIEVEMENT -> "Pilih Jenis Prestasi"
-        PoinFormMode.HANDLING -> "Pilih Jenis Pemanggilan"
+        PoinFormMode.HANDLING -> "Pilih Jenis Penanganan"
     }
     val title = when (mode) {
         PoinFormMode.VIOLATION -> "Detail Pelanggaran Siswa"
@@ -209,15 +212,18 @@ fun PoinFormScreen(
                     FieldLabel("Lampiran Foto (*opsional) :", required = false)
                     photo?.let { file ->
                         Box {
+                            // The whole picture, tap to zoom (legacy: an inline PhotoView with pinch-zoom).
                             AsyncImage(
                                 model = file,
                                 contentDescription = "Foto lampiran",
-                                contentScale = ContentScale.Crop,
+                                contentScale = ContentScale.Fit,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .heightIn(max = 220.dp)
                                     .clip(DiskolaExtraShapes.card)
-                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, DiskolaExtraShapes.card),
+                                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, DiskolaExtraShapes.card)
+                                    .clickable { showPhotoPreview = true },
                             )
                             IconButton(
                                 onClick = viewModel::removePhoto,
@@ -254,6 +260,8 @@ fun PoinFormScreen(
             onDismiss = { showPicker = false },
         )
     }
+
+    if (showPhotoPreview) photo?.let { ImagePreviewDialog(model = it, onDismiss = { showPhotoPreview = false }) }
 
     if (showPhotoSource) {
         AppDialog(

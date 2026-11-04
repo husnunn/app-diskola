@@ -97,7 +97,7 @@ class JurnalViewModel @Inject constructor(
                 runCatching { reload() }
                 // refreshed row if the server now has one (created_at/late_at), else the one tapped
                 val fresh = _rows.value.firstOrNull { it.attendanceId == attendanceId } ?: row
-                _notice.value = JurnalNotice("Absensi Berhasil", "Absensi berhasil", openRow = fresh)
+                _notice.value = JurnalNotice("Absensi Waktu Berhasil", "Absensi berhasil", openRow = fresh)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

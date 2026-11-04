@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
@@ -40,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.diskola.app.dataclass.ResponData.MateriTable
+import id.diskola.app.ui.components.LoadMoreEffect
 import id.diskola.app.ui.components.AppBottomSheet
 import id.diskola.app.ui.components.AppDialog
 import id.diskola.app.ui.components.BannerError
@@ -128,8 +130,12 @@ fun MateriGuruScreen(
                     // First load with nothing cached yet.
                     LoadingState(variant = SkeletonVariant.ListCard, rows = 4, padding = PaddingValues(horizontal = ScreenHorizontalPadding))
                 } else {
+                    val listState = rememberLazyListState()
+                    // +1: the caption above the cards is a row of the list too.
+                    LoadMoreEffect(listState, itemCount = materials.size + 1, onLoadMore = viewModel::loadMore)
                     PullToRefreshBox(isRefreshing = loading, onRefresh = { viewModel.refresh() }, modifier = Modifier.fillMaxSize()) {
                         LazyColumn(
+                            state = listState,
                             contentPadding = PaddingValues(start = ScreenHorizontalPadding, end = ScreenHorizontalPadding, bottom = 96.dp),
                             verticalArrangement = Arrangement.spacedBy(Spacing.md),
                         ) {

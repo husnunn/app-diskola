@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -17,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.diskola.app.dataclass.ResponData.MapelTable
+import id.diskola.app.ui.components.LoadMoreEffect
 import id.diskola.app.ui.components.DetailScaffold
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
@@ -37,6 +39,9 @@ fun MapelGuruScreen(
     val loading by viewModel.subjectsLoading.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { viewModel.openSubjectPicker(isTeacher = true) }
+    val listState = rememberLazyListState()
+    // +1: the caption above the subjects is a row of the list too.
+    LoadMoreEffect(listState, itemCount = subjects.size + 1, onLoadMore = { viewModel.loadMoreSubjects(isTeacher = true) })
 
     DetailScaffold(title = "Mata Pelajaran", onBack = onBack, modifier = modifier) { padding ->
         PullToRefreshBox(
@@ -45,6 +50,7 @@ fun MapelGuruScreen(
             modifier = Modifier.padding(padding).fillMaxSize(),
         ) {
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = ScreenHorizontalPadding, end = ScreenHorizontalPadding, bottom = Spacing.xxl),
                 verticalArrangement = Arrangement.spacedBy(Spacing.md),

@@ -38,7 +38,7 @@ Legenda: ✅ Selesai & diverifikasi di device · ✅* Selesai (kode benar, belum
 |---|---|---|
 | Strip tanggal sebulan, label bulan + picker bulan/tahun, ringkasan "x / y sesi" | ✅* | `DateStrip`, `MonthYearPickerDialog`, `AgendaMingguanScreen`. |
 | Status chip & routing tap (hari ini, `gate.in`) | ✅* | `AgendaUiStatus` (INFO tak dibuat), `AgendaMingguanViewModel.resolveTap()`. |
-| Alert gate: hanya "Tutup" (keputusan user; Presensi guru belum ada) | ✅* | Tombol "Presensi" legacy sengaja tidak dibuat. |
+| Alert gate: tombol "Presensi" dan "Tutup" (seperti legacy; koreksi 2026-11-04 — catatan lama "hanya Tutup" basi sejak tombol Presensi dibuat) | ✅* | "Presensi" membuka layar Presensi langsung; legacy melewati pemeriksaan ketersediaan fitur dulu (belum ditiru, lihat FLOW_QUESTIONS 2026-11-04 audit). |
 | Cache Room per tanggal; 1× fetch saat buka | ✅* | `AgendaRepository` (tidak pernah fetch sendiri); `init` memuat sekali, ON_RESUME pertama diabaikan. Legacy: 2× saat buka. |
 | Lapor masuk/pulang: izin lokasi, GPS, peta, alamat, POST `{agenda_id,lat,lng}` | ✅* | `AgendaCheckScreen`/`LocationProvider`. Deviasi disengaja: submit disabled sampai ada fix GPS; izin fine **atau** coarse cukup; Geocoder API 33 punya `onError`; jam tampil berjalan. |
 | Pesan error `errors` → `message` → fallback | ✅* | `ApiException.validationMessages` (baru, diisi `ResponseInterceptor`) dipakai `AgendaRepository`. |

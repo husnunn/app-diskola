@@ -1,5 +1,7 @@
 package id.diskola.app.repository
 
+import androidx.room.withTransaction
+import id.diskola.app.database.LocalDatabase
 import id.diskola.app.apiservice.MateriApiService
 import id.diskola.app.dataclass.ResponData.ClassRoomTable
 import id.diskola.app.dataclass.ResponData.GradeTable
@@ -28,6 +30,7 @@ class MateriRepository @Inject constructor(
     private val mapelDao: MapelDao,
     private val materiDao: MateriDao,
     private val teacherReferenceDao: TeacherReferenceDao,
+    private val db: LocalDatabase,
 ) {
     // ---- Subject list (student `TheoryPage` / teacher's own "Mata Pelajaran") ----
 
@@ -39,9 +42,17 @@ class MateriRepository @Inject constructor(
 
     suspend fun loadMoreStudentSubjects(currentCount: Int): Boolean = fetchStudentSubjectsPage(currentCount)
 
+    /**
+     * Every `refresh…` here asks the server first and only then swaps the cached rows, in one transaction: clearing first (as before) left an
+     * empty list behind whenever the request failed, so an offline pull-to-refresh wiped what the student could still have read.
+     */
     suspend fun refreshStudentSubjects(): Boolean {
-        mapelDao.clear()
-        return fetchStudentSubjectsPage(0)
+        val response = materiApiService.studentSubjects(take = PAGE_SIZE, skip = 0)
+        db.withTransaction {
+            mapelDao.clear()
+            mapelDao.insertAll(response.data.map { MapelTable.fromMapelItem(it) })
+        }
+        return response.data.size >= PAGE_SIZE
     }
 
     private suspend fun fetchStudentSubjectsPage(skip: Int): Boolean {
@@ -57,8 +68,12 @@ class MateriRepository @Inject constructor(
     suspend fun loadMoreTeacherSubjects(currentCount: Int): Boolean = fetchTeacherSubjectsPage(currentCount)
 
     suspend fun refreshTeacherSubjects(): Boolean {
-        mapelDao.clear()
-        return fetchTeacherSubjectsPage(0)
+        val response = materiApiService.teacherSubject(take = PAGE_SIZE, skip = 0)
+        db.withTransaction {
+            mapelDao.clear()
+            mapelDao.insertAll(response.data.map { MapelTable.fromMapelItem(it) })
+        }
+        return response.data.size >= PAGE_SIZE
     }
 
     private suspend fun fetchTeacherSubjectsPage(skip: Int): Boolean {
@@ -79,18 +94,24 @@ class MateriRepository @Inject constructor(
         fetchSubjectMateriPage(subjectId, isTeacher, currentCount)
 
     suspend fun refreshSubjectMateri(subjectId: Int, isTeacher: Boolean): Boolean {
-        materiDao.clearBySubject(subjectId)
-        return fetchSubjectMateriPage(subjectId, isTeacher, 0)
+        val rows = requestSubjectMateri(subjectId, isTeacher, 0)
+        db.withTransaction {
+            materiDao.clearBySubject(subjectId)
+            materiDao.insertAll(rows.map { MateriTable.fromMateriItem(it) })
+        }
+        return rows.size >= PAGE_SIZE
+    }
+
+    private suspend fun requestSubjectMateri(subjectId: Int, isTeacher: Boolean, skip: Int) = if (isTeacher) {
+        materiApiService.teacherTheoryBySubject(subjectId, take = PAGE_SIZE, skip = skip).data
+    } else {
+        materiApiService.studentTheories(subjectId, take = PAGE_SIZE, skip = skip).data
     }
 
     private suspend fun fetchSubjectMateriPage(subjectId: Int, isTeacher: Boolean, skip: Int): Boolean {
-        val response = if (isTeacher) {
-            materiApiService.teacherTheoryBySubject(subjectId, take = PAGE_SIZE, skip = skip)
-        } else {
-            materiApiService.studentTheories(subjectId, take = PAGE_SIZE, skip = skip)
-        }
-        materiDao.insertAll(response.data.map { MateriTable.fromMateriItem(it) })
-        return response.data.size >= PAGE_SIZE
+        val rows = requestSubjectMateri(subjectId, isTeacher, skip)
+        materiDao.insertAll(rows.map { MateriTable.fromMateriItem(it) })
+        return rows.size >= PAGE_SIZE
     }
 
     // ---- Teacher's own "Materi Saya" — Kelas/Mapel filters combined with AND (decision: fix the
@@ -109,8 +130,12 @@ class MateriRepository @Inject constructor(
     /** Also used right after create/edit/delete succeeds — fixes the legacy bug where a newly
      * created/edited materi never showed up without a manual pull-to-refresh (doc §3.8). */
     suspend fun refreshTeacherOwn(teacherId: Int, subjectId: Int?, classId: Int?): Boolean {
-        materiDao.clearByTeacher(teacherId)
-        return fetchTeacherOwnPage(subjectId, classId, 0)
+        val response = materiApiService.teacherTheory(take = PAGE_SIZE, skip = 0, school_subject = subjectId, school_class = classId)
+        db.withTransaction {
+            materiDao.clearByTeacher(teacherId)
+            materiDao.insertAll(response.data.map { MateriTable.fromMateriItem(it) })
+        }
+        return response.data.size >= PAGE_SIZE
     }
 
     private suspend fun fetchTeacherOwnPage(subjectId: Int?, classId: Int?, skip: Int): Boolean {

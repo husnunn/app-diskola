@@ -836,3 +836,24 @@ Pola kondisi: `kosong && !loading → EmptyState`, `kosong → LoadingState`, se
 | 1 | Tile "Asesmen" di Menu Pembelajaran tampil dengan ikon kunci; ketuk membuka dialog "Asesmen sedang dikunci — Menu Asesmen dikunci sementara. Silakan coba lagi nanti." Satu sakelar: `ASESMEN_SUSPENDED` (`HomeMenuGrid.kt`); `false` membuka lagi. Pengguna tanpa kelas tetap mendapat dialog kunci kelas yang biasa (diperiksa lebih dulu). |
 | 2 | **Hanya tile yang dikunci.** Tidak diubah: kode dan perilaku Asesmen, `AkmSubmitWorker` (jawaban tersimpan tetap terkirim), notifikasi yang menuju ujian, dan jalur "selesaikan ujian dulu" dari dialog blokir logout di tab Akun (`onOpenAkm`) — keduanya sengaja tetap bisa membuka daftar Asesmen agar tidak ada jawaban siswa yang tertahan. |
 | 3 | E-Raport: di app lama juga hanya tile "Fitur dalam pengembangan" (`PembelajaranPage.kt`), jadi tidak ada isi fitur untuk dimigrasikan. |
+
+## 2026-11-04 — Audit kesamaan Pembelajaran dengan app lama (Materi, Tugas, Jurnal, Poin, Agenda)
+
+Dua agen pembaca (hanya baca kode legacy dan baru, tanpa menjalankan app) membandingkan fitur Pembelajaran; temuan di bawah sudah saya periksa ulang di kode sebelum diubah. Panduan/coach-mark: hanya Magang dan Presensi di legacy (sudah disamakan). Berkas dan gambar: tidak ada kasus legacy di dalam aplikasi lalu app baru keluar (atau sebaliknya) di Materi/Tugas/Jurnal/Poin/Agenda.
+
+**Sudah diperbaiki (kode, JVM + build; uji device terbatas):**
+| # | Temuan | Perbaikan |
+|---|---|---|
+| H1 | Daftar guru (Materi Saya, List Tugas, Penilaian, Mata Pelajaran guru) hanya memuat halaman pertama: `loadMore()` ada tetapi tidak dipanggil | `LoadMoreEffect` (`ui/components/LoadMore.kt`) dipasang di keempat daftar |
+| H3 | Refresh yang gagal (offline) mengosongkan daftar Materi/Mapel/Materi Saya/List Tugas guru/Penilaian karena `clear()` sebelum `fetch` | Server dulu, lalu ganti isi tabel dalam satu transaksi (`LocalDatabase.withTransaction`); daftar tetap tampil bila gagal |
+| J1 | Foto Suasana KBM (detail jurnal dan form) tanpa zoom; legacy memakai `PhotoView` | `ImagePreviewDialog` (layar penuh + cubit-zoom); catatan lama "komponen belum ada" di FLOW 2026-10-31 sudah basi |
+| J2 | Judul sukses "Mulai kelas": legacy "Absensi Waktu Berhasil" | Disamakan |
+| J3 | Kartu jam siswa menampilkan lencana "Kosong"; legacy menyembunyikannya (hanya guru melihatnya) | Dihapus untuk siswa |
+| P1 | Judul picker jenis penanganan Poin: legacy "Pilih Jenis Penanganan" | Disamakan |
+| P2 | Foto lampiran Poin: legacy inline `PhotoView` dengan zoom | Ketuk untuk zoom (tombol hapus tetap) |
+| D1 | Dokumen: 05e/FLOW 2026-10-06 menulis alert gate Agenda "hanya Tutup" padahal kode (dan legacy) punya "Presensi" + "Tutup"; 05a mengklaim paging Materi Saya teruji padahal tidak tersambung | Dokumen dikoreksi |
+
+**Belum dikerjakan — perlu keputusan atau akun uji:**
+- **H2 (High)** Guru tidak bisa membuka file jawaban siswa di layar Beri/Ubah Nilai (legacy: daftar file jawaban dengan Baca/Download + pratinjau tautan; baru: hanya satu nama file, model `Assignment` membuang `files`). Bentuk JSON-nya belum terverifikasi dan butuh sesi guru untuk diuji.
+- **Medium:** Tugas: Download pada soal tidak dihitung "sudah baca soal" (legacy menghitung); guru mengetuk kartu List Tugas membuka detail gaya siswa tanpa Edit/Hapus (legacy: form baca-saja dengan ⋮ Edit/Hapus); galat kirim Upload Materi selalu "Gagal membuat materi" (legacy menampilkan pesan server); daftar mapel guru hanya 20 (legacy tanpa paging); tile Hub tidak mengunci peran staf non-Guru (`StaffMenuAccess` legacy, dan FLOW 2026-11-02 #4 merujuk seolah ada); routing tile memakai `rememberIsTeacher()` vs `is_student` legacy; pemberitahuan download memakai banner merah (legacy toast); sheet Nilai siswa mengabaikan `emitError("Gagal membuka file")`; jawaban siswa dengan path relatif/kunci alternatif; picker soal Tugas hanya PDF (legacy daftar tipe); kartu guru tanpa tag mapel/`information_label`; Agenda → Presensi tanpa pemeriksaan ketersediaan fitur; Poin guru: setelah sukses kembali ke layar Hasil (legacy menutup alur ke Hub); Verifikasi Jurnal menampilkan dialog sukses (legacy tidak, terdokumentasi).
+- **Low:** teks/label (mis. "Unggah Materi" vs "Upload Materi", "Lihat/Unduh" vs "baca materi/Download"), status line Detail Tugas jadi lencana, format tanggal/waktu form pemanggilan, pratinjau tautan jawaban, ukuran/ikon file di Upload Materi, dialog progres hapus/kirim nilai, kartu Agenda dengan tombol eksplisit (tambahan), banner galat vs toast (presentasi).

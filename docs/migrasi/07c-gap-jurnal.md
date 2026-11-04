@@ -64,7 +64,7 @@ fase ini selesai; akun uji juga tidak punya data yang membuat jalur ini aktif) �
 | "Penugasan" | ✅* | **Dipertahankan** (legacy menghapusnya di detail guru dan mengosongkan radio). |
 | Non-guru: izin/sakit ditampilkan apa adanya | ✅* | Legacy menyatukan izin/sakit menjadi alpha. |
 | Simpan `POST journal/save` (tujuan kosong → field dihilangkan); "Buang perubahan?"; "Jurnal Berhasil Disimpan"; "Jurnal gagal dimuat" + "Coba Lagi" | ✅* | Semua siswa dikirim, termasuk yang tidak bisa di-override (seperti legacy). |
-| Setelah "Mulai kelas" sukses → dialog "Absensi Berhasil" → "Ok" → detail; daftar disegarkan | ✅* | Legacy lupa menyegarkan daftar. |
+| Setelah "Mulai kelas" sukses → dialog "Absensi Waktu Berhasil" (judul legacy; sebelumnya "Absensi Berhasil") → "Ok" → detail; daftar disegarkan | ✅* | Legacy lupa menyegarkan daftar. |
 
 ## 6. Dihapus / tidak dibangun
 - `AbsensiApiService`, `AttendanceModels.kt`, `ScheduleDetailResponse.kt` (model legacy, bentuk salah), `ui/absensi/` — dihapus; semuanya digantikan `JurnalApiService`/`JurnalModels.kt`.

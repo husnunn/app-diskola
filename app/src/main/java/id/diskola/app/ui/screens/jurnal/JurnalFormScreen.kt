@@ -44,6 +44,7 @@ import coil.compose.AsyncImage
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import id.diskola.app.ui.components.ImagePreviewDialog
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppDialog
 import id.diskola.app.ui.components.AppFilterChip
@@ -292,18 +293,8 @@ fun JurnalFormScreen(
     }
 
     if (showFullPhoto) {
-        photo?.let { file ->
-            Dialog(onDismissRequest = { showFullPhoto = false }) {
-                Column(
-                    modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainer, DiskolaExtraShapes.dialog).padding(Spacing.lg),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                ) {
-                    Text("Foto Suasana KBM", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                    AsyncImage(model = file, contentDescription = "Foto suasana KBM", contentScale = ContentScale.Fit, modifier = Modifier.fillMaxWidth())
-                    AppButton(text = "Tutup", onClick = { showFullPhoto = false }, variant = ButtonVariant.Text, modifier = Modifier.fillMaxWidth())
-                }
-            }
-        }
+        // Full screen with pinch-zoom, as legacy's PhotoView dialog: the watermark on the photo has to be readable.
+        photo?.let { file -> ImagePreviewDialog(model = file, onDismiss = { showFullPhoto = false }) }
     }
 
     if (submitting) AppLoadingDialog(message = "mengunggah data")

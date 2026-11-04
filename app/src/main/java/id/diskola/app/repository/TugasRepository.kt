@@ -1,5 +1,7 @@
 package id.diskola.app.repository
 
+import androidx.room.withTransaction
+import id.diskola.app.database.LocalDatabase
 import id.diskola.app.apiservice.JurnalApiService
 import id.diskola.app.apiservice.TugasApiService
 import id.diskola.app.dataclass.ResponData.AssignmentData
@@ -36,6 +38,7 @@ class TugasRepository @Inject constructor(
     private val jurnalApiService: JurnalApiService,
     private val homeworkDao: HomeworkDao,
     private val sessionStore: SessionStore,
+    private val db: LocalDatabase,
 ) {
     // ---- Student tabs (Belum/Sudah/Nilai) ----
 
@@ -126,9 +129,14 @@ class TugasRepository @Inject constructor(
     }
     suspend fun loadMoreTeacherOwn(teacherId: Int, subjectId: Int?, classId: Int?, currentCount: Int): Boolean =
         fetchTeacherOwnPage(teacherId, subjectId, classId, currentCount)
+    /** Server first, then one transaction swaps the cached rows: a failed refresh keeps the list (clearing first emptied it). */
     suspend fun refreshTeacherOwn(teacherId: Int, subjectId: Int?, classId: Int?): Boolean {
-        homeworkDao.clearByTeacher(teacherId)
-        return fetchTeacherOwnPage(teacherId, subjectId, classId, 0)
+        val response = tugasApiService.teacherAssignmentBacklog(AssignmentFilter.teacherListQuery(teacherId, classId, subjectId, PAGE_SIZE, 0))
+        db.withTransaction {
+            homeworkDao.clearByTeacher(teacherId)
+            homeworkDao.insertAll(response.data.map { HomeworkTable.fromHomeworkItem(it, HomeworkTable.TYPE_BACKLOG).copy(school_uuid = sessionStore.school.uuid) })
+        }
+        return response.data.size >= PAGE_SIZE
     }
 
     /** "Semua" (null/0) sends no filter and the indices stay in sequence — see [AssignmentFilter] (decision 2026-10-22; replaces the literal `0`). */
@@ -202,8 +210,12 @@ class TugasRepository @Inject constructor(
     }
     suspend fun loadMoreScoredGroups(currentCount: Int): Boolean = fetchScoredGroupsPage(currentCount)
     suspend fun refreshScoredGroups(): Boolean {
-        homeworkDao.clearCollected()
-        return fetchScoredGroupsPage(0)
+        val response = tugasApiService.teacherAssignmentScoredGroups(take = PAGE_SIZE, skip = 0)
+        db.withTransaction {
+            homeworkDao.clearCollected()
+            homeworkDao.insertCollected(response.data)
+        }
+        return response.data.size >= PAGE_SIZE
     }
 
     private suspend fun fetchScoredGroupsPage(skip: Int): Boolean {
