@@ -42,6 +42,8 @@ maupun fitur yang dipakai pengguna sekarang**.
 | 07b | `07b-implementasi-presensi.md` | Laporan implementasi fase "Presensi" (harian, Dinas Luar, Izin), temuan teknis, dan hasil uji |
 | 07c | `07c-gap-jurnal.md` | Selisih implementasi Jurnal KBM (daftar, Hadir kelas/QR, form guru & siswa, foto KBM, detail) Compose vs aplikasi lama |
 | 07d | `07d-implementasi-jurnal.md` | Laporan implementasi fase "Jurnal KBM", temuan teknis, dan status pengujian |
+| 07e | `07e-gap-magang.md` | Selisih implementasi Magang (jadwal, presensi masuk, laporan, izin) Compose vs aplikasi lama |
+| 07f | `07f-implementasi-magang.md` | Laporan implementasi fase "Magang", temuan teknis, dan status pengujian (ditulis di akhir fase) |
 | 08 | `08-keuangan-pembayaran-klaspay-ppob.md` | Pembayaran & SPP, PIN, QR, Klaspay (aktivasi, top up, riwayat, tagihan, promo), PPOB, dana partisipasi |
 | 08a | `08a-gap-pembayaran.md` | Selisih Pembayaran/Klaspay app baru vs lama (hasil audit 2026-10-14), status per bagian, selisih UI yang disengaja |
 | 08b | `08b-implementasi-pembayaran-p1.md` | Laporan implementasi sub-fase P1 (fondasi, hub nyata, aktivasi, PIN, dialog keamanan), temuan teknis, status uji |

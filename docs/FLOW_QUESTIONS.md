@@ -797,3 +797,22 @@ Pola kondisi: `kosong && !loading → EmptyState`, `kosong → LoadingState`, se
 **Diverifikasi:** tes JVM app baru `HomeMenuGridTest` 4 dari 4 lulus; kedua app compile (`compileDebugKotlin` app lama exit 0, app baru exit 0).
 
 **Belum teruji (jangan diasumsikan selesai):** tampilan tile dan ikon di device (Hub 3 kolom: siswa 8 tile, baris terakhir berisi 2; guru 7 tile, baris terakhir berisi 1), dialog saat diklik di kedua app, dan perilaku akun guru dengan role non-Teacher di app lama.
+
+## 2026-11-04 — Fase Magang (siswa): keputusan
+
+**Konteks:** permintaan "lanjutkan ke fitur magang". Magang adalah satu-satunya bagian modul `07` yang belum dikerjakan (doc `07` §11, §14.4). Kondisi awal: hanya `MagangApiService` (semua `Map<String, Any>`, **tidak terdaftar** di Hilt, tanpa konsumen) dan tile di Home yang jatuh ke "Fitur dalam pengembangan". Cakupan (jawaban user): **seluruh Magang dalam satu fase**, boleh menulis data uji ke server dev, PR menunggu fase selesai. Detail: `docs/migrasi/07e-gap-magang.md`.
+
+| # | Temuan | Keputusan |
+|---|---|---|
+| 1 | Legacy menyimpan jadwal/laporan/izin di Room tetapi **menghapus tabel jadwal sebelum tiap fetch**, dan `fetchReport` menimpa tabel izin dengan item laporan saja sedangkan sinkron izin menggabungkan dua sumber | **Tanpa Room (network-only)**; satu `MagangViewModel` memegang hasil fetch terakhir. Juga menghindari `MIGRATION_11_12` (tanpanya `fallbackToDestructiveMigration` menghapus jawaban AKM yang belum terkirim). Offline = `ErrorState` + coba lagi (legacy: daftar kosong + toast mentah) |
+| 2 | Doc `07` §19#1 / Q1: "lokasi latar selalu wajib di presensi/magang, pertahankan" vs keputusan 2026-10-07: geofence dan lokasi latar dibuang | **Tanpa geofence dan tanpa `ACCESS_BACKGROUND_LOCATION`**; hanya izin presisi (FINE) saat layar presensi terbuka, ditolak → alert + keluar. Teks usang di `07:610,615,854` dan `10-infra` dinyatakan digantikan |
+| 3 | Q5: deteksi lokasi palsu untuk presensi | Presensi masuk Magang menolak posisi mock (`MockLocationGuard`) |
+| 4 | Legacy: "Laporan tersimpan" muncul walau `POST leave` gagal; hasil kirim diabaikan | Toast hanya bila sukses; gagal = banner dan form tetap (prinsip yang sama dengan form Poin/Izin: sukses hanya bila API sukses) |
+| 5 | Legacy menolak foto laporan > 5 MiB dengan pesan "Foto lebih dari 8MB" | Pesan benar "Foto lebih dari 5 MB"; foto lebih besar **dikompres** (maks 5 MB) alih-alih ditolak, karena foto kamera modern sering > 5 MB. Bukti izin: dikompres ke ≤ 2 MB, hanya gambar |
+| 6 | Legacy menampilkan "Laporan Harian" dan "Masuk" di tempat yang sama (bertumpuk bila dua flag true) | Kedua tombol tampil berdampingan, laporan lebih dulu |
+| 7 | Legacy mengunduh avatar untuk marker tanpa try/catch (loading macet / crash bila gagal) | Marker pengguna biru bawaan seperti layar Masuk |
+| 8 | Setelah presensi masuk sukses legacy membuka ulang `MagangPage` (`CLEAR_TOP`) | Tutup layar presensi, kembali ke shell dan segarkan |
+| 9 | "Panduan": overlay 4 langkah, pref `onboarding_magang_filter_done` ditulis tapi tidak pernah dibaca; "Hapus Pengajuan" selalu tersembunyi | Panduan = bottom sheet statis (seperti Presensi); hapus tetap tersembunyi |
+| 10 | Format yang tidak pasti: tanggal `schedule.date`, `check_in_at`, jam `HH:mm:ss`, koordinat/radius sebagai String | Parsing toleran (`MagangRules.dateOf` membaca 10 karakter pertama; jam dipotong ke `HH:mm`; koordinat tak terbaca = 0.0 seperti legacy) |
+
+**Diverifikasi di app lama (Infinix, siswa uji, 2026-11-04, hanya melihat):** Magang membuka tab Jadwal pada hari ini ("Jadwal Tidak Tersedia"), strip tanggal bulan berjalan dengan label "November 2026" (ketuk → pemilih bulan/tahun roda dengan "BATAL"/"PILIH"), menu "Panduan" dan "Tambah Izin"; ganti ke Juni 2026 → satu kartu "PT. TESTING MAGANG / 04 Jun 2026 / Pukul 15:00:00 : 19:15:00 / Laporan Harian"; tab Laporan → chip "Semua"/"Pilih Tanggal" dan satu laporan (masuk `2026-06-04 14:50:00`, keluar "-", lampiran "-", laporan "-"); izin: "Belum ada Pengajuan Izin", form menampilkan "Tidak ada jadwal magang yang dapat diajukan izin hari ini.". **Akibat bagi pengujian:** akun uji tidak punya jadwal hari ini, jadi presensi masuk dan izin tidak bisa dijalankan; hanya "Laporan Harian" untuk 4 Juni 2026 yang tampak bisa.

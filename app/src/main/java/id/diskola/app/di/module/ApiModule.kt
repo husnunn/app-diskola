@@ -19,6 +19,7 @@ import id.diskola.app.apiservice.JurnalApiService
 import id.diskola.app.apiservice.KlaspayApiService
 import id.diskola.app.apiservice.NotifikasiApiService
 import id.diskola.app.apiservice.KonselingApiService
+import id.diskola.app.apiservice.MagangApiService
 import id.diskola.app.apiservice.LogFileInterceptor
 import id.diskola.app.apiservice.MateriApiService
 import id.diskola.app.apiservice.PresensiApiService
@@ -128,6 +129,12 @@ object ApiModule {
     @JvmStatic
     fun providePresensiApiService(retrofit: Retrofit): PresensiApiService =
         retrofit.create(PresensiApiService::class.java)
+
+    @Provides
+    @Singleton
+    @JvmStatic
+    fun provideMagangApiService(retrofit: Retrofit): MagangApiService =
+        retrofit.create(MagangApiService::class.java)
 
     @Provides
     @Singleton
