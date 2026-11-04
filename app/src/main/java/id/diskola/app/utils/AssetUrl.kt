@@ -24,3 +24,11 @@ fun resolveAssetUrl(pathOrUrl: String): String {
     if (pathOrUrl.startsWith("/") && runCatching { File(pathOrUrl).exists() }.getOrDefault(false)) return pathOrUrl
     return BuildConfig.ASSETS_URL.trimEnd('/') + "/" + pathOrUrl.trimStart('/')
 }
+
+private val IMAGE_EXTENSIONS = setOf("png", "jpg", "jpeg", "webp", "gif", "bmp")
+
+/** Whether a stored file (URL or path) is a picture, judged by its extension; a query string or fragment is ignored, a trailing slash is a folder. */
+fun isImageFile(pathOrUrl: String): Boolean {
+    val name = pathOrUrl.substringBefore('?').substringBefore('#').substringAfterLast('/')
+    return name.substringAfterLast('.', "").lowercase() in IMAGE_EXTENSIONS
+}

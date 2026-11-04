@@ -35,7 +35,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -58,13 +60,16 @@ import id.diskola.app.ui.components.EmptyState
 import id.diskola.app.ui.components.ErrorText
 import id.diskola.app.ui.components.FieldLabel
 import id.diskola.app.ui.components.FormCard
+import id.diskola.app.ui.components.ImagePreviewDialog
 import id.diskola.app.ui.components.PillTabRow
+import id.diskola.app.ui.components.ProofImage
 import id.diskola.app.ui.components.StatusBadge
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
 import id.diskola.app.utils.PresensiRules
 import id.diskola.app.utils.resolveAssetUrl
+import id.diskola.app.utils.isImageFile
 import id.diskola.app.viewmodel.IzinAddViewModel
 import id.diskola.app.viewmodel.IzinDetailViewModel
 import id.diskola.app.viewmodel.IzinListViewModel
@@ -325,6 +330,7 @@ fun IzinDetailScreen(
     val context = LocalContext.current
     val item by viewModel.item.collectAsStateWithLifecycle()
     val notFound by viewModel.notFound.collectAsStateWithLifecycle()
+    var preview by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(uuid) { viewModel.start(uuid) }
     if (notFound) {
         LaunchedEffect(Unit) {
@@ -368,20 +374,24 @@ fun IzinDetailScreen(
                     }
                 }
                 if (leave.fileUrl.isNotBlank()) {
+                    val url = resolveAssetUrl(leave.fileUrl)
+                    val fileName = leave.fileUrl.substringBefore('?').substringAfterLast('/').takeIf { it.isNotBlank() } ?: "Lihat file bukti"
+                    val openOutside = {
+                        // Only a real http(s) address can be opened; a scheme-less value would resolve to nothing.
+                        val opened = url.startsWith("http", ignoreCase = true) &&
+                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }.isSuccess
+                        if (!opened) Toast.makeText(context, "Tidak dapat membuka file", Toast.LENGTH_SHORT).show()
+                    }
                     FormCard {
                         FieldLabel("File Bukti", required = false)
-                        AppButton(
-                            text = leave.fileUrl.substringAfterLast('/').takeIf { it.isNotBlank() } ?: "Lihat file bukti",
-                            onClick = {
-                                val url = resolveAssetUrl(leave.fileUrl)
-                                // Only a real http(s) address can be opened; a scheme-less value would resolve to nothing.
-                                val opened = url.startsWith("http", ignoreCase = true) &&
-                                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }.isSuccess
-                                if (!opened) Toast.makeText(context, "Tidak dapat membuka file", Toast.LENGTH_SHORT).show()
-                            },
-                            variant = ButtonVariant.Outlined,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
+                        if (isImageFile(leave.fileUrl)) {
+                            // A picture is shown here (legacy only listed its name); tap for the full-screen preview.
+                            ProofImage(model = url, onClick = { preview = url }, onOpenExternally = openOutside)
+                            Text(fileName, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
+                        } else {
+                            // A PDF cannot be drawn in place: it opens in the viewer app, as legacy did.
+                            AppButton(text = fileName, onClick = openOutside, variant = ButtonVariant.Outlined, modifier = Modifier.fillMaxWidth())
+                        }
                     }
                 }
                 if (leave.reviewedAt.isNotBlank()) {
@@ -390,4 +400,5 @@ fun IzinDetailScreen(
             }
         }
     }
+    preview?.let { ImagePreviewDialog(model = it, onDismiss = { preview = null }) }
 }

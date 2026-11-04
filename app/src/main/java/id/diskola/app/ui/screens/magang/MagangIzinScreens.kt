@@ -54,6 +54,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import id.diskola.app.ui.components.ProofImage
+import id.diskola.app.ui.components.openLink
+import id.diskola.app.ui.components.ImagePreviewDialog
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppCard
 import id.diskola.app.ui.components.AppTextField
@@ -434,6 +437,7 @@ fun MagangIzinDetailScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     val leave = rememberLeaves(shared).firstOrNull { it.id == leaveId }
     var preview by remember { mutableStateOf<String?>(null) }
 
@@ -483,11 +487,10 @@ fun MagangIzinDetailScreen(
                 if (leave.file.isNotBlank()) {
                     FormCard {
                         FieldLabel("File Bukti", required = false)
-                        AsyncImage(
+                        ProofImage(
                             model = resolveAssetUrl(leave.file),
-                            contentDescription = "File bukti",
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxWidth().clickable { preview = leave.file },
+                            onClick = { preview = leave.file },
+                            onOpenExternally = { openLink(context, resolveAssetUrl(leave.file)) },
                         )
                     }
                 }

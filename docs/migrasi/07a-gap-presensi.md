@@ -50,7 +50,7 @@ Legenda: ✅ selesai & diuji di device · ✅* selesai (kode benar, jalur ini be
 | Item | Status | Keterangan |
 |---|---|---|
 | Daftar: filter status, Room-first, load-more, pull-to-refresh | ✅ | Diuji dengan data asli (5+ pengajuan "Ditolak"). Sinkron `today` + `page=1` tepat 1× tiap. |
-| Detail (alasan penolakan, file bukti, "Direview") | ✅ | Diuji. Buka file hanya untuk URL http(s). |
+| Detail (alasan penolakan, file bukti, "Direview") | ✅ | Diuji. **File bukti berupa gambar kini tampil langsung di halaman detail** (`ProofImage`: spinner saat memuat, "Gambar tidak dapat dimuat" + "Buka file" bila gagal, ketuk → pratinjau penuh dengan zoom); legacy hanya menampilkan nama file yang membuka aplikasi lain. PDF tetap tombol nama file yang membuka aplikasi lain. Buka file hanya untuk URL http(s). Teruji di Samsung dengan izin BUDI (bukti PNG). |
 | Form: radio tanpa preselect, PDF/JPG/PNG ≤2 MB, keterangan 10–500, urutan validasi file→jenis→keterangan | ✅* | Belum dikirim ke server (membuat data nyata). MIME tak dikenal ditolak (legacy melabeli jpeg). |
 | Aturan "boleh ajukan" memakai data segar | ✅ | `by-month` + `today` disegarkan dulu (legacy hanya memakai cache Absensi). |
 

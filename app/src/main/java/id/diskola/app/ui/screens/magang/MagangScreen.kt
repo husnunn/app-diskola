@@ -35,6 +35,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.diskola.app.dataclass.ResponData.MagangScheduleItem
+import id.diskola.app.ui.components.ImagePreviewDialog
 import id.diskola.app.ui.components.AppDateRangePickerDialog
 import id.diskola.app.ui.components.AutoTimeGate
 import id.diskola.app.ui.components.CoachMarkOverlay

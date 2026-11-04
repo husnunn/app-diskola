@@ -37,6 +37,9 @@ import coil.compose.AsyncImage
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import id.diskola.app.ui.components.ProofImage
+import id.diskola.app.ui.components.openLink
+import id.diskola.app.ui.components.ImagePreviewDialog
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppDialog
 import id.diskola.app.ui.components.AppTextField
@@ -240,6 +243,7 @@ fun MagangReportDetailScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     val attendance by shared.attendance.collectAsStateWithLifecycle()
     val report = MagangRules.reportsOf(attendance).firstOrNull { it.id == reportId }
     var preview by remember { mutableStateOf<String?>(null) }
@@ -276,13 +280,11 @@ fun MagangReportDetailScreen(
                 if (attachment != null) {
                     FormCard {
                         FieldLabel("Lampiran", required = false)
-                        AsyncImage(
+                        ProofImage(
                             model = resolveAssetUrl(attachment),
+                            onClick = { preview = attachment },
+                            onOpenExternally = { openLink(context, resolveAssetUrl(attachment)) },
                             contentDescription = "Lampiran laporan",
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { preview = attachment },
                         )
                     }
                 }

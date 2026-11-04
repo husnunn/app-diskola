@@ -209,41 +209,6 @@ internal fun LabeledRow(label: String, value: String, modifier: Modifier = Modif
     }
 }
 
-/** The attachment on a full screen: pinch to zoom, drag when zoomed, "Tutup" top right. [model] is a URL or a local file. */
-@Composable
-internal fun ImagePreviewDialog(model: Any, onDismiss: () -> Unit) {
-    var scale by remember { mutableFloatStateOf(1f) }
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    var offsetY by remember { mutableFloatStateOf(0f) }
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.92f))) {
-            AsyncImage(
-                model = model,
-                contentDescription = "Lampiran laporan",
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(Unit) {
-                        detectTransformGestures { _, pan, zoom, _ ->
-                            scale = (scale * zoom).coerceIn(1f, 5f)
-                            if (scale == 1f) {
-                                offsetX = 0f
-                                offsetY = 0f
-                            } else {
-                                offsetX += pan.x
-                                offsetY += pan.y
-                            }
-                        }
-                    }
-                    .graphicsLayer(scaleX = scale, scaleY = scale, translationX = offsetX, translationY = offsetY),
-            )
-            IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.TopEnd).padding(Spacing.sm)) {
-                Icon(Icons.Rounded.Close, contentDescription = "Tutup", tint = Color.White)
-            }
-        }
-    }
-}
-
 /** The tap target of the report form: the picked picture with a remove button, or the "Tambah Gambar" box. */
 @Composable
 internal fun AttachmentBox(
