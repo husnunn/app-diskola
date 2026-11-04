@@ -1018,7 +1018,9 @@ Bug/anti-pattern (perbaikan internal yang tidak mengubah perilaku boleh langsung
 > Dinas Luar diuji di device. Masuk/Pulang, Dinas Luar+kamera, kirim Izin, dan mock location *(kode ada, belum diuji)*.
 > **Jurnal KBM** (daftar, Hadir kelas + QR, form guru & siswa, foto KBM, Detail) dibangun 2026-10-07
 > (`07c-gap-jurnal.md`/`07d-implementasi-jurnal.md`): kode + aturan murni (`JurnalRulesTest`) lolos, **belum diuji di device**
-> (HP uji terkunci). Magang belum dikerjakan. Butir geofence/background location **dibuang** (keputusan 2026-10-07).
+> (HP uji terkunci). **Magang** dibangun 2026-11-04 (`07e-gap-magang.md`/`07f-implementasi-magang.md`): jadwal, presensi masuk (peta + radius), laporan harian + presensi keluar,
+> daftar laporan, izin magang; teruji di device Samsung dengan data dev (presensi masuk dan laporan dikirim sungguhan), **kecuali** pengajuan izin, Galeri, dan kompres gambar besar.
+> Butir geofence/background location **dibuang** (keputusan 2026-10-07).
 - [ ] Tile Presensi/Jurnal terkunci bila `is_having_class`=false; feature gate + fail-open.
 - [ ] Dialog "Harap atur tanggal dan waktu ponsel ke "Otomatis"" di Presensi, Jurnal, Jadwal Magang (tiap resume).
 - [ ] Data Absensi: cache-first, warna merah terlambat/pulang awal/kosong, "Libur", label izin disetujui, detail offsite.
@@ -1039,7 +1041,7 @@ Bug/anti-pattern (perbaikan internal yang tidak mengubah perilaku boleh langsung
 - [ ] Capture KBM: scope dibaca tiap buka, "*" bila wajib, toast wajib, kamera belakang+flip, watermark, ≤1600 px ≤2 MB.
 - [ ] Detail jurnal: info rows, breakdown, edit tujuan, status sesi wajib, H/I/S/A per siswa + sumber, simpan & buang perubahan.
 - [ ] Izin: aturan boleh ajukan, filter status, load more, PDF/gambar ≤2 MB, keterangan 10–500, detail + alasan penolakan, buka dari notifikasi.
-- [ ] Magang: strip tanggal, jadwal per tanggal, presensi radius perusahaan/`radius_enabled`, laporan ≥100 char + gambar ≤5 MB, laporan filter rentang, izin magang (gambar, 10–5000, spinner jadwal).
+- [x] Magang: strip tanggal, jadwal per tanggal, presensi radius perusahaan/`radius_enabled`, laporan ≥100 char + gambar ≤5 MB, laporan filter rentang, izin magang (gambar, 10–5000, spinner jadwal). *(2026-11-04, `07f`; belum teruji di device: `POST leave-request`, Galeri, kompres gambar besar, spinner jadwal bila > 1.)*
 - [ ] Verifikasi: alur Sudah/Belum, validasi enable tombol, body endpoint, navigasi ke Home, notif default password.
 - [ ] **(Fitur baru per keputusan 30-09-2026, §19 butir 5)** Deteksi mock location (+ root bila memungkinkan) aktif sebelum presensi GPS (onsite & offsite) dan presensi magang diproses; presensi ditolak dengan pesan jelas bila terdeteksi.
 - [ ] Keputusan ❓ §19 (butir 2,3,4,6–13,15,16 — sisa yang belum ditanyakan) sudah dicatat di `docs/FLOW_QUESTIONS.md` sebelum implementasi.
