@@ -35,7 +35,25 @@ import id.diskola.app.viewmodel.HomeProfile
  * `is_teacher` (doc §1.8's ❓, not reproduced here since `MenuKey` never relies on position). */
 enum class MenuKey { MATERI, TUGAS, PRESENSI, JURNAL, AGENDA_MINGGUAN, ASESMEN, POIN, MAGANG, E_RAPORT }
 
-data class MenuTileData(val key: MenuKey, val icon: String, val label: String, val implemented: Boolean, val locked: Boolean)
+/**
+ * [locked]: the user has no class (every tile). [suspended]: the feature itself is switched off for now (see [ASESMEN_SUSPENDED]); it draws
+ * the same lock but says so in its own words instead of blaming the class.
+ */
+data class MenuTileData(
+    val key: MenuKey,
+    val icon: String,
+    val label: String,
+    val implemented: Boolean,
+    val locked: Boolean,
+    val suspended: Boolean = false,
+)
+
+/**
+ * Asesmen is locked in the menu for now (owner's decision, 2026-11-04, while work goes to the other Pembelajaran features). Set to false to
+ * open it again. Only the tile is locked: a notification that targets an exam, and the worker that still has to send saved answers, are
+ * not affected, so nothing a student already started is lost.
+ */
+const val ASESMEN_SUSPENDED = true
 
 /**
  * Doc §1.5's per-role item list (legacy `PembelajaranPage.kt:212-260`); every tile locks without a class. Students and teachers also get
@@ -43,15 +61,15 @@ data class MenuTileData(val key: MenuKey, val icon: String, val label: String, v
  */
 fun menuTilesFor(profile: HomeProfile): List<MenuTileData> {
     val locked = !profile.isHavingClass
-    fun tile(key: MenuKey, icon: String, label: String, implemented: Boolean) =
-        MenuTileData(key, icon, label, implemented, locked)
+    fun tile(key: MenuKey, icon: String, label: String, implemented: Boolean, suspended: Boolean = false) =
+        MenuTileData(key, icon, label, implemented, locked, suspended)
     return when {
         profile.isStudent -> listOf(
             tile(MenuKey.MATERI, "auto_stories", "Materi", true),
             tile(MenuKey.TUGAS, "assignment", "Tugas", true),
             tile(MenuKey.PRESENSI, "how_to_reg", "Presensi", true),
             tile(MenuKey.JURNAL, "edit_note", "Jurnal", true),
-            tile(MenuKey.ASESMEN, "quiz", "Asesmen", true),
+            tile(MenuKey.ASESMEN, "quiz", "Asesmen", true, suspended = ASESMEN_SUSPENDED),
             tile(MenuKey.POIN, "workspace_premium", "Poin", true),
             tile(MenuKey.MAGANG, "business_center", "Magang", true),
             tile(MenuKey.E_RAPORT, "grading", "E-Raport", false),
@@ -109,10 +127,10 @@ fun MenuGridTile(tile: MenuTileData, badge: Int, onClick: () -> Unit, modifier: 
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        if (!tile.locked && badge > 0) {
+        if (!tile.locked && !tile.suspended && badge > 0) {
             CounterBadge(count = badge, max = 9, modifier = Modifier.align(Alignment.TopEnd))
         }
-        if (tile.locked) {
+        if (tile.locked || tile.suspended) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopStart)

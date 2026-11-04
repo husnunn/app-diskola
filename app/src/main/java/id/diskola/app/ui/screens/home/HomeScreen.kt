@@ -85,6 +85,7 @@ fun HomeScreen(
 
     var comingSoonDialog by rememberSaveable { mutableStateOf(false) }
     var lockedDialog by rememberSaveable { mutableStateOf(false) }
+    var suspendedDialog by rememberSaveable { mutableStateOf(false) }
     var verifyDialog by rememberSaveable { mutableStateOf(false) }
     var checkInSheet by rememberSaveable { mutableStateOf(false) }
 
@@ -119,6 +120,7 @@ fun HomeScreen(
     fun onTileClick(tile: MenuTileData) {
         when {
             tile.locked -> lockedDialog = true
+            tile.suspended -> suspendedDialog = true
             tile.key == MenuKey.MATERI -> onNavigateToMateri()
             tile.key == MenuKey.TUGAS -> onNavigateToTugas()
             tile.key == MenuKey.PRESENSI -> viewModel.openFeature(FeatureGateRepository.PRESENSI, onNavigateToPresensi)
@@ -216,6 +218,15 @@ fun HomeScreen(
             body = "Menu ini sedang dalam proses pembangunan, ditunggu updatenya yah...",
             primaryButtonText = "Ok Deh",
             onPrimaryClick = { comingSoonDialog = false },
+        )
+    }
+    if (suspendedDialog) {
+        AppDialog(
+            onDismiss = { suspendedDialog = false },
+            title = "Asesmen sedang dikunci",
+            body = "Menu Asesmen dikunci sementara. Silakan coba lagi nanti.",
+            primaryButtonText = "Ok Deh",
+            onPrimaryClick = { suspendedDialog = false },
         )
     }
     if (lockedDialog) {

@@ -53,4 +53,17 @@ class HomeMenuGridTest {
         assertTrue(menuTilesFor(profile(student = true, hasClass = false)).all { it.locked })
         assertTrue(menuTilesFor(profile(teacher = true, hasClass = false)).all { it.locked })
     }
+
+    @Test
+    fun `asesmen tile is suspended while the switch is on, and no other tile is`() {
+        val tiles = menuTilesFor(profile(student = true))
+        assertEquals(ASESMEN_SUSPENDED, tiles.single { it.key == MenuKey.ASESMEN }.suspended)
+        assertTrue(tiles.filter { it.key != MenuKey.ASESMEN }.none { it.suspended })
+    }
+
+    @Test
+    fun `a user without a class still gets the class lock on asesmen, which is checked before the suspension`() {
+        val asesmen = menuTilesFor(profile(student = true, hasClass = false)).single { it.key == MenuKey.ASESMEN }
+        assertTrue(asesmen.locked)
+    }
 }

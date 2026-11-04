@@ -77,7 +77,7 @@ tapi titik masuknya dikomentari/tidak ada) · 🧩 **Stub** (layar ada tapi isin
 | Poin (guru & siswa) | Siswa, guru | Menu "Poin", notifikasi | ✅ | 05 |
 | E-Raport | Siswa, guru | Menu "E-Raport" | ⏳ Tile saja (sejak 2026-11-02): klik membuka dialog "Fitur dalam pengembangan"; isi fitur belum dibangun | 03 §3.7 |
 | Perpustakaan | — | Tidak ada pemanggil | ⛔ | 05 |
-| Asesmen/AKM (ujian sekolah) | Siswa | Menu "Asesmen" | ✅ | 06 |
+| Asesmen/AKM (ujian sekolah) | Siswa | Menu "Asesmen" | ✅ — **tile dikunci sementara sejak 2026-11-04** (`ASESMEN_SUSPENDED` di `HomeMenuGrid.kt`; ketuk → "Asesmen sedang dikunci") | 06 |
 | Try Out | Siswa | Hanya sebagai tujuan "kembali" dari layar AKM | 🟡 | 06 §19 |
 | Ujian lama (legacy) | Siswa | Notifikasi `COURSE/ASSIGNMENT`, worker | 🟡 | 06 §20 |
 | Presensi (onsite, offsite guru, rekap, izin) | Siswa, guru | Menu "Presensi" (+ feature gate server) | ✅ | 07 |
