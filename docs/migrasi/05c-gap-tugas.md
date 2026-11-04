@@ -37,7 +37,7 @@ diuji jalur ini secara langsung) · ⛔ Ditunda/di luar cakupan.
 | Validasi "Kelas/Hari/Mapel wajib dipilih", tombol aktif sesuai aturan | ✅* Selesai | Pesan inline persis doc, tombol `canSubmit` sesuai rumus §6.4. Belum diuji. |
 | "Tugas Terkumpul": panel Detail collapsible, filter lokal Semua/Belum/Sudah | ✅* Selesai | `TugasTerkumpulViewModel`/`Screen`. Selalu network (tanpa cache Room, sesuai sifat data yang berubah tiap nilai disimpan). Belum diuji. |
 | "Lihat Jawaban" terhubung (keputusan: app lama listener-nya kosong, sekarang dihubungkan ke Detail Tugas mode guru read-only) | ✅* Selesai | Tombol memanggil `onOpenTugasReadonly` → `Route.TugasDetail(isTeacher=true)`. Belum diuji. |
-| Beri/Ubah Nilai: input 0–100, info peserta, file jawaban | ✅* Selesai | `TugasScoringViewModel`/`Screen` — skor diambil dari `Assignment` yang sudah dimuat `TugasTerkumpulViewModel` (tidak fetch ulang). Belum diuji. |
+| Beri/Ubah Nilai: input 0–100, info peserta, file jawaban | ✅* Selesai (file jawaban disambungkan 2026-11-04, lihat catatan di bawah tabel ini) | `TugasScoringViewModel`/`Screen` — skor diambil dari `Assignment` yang sudah dimuat `TugasTerkumpulViewModel` (tidak fetch ulang). Belum diuji. |
 
 ## 3. Catatan teknis penting (perlu diverifikasi begitu ada data/akun nyata)
 

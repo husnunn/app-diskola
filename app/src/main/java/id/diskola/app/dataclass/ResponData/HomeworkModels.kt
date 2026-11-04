@@ -248,7 +248,28 @@ data class Assignment(
     val file_size: String = "",
     val student: TugasStudentItem = TugasStudentItem(),
     val subject_assignment: HomeworkItem = HomeworkItem(),
-    val uri_student: MateriLink? = MateriLink()
+    val uri_student: MateriLink? = MateriLink(),
+    /** Every file of the answer; empty on servers that only send the single `file_*` fields above (see `AnswerFileRules.filesOf`). */
+    val files: List<AssignmentAnswerFile> = emptyList(),
+)
+
+/**
+ * One file of a student's answer as the teacher's scoring list sends it (legacy `StudentAssignmentFile`). Some responses name the fields
+ * `student_assignment_files_*` instead of `file_*`; both spellings are read and the first non-empty one wins (`AnswerFileRules`).
+ */
+@Keep
+@JsonClass(generateAdapter = true)
+data class AssignmentAnswerFile(
+    @NullToEmptyString val file_name: String = "",
+    @NullToEmptyString val file_path: String = "",
+    @NullToEmptyString val file_format: String = "",
+    @NullToEmptyString val file_type: String = "",
+    @NullToEmptyString val file_size: String = "",
+    @NullToEmptyString val student_assignment_files_name: String = "",
+    @NullToEmptyString val student_assignment_files_path: String = "",
+    @NullToEmptyString val student_assignment_files_format: String = "",
+    @NullToEmptyString val student_assignment_files_type: String = "",
+    @NullToEmptyString val student_assignment_files_size: String = "",
 )
 
 @Keep

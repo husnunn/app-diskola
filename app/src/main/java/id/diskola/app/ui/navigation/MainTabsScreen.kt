@@ -682,6 +682,7 @@ fun MainTabsScreen(
                             navController.previousBackStackEntry?.savedStateHandle?.set("scoreSaved", true)
                             navController.popBackStack()
                         },
+                        onOpenPdf = { filePath, title -> navController.navigate(Route.PdfViewer(filePath, title)) },
                         terkumpulViewModel = terkumpulVm,
                     )
                 }

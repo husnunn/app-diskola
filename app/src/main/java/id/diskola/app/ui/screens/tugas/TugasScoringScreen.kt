@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
@@ -23,11 +24,13 @@ import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppTextField
 import id.diskola.app.ui.components.BannerError
 import id.diskola.app.ui.components.DetailScaffold
+import id.diskola.app.ui.components.FileViewerHost
 import id.diskola.app.ui.components.LinkPreviewCard
 import id.diskola.app.ui.components.openLink
 import id.diskola.app.ui.components.SectionLabel
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
+import id.diskola.app.utils.AnswerFileRules
 import id.diskola.app.viewmodel.TugasScoringViewModel
 import id.diskola.app.viewmodel.TugasTerkumpulViewModel
 
@@ -39,6 +42,7 @@ fun TugasScoringScreen(
     assignmentId: Int,
     onBack: () -> Unit,
     onSaved: () -> Unit,
+    onOpenPdf: (filePath: String, title: String) -> Unit,
     modifier: Modifier = Modifier,
     terkumpulViewModel: TugasTerkumpulViewModel,
     viewModel: TugasScoringViewModel = hiltViewModel(),
@@ -50,7 +54,18 @@ fun TugasScoringScreen(
     val saveSuccess by viewModel.saveSuccess.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
     val loading by viewModel.loading.collectAsStateWithLifecycle()
+    val fileLoading by viewModel.fileLoading.collectAsStateWithLifecycle()
+    val pdfPath by viewModel.pdfPath.collectAsStateWithLifecycle()
+    val openFileIntent by viewModel.openFileIntent.collectAsStateWithLifecycle()
+    val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
 
+    FileViewerHost(intent = openFileIntent, fileName = null, onConsumed = viewModel::consumeOpenFileIntent)
+    LaunchedEffect(pdfPath) {
+        pdfPath?.let { path ->
+            onOpenPdf(path, assignment?.student?.name?.let { "Jawaban $it" } ?: "Jawaban")
+            viewModel.consumePdfPath()
+        }
+    }
     LaunchedEffect(assignmentId) {
         terkumpulViewModel.findAssignment(assignmentId)?.let { viewModel.load(it) }
     }
@@ -71,6 +86,7 @@ fun TugasScoringScreen(
                 if (errorMessage.isNotBlank()) {
                     BannerError(message = errorMessage, onDismiss = { viewModel.clearError() })
                 }
+                infoMessage?.let { BannerError(message = it, onDismiss = viewModel::consumeInfoMessage) }
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     SectionLabel("SKOR")
                     AppTextField(
@@ -88,13 +104,22 @@ fun TugasScoringScreen(
                     InfoRow("NIS", current.student.nisn)
                     InfoRow("Kelas", current.student.`class`)
                 }
-                if (current.file_name.isNotBlank() || current.uri_student?.link?.isNotEmpty() == true) {
+                val answerFiles = remember(current) { AnswerFileRules.filesOf(current) }
+                val answerLinks = remember(current) { AnswerFileRules.linksOf(current) }
+                if (AnswerFileRules.hasAnswer(answerFiles, answerLinks)) {
                     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                         SectionLabel("JAWABAN TERKUMPUL")
-                        if (current.file_name.isNotBlank()) {
-                            Text(current.file_name, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurface)
+                        answerFiles.forEach { file ->
+                            TugasFileCard(
+                                fileName = AnswerFileRules.name(file),
+                                fileSize = formatFileSize(AnswerFileRules.size(file)),
+                                loading = fileLoading,
+                                readLabel = "Baca",
+                                onOpen = { viewModel.openAnswerFile(file) },
+                                onDownload = { viewModel.downloadAnswerFile(file) },
+                            )
                         }
-                        current.uri_student?.link?.firstOrNull()?.let { link ->
+                        answerLinks.firstOrNull()?.let { link ->
                             LinkPreviewCard(url = link, loading = false, data = null, onClick = { openLink(context, link) })
                         }
                     }

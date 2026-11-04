@@ -74,7 +74,7 @@ private val ANSWER_MIME_TYPES = arrayOf(
     "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 )
 
-private fun formatFileSize(raw: String): String {
+internal fun formatFileSize(raw: String): String {
     val bytes = raw.toLongOrNull() ?: return raw
     val df = DecimalFormat("0.00")
     val kb = 1024.0
