@@ -310,18 +310,24 @@ fun MagangIzinAddScreen(
         onBack = onBack,
         modifier = modifier,
         bottomBar = {
-            Box(
-                modifier = Modifier
-                    .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-                    .padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md),
-            ) {
-                AppButton(
-                    text = "Kirim",
-                    onClick = { viewModel.submit(scheduleId) },
-                    enabled = !locked,
-                    loading = submitting,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+            // The reason of a failed send sits above the button: at the top of the form it was out of sight whenever the form had scrolled.
+            Column(modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerLowest)) {
+                if (errorMessage.isNotBlank()) {
+                    BannerError(
+                        message = errorMessage,
+                        onDismiss = viewModel::clearError,
+                        modifier = Modifier.padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.sm),
+                    )
+                }
+                Box(modifier = Modifier.padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md)) {
+                    AppButton(
+                        text = "Kirim",
+                        onClick = { viewModel.submit(scheduleId) },
+                        enabled = !locked,
+                        loading = submitting,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         },
     ) { padding ->
@@ -334,7 +340,6 @@ fun MagangIzinAddScreen(
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
             banner?.let { Text(it, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.error) }
-            if (errorMessage.isNotBlank()) BannerError(message = errorMessage, onDismiss = viewModel::clearError)
 
             if (submittable.size > 1 && banner == null) {
                 FormCard {

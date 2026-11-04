@@ -109,7 +109,15 @@ fun MagangReportScreen(
         onBack = onBack,
         modifier = modifier,
         bottomBar = {
+            // The reason of a failed send sits above the button: at the top of the form it was out of sight whenever the form had scrolled.
             Column(modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerLowest)) {
+                if (errorMessage.isNotBlank()) {
+                    BannerError(
+                        message = errorMessage,
+                        onDismiss = viewModel::clearError,
+                        modifier = Modifier.padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.sm),
+                    )
+                }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Box(modifier = Modifier.padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md)) {
                     AppButton(
@@ -131,7 +139,6 @@ fun MagangReportScreen(
                 .padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
-            if (errorMessage.isNotBlank()) BannerError(message = errorMessage, onDismiss = viewModel::clearError)
             item?.let {
                 Column {
                     Text(
