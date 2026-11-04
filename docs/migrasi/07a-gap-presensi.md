@@ -18,7 +18,7 @@ Legenda: ✅ selesai & diuji di device · ✅* selesai (kode benar, jalur ini be
 | Chooser "Pilih Jenis Presensi" (guru, `offsite_enabled && allow`) | ✅* | Belum terpicu (server uji `allow=false`). |
 | Rekap: cache-first, filter tahun dinonaktifkan saat memuat + cooldown 5 s, T merah >0 | ✅ | Diuji dengan data asli (`month` = nama bulan String, `year` = Int). |
 | Dialog "Atur tanggal & waktu Otomatis" (`AutoTimeGate`) | ✅* | Komponen bersama; tidak terpicu (waktu HP otomatis). |
-| "Panduan" (3 langkah) | ✅* | Dibuat sebagai bottom sheet statis (legacy: coach-mark berlapis). |
+| "Panduan" (3 langkah) | ✅ | **Tur spotlight seperti legacy** (diubah 2026-11-04 dari bottom sheet statis): Data Absensi, Rekap Absensi, Tambah Izin, memakai komponen bersama `ui/components/CoachMarks.kt` (lihat `07e`). Teruji di Samsung: tiga langkah dan "Selesai". |
 | Refresh setelah kembali dari layar anak: 1× | ✅ | ON_RESUME pertama diabaikan (legacy: 2× saat buka). |
 
 ## 2. Masuk / Pulang sekolah (doc §5)

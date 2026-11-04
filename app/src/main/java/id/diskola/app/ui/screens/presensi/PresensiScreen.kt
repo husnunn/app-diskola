@@ -58,6 +58,8 @@ import id.diskola.app.ui.components.AppBottomSheet
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppDialog
 import id.diskola.app.ui.components.AutoTimeGate
+import id.diskola.app.ui.components.CoachMarkOverlay
+import id.diskola.app.ui.components.CoachStep
 import id.diskola.app.ui.components.BannerError
 import id.diskola.app.ui.components.DetailScaffold
 import id.diskola.app.ui.components.EmptyState
@@ -65,6 +67,8 @@ import id.diskola.app.ui.components.LoadingState
 import id.diskola.app.ui.components.MonthYearPickerDialog
 import id.diskola.app.ui.components.SkeletonVariant
 import id.diskola.app.ui.components.UnderlineTabRow
+import id.diskola.app.ui.components.coachTarget
+import id.diskola.app.ui.components.rememberCoachMarkState
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
@@ -78,6 +82,17 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private val TAB_LABELS = listOf("Data Absensi", "Rekap Absensi")
+
+private const val GUIDE_ABSENSI = "absensi"
+private const val GUIDE_REKAP = "rekap"
+private const val GUIDE_IZIN = "izin"
+
+/** The three stops of legacy's tour, in its order and words. */
+private val GUIDE_STEPS = listOf(
+    CoachStep(GUIDE_ABSENSI, "Data Absensi", "Ketuk untuk melihat data absensi harian Anda."),
+    CoachStep(GUIDE_REKAP, "Rekap Absensi", "Ketuk untuk melihat rekap absensi dalam periode tertentu."),
+    CoachStep(GUIDE_IZIN, "Tambah Izin", "Ketuk ikon ini untuk mengajukan atau melihat pengajuan izin presensi."),
+)
 private val MONTH_LABEL = DateTimeFormatter.ofPattern("MMMM yyyy", Locale("id"))
 private val DAY_LABEL = DateTimeFormatter.ofPattern("d MMM yyyy", Locale("id"))
 
@@ -101,6 +116,7 @@ fun PresensiScreen(
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var showMonthPicker by remember { mutableStateOf(false) }
     var showGuide by remember { mutableStateOf(false) }
+    val coach = rememberCoachMarkState()
     var chooseType by remember { mutableStateOf(false) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
     var offsiteDetail by remember { mutableStateOf<OffsiteDetail?>(null) }
@@ -121,69 +137,82 @@ fun PresensiScreen(
         onCancel = onBack,
     )
 
-    DetailScaffold(
-        title = "Presensi",
-        onBack = onBack,
-        modifier = modifier,
-        actions = {
-            TextButton(onClick = onOpenIzin, modifier = Modifier.heightIn(min = 48.dp)) { Text("Tambah Izin") }
-            IconButton(onClick = { showGuide = true }) {
-                Icon(Icons.AutoMirrored.Rounded.HelpOutline, contentDescription = "Panduan")
-            }
-        },
-        bottomBar = {
-            if (tab == 0) {
-                Box(
-                    modifier = Modifier
-                        .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-                        .padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md),
-                ) {
-                    AppButton(
-                        text = "Lakukan Presensi",
-                        onClick = {
-                            when (val action = viewModel.onPresensiClick()) {
-                                is PresensiAction.Blocked -> alertMessage = action.message
-                                is PresensiAction.OffsiteBlocked -> alertMessage = action.message
-                                PresensiAction.ChooseType -> chooseType = true
-                                PresensiAction.Onsite -> onOpenMasuk()
-                            }
-                        },
-                        enabled = canPerform,
-                        modifier = Modifier.fillMaxWidth(),
+    // The tour is drawn over the whole screen, app bar and bottom button included, because "Tambah Izin" is one of its targets.
+    Box(modifier = modifier.fillMaxSize()) {
+        DetailScaffold(
+            title = "Presensi",
+            onBack = onBack,
+            actions = {
+                TextButton(
+                    onClick = onOpenIzin,
+                    modifier = Modifier.heightIn(min = 48.dp).coachTarget(coach, GUIDE_IZIN),
+                ) { Text("Tambah Izin") }
+                IconButton(onClick = { showGuide = true }) {
+                    Icon(Icons.AutoMirrored.Rounded.HelpOutline, contentDescription = "Panduan")
+                }
+            },
+            bottomBar = {
+                if (tab == 0) {
+                    Box(
+                        modifier = Modifier
+                            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                            .padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md),
+                    ) {
+                        AppButton(
+                            text = "Lakukan Presensi",
+                            onClick = {
+                                when (val action = viewModel.onPresensiClick()) {
+                                    is PresensiAction.Blocked -> alertMessage = action.message
+                                    is PresensiAction.OffsiteBlocked -> alertMessage = action.message
+                                    PresensiAction.ChooseType -> chooseType = true
+                                    PresensiAction.Onsite -> onOpenMasuk()
+                                }
+                            },
+                            enabled = canPerform,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+            },
+        ) { padding ->
+            Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+                UnderlineTabRow(
+                    options = TAB_LABELS,
+                    selectedIndex = tab,
+                    onSelect = { tab = it },
+                    modifier = Modifier.padding(horizontal = ScreenHorizontalPadding),
+                    tabModifier = {
+                        when (it) {
+                            0 -> Modifier.coachTarget(coach, GUIDE_ABSENSI)
+                            1 -> Modifier.coachTarget(coach, GUIDE_REKAP)
+                            else -> Modifier
+                        }
+                    },
+                )
+                if (errorMessage.isNotBlank()) {
+                    BannerError(
+                        message = errorMessage,
+                        onDismiss = { viewModel.clearError() },
+                        modifier = Modifier.padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.sm),
                     )
                 }
-            }
-        },
-    ) { padding ->
-        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-            UnderlineTabRow(
-                options = TAB_LABELS,
-                selectedIndex = tab,
-                onSelect = { tab = it },
-                modifier = Modifier.padding(horizontal = ScreenHorizontalPadding),
-            )
-            if (errorMessage.isNotBlank()) {
-                BannerError(
-                    message = errorMessage,
-                    onDismiss = { viewModel.clearError() },
-                    modifier = Modifier.padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.sm),
-                )
-            }
-            if (tab == 0) {
-                AbsenTab(
-                    month = month,
-                    days = days,
-                    loading = loading,
-                    onPrev = { viewModel.shiftMonth(-1) },
-                    onNext = { viewModel.shiftMonth(1) },
-                    onPickMonth = { showMonthPicker = true },
-                    onRefresh = viewModel::refresh,
-                    onOffsiteDetail = { offsiteDetail = it },
-                )
-            } else {
-                RekapTab(viewModel)
+                if (tab == 0) {
+                    AbsenTab(
+                        month = month,
+                        days = days,
+                        loading = loading,
+                        onPrev = { viewModel.shiftMonth(-1) },
+                        onNext = { viewModel.shiftMonth(1) },
+                        onPickMonth = { showMonthPicker = true },
+                        onRefresh = viewModel::refresh,
+                        onOffsiteDetail = { offsiteDetail = it },
+                    )
+                } else {
+                    RekapTab(viewModel)
+                }
             }
         }
+        if (showGuide) CoachMarkOverlay(steps = GUIDE_STEPS, state = coach, onFinish = { showGuide = false })
     }
 
     if (showMonthPicker) {
@@ -233,7 +262,6 @@ fun PresensiScreen(
         )
     }
 
-    if (showGuide) GuideSheet(onDismiss = { showGuide = false })
     offsiteDetail?.let { OffsiteDetailSheet(it, onDismiss = { offsiteDetail = null }) }
 }
 
@@ -533,41 +561,6 @@ private fun RekapRow(row: PresensiRekapTable) {
                 textAlign = TextAlign.Center,
                 modifier = Modifier.weight(0.6f),
             )
-        }
-    }
-}
-
-// ---- Panduan ----
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun GuideSheet(onDismiss: () -> Unit) {
-    val scheme = MaterialTheme.colorScheme
-    AppBottomSheet(title = "Panduan", onDismiss = onDismiss) {
-        Column(
-            modifier = Modifier.padding(horizontal = ScreenHorizontalPadding).padding(bottom = Spacing.xl),
-            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-        ) {
-            listOf(
-                "Data Absensi" to "Ketuk untuk melihat data absensi harian Anda.",
-                "Rekap Absensi" to "Ketuk untuk melihat rekap absensi dalam periode tertentu.",
-                "Tambah Izin" to "Ketuk ikon ini untuk mengajukan atau melihat pengajuan izin presensi.",
-            ).forEachIndexed { index, (title, text) ->
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                    Text(
-                        "${index + 1}",
-                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
-                        color = scheme.onPrimary,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.size(28.dp).background(scheme.primary, androidx.compose.foundation.shape.CircleShape).padding(top = 3.dp),
-                    )
-                    Column {
-                        Text(title, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black), color = scheme.onSurface)
-                        Text(text, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
-                    }
-                }
-            }
-            AppButton(text = "Mengerti", onClick = onDismiss, modifier = Modifier.fillMaxWidth())
         }
     }
 }
