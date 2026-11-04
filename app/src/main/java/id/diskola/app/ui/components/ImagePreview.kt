@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
@@ -88,9 +89,12 @@ fun ProofImage(
     contentDescription: String = "File bukti",
 ) {
     val scheme = MaterialTheme.colorScheme
+    // A tinted frame with a height cap: a small picture or a tall photo sits centred in it instead of in white space or filling the screen.
     val frame = modifier
         .fillMaxWidth()
+        .heightIn(max = 320.dp)
         .clip(DiskolaExtraShapes.card)
+        .background(scheme.surfaceContainerLow)
         .border(1.dp, scheme.outlineVariant, DiskolaExtraShapes.card)
     SubcomposeAsyncImage(
         model = model,

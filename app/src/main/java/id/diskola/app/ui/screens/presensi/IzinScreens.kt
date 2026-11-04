@@ -60,6 +60,11 @@ import id.diskola.app.ui.components.EmptyState
 import id.diskola.app.ui.components.ErrorText
 import id.diskola.app.ui.components.FieldLabel
 import id.diskola.app.ui.components.FormCard
+import id.diskola.app.ui.components.LeaveDetailContent
+import id.diskola.app.ui.components.LeaveDetailUi
+import id.diskola.app.ui.components.LeaveFact
+import id.diskola.app.ui.components.LeaveProofUi
+import id.diskola.app.ui.components.LeaveStatusUi
 import id.diskola.app.ui.components.ImagePreviewDialog
 import id.diskola.app.ui.components.PillTabRow
 import id.diskola.app.ui.components.ProofImage
@@ -319,7 +324,7 @@ fun IzinAddScreen(
 
 // ---- Detail ----
 
-/** "Detail Pengajuan" (doc `07` §10.3). */
+/** "Detail Pengajuan" (doc `07` §10.3), drawn by the shared [LeaveDetailContent]. */
 @Composable
 fun IzinDetailScreen(
     uuid: String,
@@ -330,7 +335,6 @@ fun IzinDetailScreen(
     val context = LocalContext.current
     val item by viewModel.item.collectAsStateWithLifecycle()
     val notFound by viewModel.notFound.collectAsStateWithLifecycle()
-    var preview by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(uuid) { viewModel.start(uuid) }
     if (notFound) {
         LaunchedEffect(Unit) {
@@ -342,63 +346,38 @@ fun IzinDetailScreen(
     DetailScaffold(title = "Detail Pengajuan", onBack = onBack, modifier = modifier) { padding ->
         val leave = item
         if (leave != null) {
-            val scheme = MaterialTheme.colorScheme
-            val (label, tone) = statusBadge(leave.approvalStatus)
-            Column(
-                modifier = Modifier
-                    .padding(padding)
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md),
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(typeLabel(leave.status), style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black), color = scheme.onSurface)
-                        Text(dateLabel(leave.date), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
-                    }
-                    StatusBadge(label = label, tone = tone)
-                }
-                FormCard {
-                    FieldLabel("Keterangan", required = false)
-                    Text(leave.note.ifBlank { "-" }, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurface)
-                }
-                if (leave.approvalStatus.equals("rejected", ignoreCase = true)) {
-                    FormCard {
-                        FieldLabel("Alasan Penolakan", required = false)
-                        Text(
-                            leave.rejectionNote.ifBlank { "Tidak ada keterangan alasan penolakan." },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = scheme.onSurface,
-                        )
-                    }
-                }
-                if (leave.fileUrl.isNotBlank()) {
-                    val url = resolveAssetUrl(leave.fileUrl)
-                    val fileName = leave.fileUrl.substringBefore('?').substringAfterLast('/').takeIf { it.isNotBlank() } ?: "Lihat file bukti"
-                    val openOutside = {
-                        // Only a real http(s) address can be opened; a scheme-less value would resolve to nothing.
-                        val opened = url.startsWith("http", ignoreCase = true) &&
-                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }.isSuccess
-                        if (!opened) Toast.makeText(context, "Tidak dapat membuka file", Toast.LENGTH_SHORT).show()
-                    }
-                    FormCard {
-                        FieldLabel("File Bukti", required = false)
-                        if (isImageFile(leave.fileUrl)) {
-                            // A picture is shown here (legacy only listed its name); tap for the full-screen preview.
-                            ProofImage(model = url, onClick = { preview = url }, onOpenExternally = openOutside)
-                            Text(fileName, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
-                        } else {
-                            // A PDF cannot be drawn in place: it opens in the viewer app, as legacy did.
-                            AppButton(text = fileName, onClick = openOutside, variant = ButtonVariant.Outlined, modifier = Modifier.fillMaxWidth())
-                        }
-                    }
-                }
-                if (leave.reviewedAt.isNotBlank()) {
-                    Text("Direview: ${dateLabel(leave.reviewedAt)}", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
-                }
-            }
+            val (statusLabel, tone) = statusBadge(leave.approvalStatus)
+            val url = resolveAssetUrl(leave.fileUrl)
+            val ui = LeaveDetailUi(
+                type = leave.status,
+                typeLabel = typeLabel(leave.status),
+                dateLabel = dateLabel(leave.date),
+                status = LeaveStatusUi(statusLabel, tone),
+                facts = listOf(LeaveFact("Keterangan", leave.note.ifBlank { "-" })),
+                rejectionNote = if (leave.approvalStatus.equals("rejected", ignoreCase = true)) {
+                    leave.rejectionNote.ifBlank { "Tidak ada keterangan alasan penolakan." }
+                } else {
+                    null
+                },
+                proof = leave.fileUrl.takeIf { it.isNotBlank() }?.let {
+                    LeaveProofUi(
+                        url = url,
+                        fileName = it.substringBefore('?').substringAfterLast('/').takeIf { name -> name.isNotBlank() } ?: "Lihat file bukti",
+                        isImage = isImageFile(it),
+                    )
+                },
+                footnote = leave.reviewedAt.takeIf { it.isNotBlank() }?.let { "Direview ${dateLabel(it)}" },
+            )
+            LeaveDetailContent(
+                ui = ui,
+                onOpenProofExternally = {
+                    // Only a real http(s) address can be opened; a scheme-less value would resolve to nothing.
+                    val opened = url.startsWith("http", ignoreCase = true) &&
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }.isSuccess
+                    if (!opened) Toast.makeText(context, "Tidak dapat membuka file", Toast.LENGTH_SHORT).show()
+                },
+                modifier = Modifier.padding(padding),
+            )
         }
     }
-    preview?.let { ImagePreviewDialog(model = it, onDismiss = { preview = null }) }
 }

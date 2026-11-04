@@ -69,6 +69,11 @@ import id.diskola.app.ui.components.ErrorState
 import id.diskola.app.ui.components.ErrorText
 import id.diskola.app.ui.components.FieldLabel
 import id.diskola.app.ui.components.FormCard
+import id.diskola.app.ui.components.LeaveDetailContent
+import id.diskola.app.ui.components.LeaveDetailUi
+import id.diskola.app.ui.components.LeaveFact
+import id.diskola.app.ui.components.LeaveProofUi
+import id.diskola.app.ui.components.LeaveTypeIcon
 import id.diskola.app.ui.components.LoadingState
 import id.diskola.app.ui.components.PillTabRow
 import id.diskola.app.ui.components.SkeletonVariant
@@ -80,6 +85,7 @@ import id.diskola.app.utils.MagangRules
 import id.diskola.app.utils.MagangRules.Leave
 import id.diskola.app.utils.MagangRules.LeaveField
 import id.diskola.app.utils.resolveAssetUrl
+import id.diskola.app.utils.isImageFile
 import id.diskola.app.viewmodel.MagangIzinAddViewModel
 import id.diskola.app.viewmodel.MagangViewModel
 import java.time.LocalDate
@@ -220,26 +226,6 @@ internal fun MonthNavigator(month: YearMonth, onPrev: () -> Unit, onNext: () -> 
             modifier = Modifier.weight(1f),
         )
         IconButton(onClick = onNext) { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "Bulan berikutnya") }
-    }
-}
-
-/** Sick leave is the red document of legacy, izin the green one. */
-@Composable
-private fun LeaveTypeIcon(type: String, modifier: Modifier = Modifier) {
-    val scheme = MaterialTheme.colorScheme
-    val extended = MaterialTheme.extendedColors
-    val sick = type.equals(MagangRules.TYPE_SAKIT, ignoreCase = true)
-    Box(
-        modifier = modifier
-            .size(48.dp)
-            .background(if (sick) scheme.errorContainer else extended.successContainer, DiskolaExtraShapes.iconBox),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            if (sick) Icons.Rounded.MedicalServices else Icons.Rounded.Description,
-            contentDescription = null,
-            tint = if (sick) scheme.onErrorContainer else extended.onSuccessContainer,
-        )
     }
 }
 
@@ -429,7 +415,7 @@ fun MagangIzinAddScreen(
 
 // ---- Detail ----
 
-/** "Detail Pengajuan"; legacy had a "Hapus Pengajuan" button that it always hid, so there is none here. */
+/** "Detail Pengajuan"; legacy had a "Hapus Pengajuan" button that it always hid, so there is none here. Drawn by the shared [LeaveDetailContent]. */
 @Composable
 fun MagangIzinDetailScreen(
     leaveId: Long,
@@ -439,7 +425,6 @@ fun MagangIzinDetailScreen(
 ) {
     val context = LocalContext.current
     val leave = rememberLeaves(shared).firstOrNull { it.id == leaveId }
-    var preview by remember { mutableStateOf<String?>(null) }
 
     DetailScaffold(title = "Detail Pengajuan", onBack = onBack, modifier = modifier) { padding ->
         if (leave == null) {
@@ -452,50 +437,28 @@ fun MagangIzinDetailScreen(
                 modifier = Modifier.padding(padding).fillMaxSize(),
             )
         } else {
-            val scheme = MaterialTheme.colorScheme
-            Column(
-                modifier = Modifier
-                    .padding(padding)
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md),
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                    LeaveTypeIcon(leave.type)
-                    Column {
-                        Text(
-                            MagangRules.typeLabel(leave.type),
-                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
-                            color = scheme.onSurface,
-                        )
-                        Text(MagangRules.dateLabel(leave.date), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
-                    }
-                }
-                if (leave.companyName.isNotBlank()) {
-                    FormCard {
-                        FieldLabel("Perusahaan", required = false)
-                        Text(leave.companyName, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurface)
-                    }
-                }
-                if (leave.note.isNotBlank()) {
-                    FormCard {
-                        FieldLabel("Keterangan", required = false)
-                        Text(leave.note, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurface)
-                    }
-                }
-                if (leave.file.isNotBlank()) {
-                    FormCard {
-                        FieldLabel("File Bukti", required = false)
-                        ProofImage(
-                            model = resolveAssetUrl(leave.file),
-                            onClick = { preview = leave.file },
-                            onOpenExternally = { openLink(context, resolveAssetUrl(leave.file)) },
-                        )
-                    }
-                }
-            }
+            val url = resolveAssetUrl(leave.file)
+            val ui = LeaveDetailUi(
+                type = leave.type,
+                typeLabel = MagangRules.typeLabel(leave.type),
+                dateLabel = MagangRules.dateLabel(leave.date),
+                facts = buildList {
+                    if (leave.companyName.isNotBlank()) add(LeaveFact("Perusahaan", leave.companyName))
+                    if (leave.note.isNotBlank()) add(LeaveFact("Keterangan", leave.note))
+                },
+                proof = leave.file.takeIf { it.isNotBlank() }?.let {
+                    LeaveProofUi(
+                        url = url,
+                        fileName = it.substringBefore('?').substringAfterLast('/').takeIf { name -> name.isNotBlank() } ?: "Lihat file bukti",
+                        isImage = isImageFile(it),
+                    )
+                },
+            )
+            LeaveDetailContent(
+                ui = ui,
+                onOpenProofExternally = { openLink(context, url) },
+                modifier = Modifier.padding(padding),
+            )
         }
     }
-    preview?.let { ImagePreviewDialog(model = resolveAssetUrl(it), onDismiss = { preview = null }) }
 }
