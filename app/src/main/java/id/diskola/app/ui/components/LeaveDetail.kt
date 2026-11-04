@@ -42,6 +42,7 @@ import id.diskola.app.ui.theme.DiskolaTheme
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
 import id.diskola.app.ui.theme.extendedColors
+import id.diskola.app.utils.AppDialogTone
 
 /** The approval state of a request, where the module has one (school izin does, Magang izin does not). */
 @Immutable
@@ -95,12 +96,12 @@ fun LeaveTypeIcon(type: String, modifier: Modifier = Modifier, size: Dp = 48.dp)
 /**
  * "Detail Pengajuan", the same for every kind of izin: a summary card (type icon, type, date, status), one card with the labelled facts, the
  * rejection reason when there is one, the proof file and a closing line. Scrolls; draw it inside the scaffold's padding.
- * [onOpenProofExternally] opens the proof in another app: for a file that is not a picture, and as the fallback when a picture cannot load.
+ * A picture proof is drawn in place; any other proof (a PDF) is a button that calls [onOpenFile], which brings it into the in-app viewer.
  */
 @Composable
 fun LeaveDetailContent(
     ui: LeaveDetailUi,
-    onOpenProofExternally: () -> Unit,
+    onOpenFile: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var preview by remember { mutableStateOf<String?>(null) }
@@ -174,11 +175,17 @@ fun LeaveDetailContent(
                 FieldLabel("File Bukti", required = false)
                 if (proof.isImage) {
                     // The picture is shown in place; tap for the full-screen preview.
-                    ProofImage(model = proof.url, onClick = { preview = proof.url }, onOpenExternally = onOpenProofExternally)
+                    ProofImage(model = proof.url, onClick = { preview = proof.url })
                     Text(proof.fileName, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
                 } else {
-                    // A PDF cannot be drawn in place: it opens in the viewer app.
-                    AppButton(text = proof.fileName, onClick = onOpenProofExternally, variant = ButtonVariant.Outlined, modifier = Modifier.fillMaxWidth())
+                    // A PDF cannot be drawn in place: it opens in the app's own viewer.
+                    AppButton(
+                        text = proof.fileName,
+                        onClick = onOpenFile,
+                        variant = ButtonVariant.Outlined,
+                        leadingIcon = { Icon(fileIcon(proof.fileName), contentDescription = null) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
         }
@@ -195,6 +202,25 @@ fun LeaveDetailContent(
         }
     }
     preview?.let { ImagePreviewDialog(model = it, onDismiss = { preview = null }) }
+}
+
+/**
+ * What bringing a proof file into the app shows: a blocking "membuka file" while it downloads, and a centred error dialog when it could not
+ * be opened (the app does not fall back to another app).
+ */
+@Composable
+fun ProofFileStatus(opening: Boolean, error: String?, onDismissError: () -> Unit) {
+    if (opening) AppLoadingDialog(message = "membuka file")
+    error?.let {
+        AppDialog(
+            onDismiss = onDismissError,
+            title = "Tidak Bisa Membuka File",
+            body = it,
+            primaryButtonText = "Tutup",
+            onPrimaryClick = onDismissError,
+            tone = AppDialogTone.ERROR,
+        )
+    }
 }
 
 // ---- Previews ----
@@ -240,7 +266,7 @@ private val magang = LeaveDetailUi(
 @Composable
 private fun DetailPreview(ui: LeaveDetailUi) {
     DiskolaTheme(darkTheme = isSystemInDarkTheme()) {
-        Surface(modifier = Modifier.fillMaxSize()) { LeaveDetailContent(ui, onOpenProofExternally = {}) }
+        Surface(modifier = Modifier.fillMaxSize()) { LeaveDetailContent(ui, onOpenFile = {}) }
     }
 }
 

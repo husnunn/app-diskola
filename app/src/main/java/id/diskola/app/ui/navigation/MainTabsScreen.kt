@@ -478,6 +478,7 @@ fun MainTabsScreen(
                         leaveId = route.leaveId,
                         shared = hiltViewModel(shellEntry),
                         onBack = { navController.popBackStack() },
+                        onOpenPdf = { filePath, title -> navController.navigate(Route.PdfViewer(filePath, title)) },
                     )
                 }
                 composable<Route.MagangAttend> { backStackEntry ->
@@ -511,7 +512,11 @@ fun MainTabsScreen(
                 }
                 composable<Route.IzinDetail> { backStackEntry ->
                     val route = backStackEntry.toRoute<Route.IzinDetail>()
-                    IzinDetailScreen(uuid = route.uuid, onBack = { navController.popBackStack() })
+                    IzinDetailScreen(
+                        uuid = route.uuid,
+                        onBack = { navController.popBackStack() },
+                        onOpenPdf = { filePath, title -> navController.navigate(Route.PdfViewer(filePath, title)) },
+                    )
                 }
                 composable<Route.MateriDetail> { backStackEntry ->
                     val route = backStackEntry.toRoute<Route.MateriDetail>()

@@ -20,6 +20,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -77,17 +79,17 @@ fun ImagePreviewDialog(model: Any, onDismiss: () -> Unit) {
 
 /**
  * A stored proof picture on a detail screen: the whole picture in a bordered frame, tap → [onClick] (the full-screen preview). While it
- * loads there is a spinner; if it cannot be loaded (offline, a link that expired) the frame says so and offers [onOpenExternally] instead
- * of staying blank.
+ * loads there is a spinner; if it cannot be loaded (offline, a link that expired) the frame says so and offers "Coba lagi", which asks for
+ * the picture again, instead of staying blank. The picture never leaves the app.
  */
 @Composable
 fun ProofImage(
     model: Any,
     onClick: () -> Unit,
-    onOpenExternally: () -> Unit,
     modifier: Modifier = Modifier,
     contentDescription: String = "File bukti",
 ) {
+    var attempt by remember { mutableIntStateOf(0) }
     val scheme = MaterialTheme.colorScheme
     // A tinted frame with a height cap: a small picture or a tall photo sits centred in it instead of in white space or filling the screen.
     val frame = modifier
@@ -96,26 +98,29 @@ fun ProofImage(
         .clip(DiskolaExtraShapes.card)
         .background(scheme.surfaceContainerLow)
         .border(1.dp, scheme.outlineVariant, DiskolaExtraShapes.card)
-    SubcomposeAsyncImage(
-        model = model,
-        contentDescription = contentDescription,
-        contentScale = ContentScale.Fit,
-        modifier = frame,
-        loading = {
-            Box(modifier = Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = scheme.primary)
-            }
-        },
-        error = {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                Text("Gambar tidak dapat dimuat", style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
-                AppButton(text = "Buka file", onClick = onOpenExternally, variant = ButtonVariant.Outlined)
-            }
-        },
-        success = { SubcomposeAsyncImageContent(modifier = Modifier.clickable(onClick = onClick)) },
-    )
+    // A new key rebuilds the request, so "Coba lagi" really fetches again.
+    key(attempt) {
+        SubcomposeAsyncImage(
+            model = model,
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Fit,
+            modifier = frame,
+            loading = {
+                Box(modifier = Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = scheme.primary)
+                }
+            },
+            error = {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    Text("Gambar tidak dapat dimuat", style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+                    AppButton(text = "Coba lagi", onClick = { attempt++ }, variant = ButtonVariant.Outlined)
+                }
+            },
+            success = { SubcomposeAsyncImageContent(modifier = Modifier.clickable(onClick = onClick)) },
+        )
+    }
 }

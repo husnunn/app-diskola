@@ -67,6 +67,7 @@ import id.diskola.app.ui.components.LeaveProofUi
 import id.diskola.app.ui.components.LeaveStatusUi
 import id.diskola.app.ui.components.ImagePreviewDialog
 import id.diskola.app.ui.components.PillTabRow
+import id.diskola.app.ui.components.ProofFileStatus
 import id.diskola.app.ui.components.ProofImage
 import id.diskola.app.ui.components.StatusBadge
 import id.diskola.app.ui.theme.DiskolaExtraShapes
@@ -78,6 +79,7 @@ import id.diskola.app.utils.isImageFile
 import id.diskola.app.viewmodel.IzinAddViewModel
 import id.diskola.app.viewmodel.IzinDetailViewModel
 import id.diskola.app.viewmodel.IzinListViewModel
+import id.diskola.app.viewmodel.ProofFileViewModel
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -329,12 +331,16 @@ fun IzinAddScreen(
 fun IzinDetailScreen(
     uuid: String,
     onBack: () -> Unit,
+    onOpenPdf: (filePath: String, title: String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: IzinDetailViewModel = hiltViewModel(),
+    proofViewModel: ProofFileViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val item by viewModel.item.collectAsStateWithLifecycle()
     val notFound by viewModel.notFound.collectAsStateWithLifecycle()
+    val opening by proofViewModel.opening.collectAsStateWithLifecycle()
+    val proofError by proofViewModel.error.collectAsStateWithLifecycle()
     LaunchedEffect(uuid) { viewModel.start(uuid) }
     if (notFound) {
         LaunchedEffect(Unit) {
@@ -370,14 +376,13 @@ fun IzinDetailScreen(
             )
             LeaveDetailContent(
                 ui = ui,
-                onOpenProofExternally = {
-                    // Only a real http(s) address can be opened; a scheme-less value would resolve to nothing.
-                    val opened = url.startsWith("http", ignoreCase = true) &&
-                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }.isSuccess
-                    if (!opened) Toast.makeText(context, "Tidak dapat membuka file", Toast.LENGTH_SHORT).show()
+                // A PDF is downloaded and read in the app's own viewer; it is never handed to another app.
+                onOpenFile = {
+                    proofViewModel.open(url, ui.proof?.fileName ?: "bukti.pdf") { file -> onOpenPdf(file.absolutePath, "File Bukti") }
                 },
                 modifier = Modifier.padding(padding),
             )
         }
     }
+    ProofFileStatus(opening = opening, error = proofError, onDismissError = proofViewModel::dismissError)
 }

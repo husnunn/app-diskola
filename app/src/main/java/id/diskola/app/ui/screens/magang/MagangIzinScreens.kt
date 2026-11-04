@@ -73,6 +73,7 @@ import id.diskola.app.ui.components.LeaveDetailContent
 import id.diskola.app.ui.components.LeaveDetailUi
 import id.diskola.app.ui.components.LeaveFact
 import id.diskola.app.ui.components.LeaveProofUi
+import id.diskola.app.ui.components.ProofFileStatus
 import id.diskola.app.ui.components.LeaveTypeIcon
 import id.diskola.app.ui.components.LoadingState
 import id.diskola.app.ui.components.PillTabRow
@@ -88,6 +89,7 @@ import id.diskola.app.utils.resolveAssetUrl
 import id.diskola.app.utils.isImageFile
 import id.diskola.app.viewmodel.MagangIzinAddViewModel
 import id.diskola.app.viewmodel.MagangViewModel
+import id.diskola.app.viewmodel.ProofFileViewModel
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -421,10 +423,13 @@ fun MagangIzinDetailScreen(
     leaveId: Long,
     shared: MagangViewModel,
     onBack: () -> Unit,
+    onOpenPdf: (filePath: String, title: String) -> Unit,
     modifier: Modifier = Modifier,
+    proofViewModel: ProofFileViewModel = hiltViewModel(),
 ) {
-    val context = LocalContext.current
     val leave = rememberLeaves(shared).firstOrNull { it.id == leaveId }
+    val opening by proofViewModel.opening.collectAsStateWithLifecycle()
+    val proofError by proofViewModel.error.collectAsStateWithLifecycle()
 
     DetailScaffold(title = "Detail Pengajuan", onBack = onBack, modifier = modifier) { padding ->
         if (leave == null) {
@@ -456,9 +461,12 @@ fun MagangIzinDetailScreen(
             )
             LeaveDetailContent(
                 ui = ui,
-                onOpenProofExternally = { openLink(context, url) },
+                onOpenFile = {
+                    proofViewModel.open(url, ui.proof?.fileName ?: "bukti.pdf") { file -> onOpenPdf(file.absolutePath, "File Bukti") }
+                },
                 modifier = Modifier.padding(padding),
             )
         }
     }
+    ProofFileStatus(opening = opening, error = proofError, onDismissError = proofViewModel::dismissError)
 }

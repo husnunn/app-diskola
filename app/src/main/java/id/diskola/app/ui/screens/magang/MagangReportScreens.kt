@@ -243,7 +243,6 @@ fun MagangReportDetailScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
     val attendance by shared.attendance.collectAsStateWithLifecycle()
     val report = MagangRules.reportsOf(attendance).firstOrNull { it.id == reportId }
     var preview by remember { mutableStateOf<String?>(null) }
@@ -283,7 +282,6 @@ fun MagangReportDetailScreen(
                         ProofImage(
                             model = resolveAssetUrl(attachment),
                             onClick = { preview = attachment },
-                            onOpenExternally = { openLink(context, resolveAssetUrl(attachment)) },
                             contentDescription = "Lampiran laporan",
                         )
                     }
