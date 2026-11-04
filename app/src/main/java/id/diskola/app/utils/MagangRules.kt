@@ -98,6 +98,21 @@ object MagangRules {
 
     fun isLongReport(text: String): Boolean = text.length > EXCERPT_LIMIT
 
+    /** `04 Jun 2026 – 10 Jun 2026`, the text of the "Pilih Tanggal" chip once a range is chosen (legacy: the same, with an en dash). */
+    fun rangeLabel(from: LocalDate, to: LocalDate): String = "${from.format(DAY_LABEL)} – ${to.format(DAY_LABEL)}"
+
+    /** `04 Jun 2026, 14:50` from `2026-06-04 14:50:00`; "-" when there is nothing (legacy showed "-" for a missing check-out), else as sent. */
+    fun dateTimeLabel(raw: String?): String {
+        val text = raw?.trim().orEmpty()
+        if (text.isEmpty()) return "-"
+        val day = dateOf(text) ?: return text
+        val clock = text.drop(10).trimStart(' ', 'T').takeIf { it.isNotEmpty() } ?: return day.format(DAY_LABEL)
+        return "${day.format(DAY_LABEL)}, ${JurnalRules.shortClock(clock)}"
+    }
+
+    /** The report text of a card: "-" when there is none, as legacy. */
+    fun reportText(item: MagangAttendanceItem): String = item.daily_report.trim().ifEmpty { "-" }
+
     /** The first image link written inside a report's text (legacy showed it as the attachment when `file` was empty). */
     fun firstImageUrl(text: String): String? = IMAGE_URL.find(text)?.value
 

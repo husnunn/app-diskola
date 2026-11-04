@@ -42,14 +42,16 @@ Legenda: ✅ selesai & teruji (JVM/compile) · ✅* kode selesai, **belum diuji 
 | Tanpa unduh avatar untuk marker | ✅ | Marker pengguna biru seperti layar Masuk Sekolah. |
 | Tanpa geofence, tanpa `ACCESS_BACKGROUND_LOCATION` | ✅ | Keputusan 2026-10-07 menggantikan Q1. |
 
-## 4. Laporan harian + riwayat (doc §11.4–11.5)
+## 4. Laporan harian + riwayat (doc §11.4–11.5) — tahap S4
 
 | Item | Status | Keterangan |
 |---|---|---|
-| Form: lampiran gambar (Kamera/Galeri), catatan ≥ 100 karakter + penghitung, "Submit Laporan", alert "Presensi Keluar", `POST leave` | ⏳ | Foto > 5 MB **dikompres** (legacy menolak dengan pesan "8MB"); pesan batas yang benar "Foto lebih dari 5 MB". |
-| "Laporan tersimpan" hanya bila sukses | ⏳ | Legacy memunculkannya walau gagal dan mengabaikan hasil kirim. |
-| Mode baca dari daftar laporan (lampiran ketuk → penuh) | ⏳ | |
-| Tab Laporan: "Semua"/"Pilih Tanggal" (rentang), kartu laporan, "Lihat Selengkapnya" bila > 121 karakter | ⏳ | |
+| Form: lampiran gambar (Kamera/Galeri), catatan ≥ 100 karakter + penghitung (hijau/merah), "Submit Laporan", alert "Presensi Keluar", `POST leave` multipart `{id, daily_report, file}` | ✅* | Kode selesai, kompilasi dan aturan teruji JVM. **Belum dibuka di device**: tombol "Laporan Harian" muncul hanya bila `can_leave`, dan itu belum pernah true di akun uji BUDI (status "Belum waktunya presensi pulang") — lihat §7. Kamera meminta izin CAMERA saat dipakai (manifest sudah mendeklarasikannya, jadi tanpa izin kamera sistem menolak dibuka). |
+| Foto > 5 MB **dikompres**; pesan batas "Foto lebih dari 5 MB" | ✅* | Legacy menolak dengan pesan "8MB". Foto yang tak bisa masuk batas / tak terbaca → "Foto tidak dapat diproses atau lebih dari 5 MB." |
+| "Laporan tersimpan" hanya bila sukses | ✅* | Dialog sukses muncul setelah server menerima; gagal = banner dan form tetap (legacy menampilkannya walau gagal). |
+| Mode baca dari daftar laporan (lampiran ketuk → penuh) | ✅ | Pratinjau lampiran (pinch-zoom, "Tutup") teramati di device; layar detail "Lihat Selengkapnya" belum terlihat karena laporan uji ≤ 121 karakter (diuji lewat aturan JVM). |
+| Tab Laporan: "Semua"/"Pilih Tanggal" (rentang), kartu laporan, "Lihat Selengkapnya" bila > 121 karakter | ✅ | Diuji di Samsung: 2 laporan nyata terurut terbaru dulu; filter rentang 1–7 Nov menyisakan satu laporan; "Semua" mengembalikan. Waktu ditampilkan "04 Nov 2026, 10:13" (legacy: string mentah). |
+| Bentuk respons `attendance` | ✅ | `id` angka, tanpa `record_type`, `check_in_status`/`check_out_status` "ontime", `file` URL penuh, `daily_report` bisa `null`, `company` tanpa `id`, `location` `{latitude, longitude}`. |
 
 ## 5. Izin magang (doc §11.6)
 

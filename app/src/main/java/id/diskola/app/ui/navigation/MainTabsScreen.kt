@@ -46,6 +46,8 @@ import id.diskola.app.ui.screens.jurnal.JurnalFormScreen
 import id.diskola.app.ui.screens.jurnal.JurnalScreen
 import id.diskola.app.ui.screens.jurnal.VerifikasiJurnalScreen
 import id.diskola.app.ui.screens.magang.MagangAttendScreen
+import id.diskola.app.ui.screens.magang.MagangReportDetailScreen
+import id.diskola.app.ui.screens.magang.MagangReportScreen
 import id.diskola.app.ui.screens.magang.MagangScreen
 import id.diskola.app.ui.screens.presensi.IzinAddScreen
 import id.diskola.app.ui.screens.presensi.IzinDetailScreen
@@ -444,7 +446,8 @@ fun MainTabsScreen(
                     MagangScreen(
                         onBack = { navController.popBackStack() },
                         onOpenMasuk = { navController.navigate(Route.MagangAttend(it)) },
-                        onOpenLaporan = { },
+                        onOpenLaporan = { navController.navigate(Route.MagangReport(it)) },
+                        onOpenReport = { navController.navigate(Route.MagangReportDetail(it)) },
                     )
                 }
                 composable<Route.MagangAttend> { backStackEntry ->
@@ -455,6 +458,25 @@ fun MainTabsScreen(
                         shared = hiltViewModel(shellEntry),
                         onBack = { navController.popBackStack() },
                         onDone = { navController.popBackStack() },
+                    )
+                }
+                composable<Route.MagangReport> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.MagangReport>()
+                    val shellEntry = remember(backStackEntry) { navController.getBackStackEntry(Route.Magang) }
+                    MagangReportScreen(
+                        scheduleId = route.scheduleId,
+                        shared = hiltViewModel(shellEntry),
+                        onBack = { navController.popBackStack() },
+                        onDone = { navController.popBackStack() },
+                    )
+                }
+                composable<Route.MagangReportDetail> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.MagangReportDetail>()
+                    val shellEntry = remember(backStackEntry) { navController.getBackStackEntry(Route.Magang) }
+                    MagangReportDetailScreen(
+                        reportId = route.reportId,
+                        shared = hiltViewModel(shellEntry),
+                        onBack = { navController.popBackStack() },
                     )
                 }
                 composable<Route.IzinDetail> { backStackEntry ->

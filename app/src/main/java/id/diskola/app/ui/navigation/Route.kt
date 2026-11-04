@@ -132,6 +132,14 @@ sealed interface Route {
     @Serializable
     data class MagangAttend(val scheduleId: Long = 0) : Route
 
+    /** Write the daily report (and check out) for one schedule day. */
+    @Serializable
+    data class MagangReport(val scheduleId: Long = 0) : Route
+
+    /** A report sent earlier, read-only; [reportId] is the `attendance` row id. */
+    @Serializable
+    data class MagangReportDetail(val reportId: Long = 0) : Route
+
     /** Materi entry point for students — the subject picker. */
     @Serializable
     data object Mapel : Route

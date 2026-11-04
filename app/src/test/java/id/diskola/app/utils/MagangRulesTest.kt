@@ -153,6 +153,27 @@ class MagangRulesTest {
         assertEquals(0.0, MagangRules.reportLatitude(MagangAttendanceItem()), 0.0)
     }
 
+    @Test
+    fun rangeLabel_usesTheLegacyDayFormatWithAnEnDash() {
+        assertEquals("04 Jun 2026 – 10 Jun 2026", MagangRules.rangeLabel(june4, LocalDate.of(2026, 6, 10)))
+    }
+
+    @Test
+    fun dateTimeLabel_formatsWhatItCanAndKeepsTheRest() {
+        assertEquals("04 Jun 2026, 14:50", MagangRules.dateTimeLabel("2026-06-04 14:50:00"))
+        assertEquals("04 Jun 2026, 14:50", MagangRules.dateTimeLabel("2026-06-04T14:50:00"))
+        assertEquals("04 Jun 2026", MagangRules.dateTimeLabel("2026-06-04"))
+        assertEquals("-", MagangRules.dateTimeLabel(""))
+        assertEquals("-", MagangRules.dateTimeLabel(null))
+        assertEquals("kemarin", MagangRules.dateTimeLabel("kemarin"))
+    }
+
+    @Test
+    fun reportText_isDashWhenBlank() {
+        assertEquals("-", MagangRules.reportText(report(1, "2026-06-04 14:50:00")))
+        assertEquals("Belajar", MagangRules.reportText(report(1, "2026-06-04 14:50:00").copy(daily_report = " Belajar ")))
+    }
+
     // ---- writing a report ----
 
     @Test

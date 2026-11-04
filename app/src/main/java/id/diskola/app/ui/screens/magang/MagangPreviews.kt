@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import id.diskola.app.dataclass.ResponData.MagangAttendanceItem
 import id.diskola.app.dataclass.ResponData.MagangAttendanceState
 import id.diskola.app.dataclass.ResponData.MagangCompany
 import id.diskola.app.dataclass.ResponData.MagangScheduleItem
@@ -181,3 +182,68 @@ private fun AttendServerPreview() = AttendPreview(attendView.copy(distance = nul
 @Preview(name = "Masuk, submitting with error", showBackground = true, widthDp = 360, heightDp = 860)
 @Composable
 private fun AttendErrorPreview() = AttendPreview(attendView, errorMessage = "Anda berada di luar radius yang diizinkan.", submitting = true)
+
+// ---- Laporan ----
+// The Laporan tab: a long report (cut short with "Lihat Selengkapnya"), one without text or attachment, an empty range, loading, failure.
+
+private val longReport = MagangAttendanceItem(
+    id = 1,
+    check_in_at = "2026-06-04 14:50:00",
+    check_out_at = "2026-06-04 19:15:00",
+    daily_report = "Hari ini saya mengerjakan perbaikan modul pelaporan: memeriksa alur data dari form ke server, menulis pengujian untuk " +
+        "aturan validasi, dan mendampingi rekan magang lain menyiapkan lingkungan pengembangan. Kendala utama ada pada konfigurasi jaringan.",
+    company = MagangCompany(name = "PT. Teknologi Pendidikan Nusantara Berkembang Bersama"),
+)
+
+private val bareReport = MagangAttendanceItem(
+    id = 2,
+    check_in_at = "2026-06-03 14:55:00",
+    company = MagangCompany(name = "PT. TESTING MAGANG"),
+)
+
+@Composable
+private fun LaporanPreview(
+    reports: List<MagangAttendanceItem>,
+    loaded: Boolean = true,
+    loading: Boolean = false,
+    errorMessage: String = "",
+    range: Pair<LocalDate, LocalDate>? = null,
+) {
+    DiskolaTheme(darkTheme = isSystemInDarkTheme()) {
+        Surface {
+            LaporanTab(
+                reports = reports,
+                range = range,
+                loaded = loaded,
+                loading = loading,
+                errorMessage = errorMessage,
+                onPickRange = {},
+                onClearRange = {},
+                onRefresh = {},
+                onRetry = {},
+                onDismissError = {},
+                onOpenReport = {},
+                onOpenAttachment = {},
+            )
+        }
+    }
+}
+
+@Preview(name = "Laporan, list", showBackground = true, widthDp = 360, heightDp = 760)
+@Preview(name = "Laporan, list, dark", showBackground = true, widthDp = 360, heightDp = 760, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Preview(name = "Laporan, list, large font", showBackground = true, widthDp = 360, heightDp = 1100, fontScale = 1.5f)
+@Composable
+private fun LaporanListPreview() = LaporanPreview(listOf(longReport, bareReport))
+
+@Preview(name = "Laporan, range without reports", showBackground = true, widthDp = 360, heightDp = 640)
+@Composable
+private fun LaporanRangePreview() =
+    LaporanPreview(listOf(longReport), range = LocalDate.of(2026, 7, 1) to LocalDate.of(2026, 7, 31))
+
+@Preview(name = "Laporan, loading", showBackground = true, widthDp = 360, heightDp = 640)
+@Composable
+private fun LaporanLoadingPreview() = LaporanPreview(emptyList(), loaded = false, loading = true)
+
+@Preview(name = "Laporan, failed", showBackground = true, widthDp = 360, heightDp = 640)
+@Composable
+private fun LaporanErrorPreview() = LaporanPreview(emptyList(), loaded = false, errorMessage = "Tidak dapat terhubung ke server.")

@@ -14,6 +14,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -29,6 +30,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.diskola.app.dataclass.ResponData.MagangScheduleItem
+import id.diskola.app.ui.components.AppDateRangePickerDialog
 import id.diskola.app.ui.components.AutoTimeGate
 import id.diskola.app.ui.components.BannerError
 import id.diskola.app.ui.components.DateStrip
@@ -42,9 +44,12 @@ import id.diskola.app.ui.components.UnderlineTabRow
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
 import id.diskola.app.utils.MagangRules
+import id.diskola.app.utils.resolveAssetUrl
 import id.diskola.app.viewmodel.MagangViewModel
+import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.ZoneOffset
 
 private val TAB_LABELS = listOf("Jadwal", "Laporan")
 
@@ -58,6 +63,7 @@ fun MagangScreen(
     onBack: () -> Unit,
     onOpenMasuk: (scheduleId: Long) -> Unit,
     onOpenLaporan: (scheduleId: Long) -> Unit,
+    onOpenReport: (reportId: Long) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: MagangViewModel = hiltViewModel(),
 ) {
@@ -66,10 +72,16 @@ fun MagangScreen(
     val loading by viewModel.loading.collectAsStateWithLifecycle()
     val selected by viewModel.selected.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
+    val attendance by viewModel.attendance.collectAsStateWithLifecycle()
+    val attendanceLoaded by viewModel.attendanceLoaded.collectAsStateWithLifecycle()
+    val attendanceError by viewModel.attendanceError.collectAsStateWithLifecycle()
+    val reportRange by viewModel.reportRange.collectAsStateWithLifecycle()
 
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var showMonthPicker by remember { mutableStateOf(false) }
     var showGuide by remember { mutableStateOf(false) }
+    var showRangePicker by remember { mutableStateOf(false) }
+    var attachment by remember { mutableStateOf<String?>(null) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -124,11 +136,22 @@ fun MagangScreen(
                     onLaporan = { onOpenLaporan(it.id) },
                 )
             } else {
-                EmptyState(
-                    title = "Laporan belum tersedia",
-                    description = "Riwayat laporan harian akan tampil di sini.",
-                    icon = Icons.Rounded.EventBusy,
-                    modifier = Modifier.fillMaxSize(),
+                LaporanTab(
+                    reports = attendance,
+                    range = reportRange,
+                    loaded = attendanceLoaded,
+                    loading = loading,
+                    errorMessage = attendanceError,
+                    onPickRange = { showRangePicker = true },
+                    onClearRange = viewModel::clearReportRange,
+                    onRefresh = viewModel::refresh,
+                    onRetry = {
+                        viewModel.clearAttendanceError()
+                        viewModel.refresh()
+                    },
+                    onDismissError = viewModel::clearAttendanceError,
+                    onOpenReport = { onOpenReport(it.id) },
+                    onOpenAttachment = { attachment = it },
                 )
             }
         }
@@ -145,6 +168,30 @@ fun MagangScreen(
         )
     }
     if (showGuide) MagangGuideSheet(onDismiss = { showGuide = false })
+    if (showRangePicker) {
+        val state = rememberDateRangePickerState(
+            initialSelectedStartDateMillis = reportRange?.first?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli(),
+            initialSelectedEndDateMillis = reportRange?.second?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli(),
+        )
+        AppDateRangePickerDialog(
+            state = state,
+            title = "Pilih Rentang Tanggal",
+            confirmText = "Pilih",
+            onConfirm = {
+                val start = state.selectedStartDateMillis
+                val end = state.selectedEndDateMillis
+                if (start != null && end != null) {
+                    viewModel.setReportRange(
+                        Instant.ofEpochMilli(start).atZone(ZoneOffset.UTC).toLocalDate(),
+                        Instant.ofEpochMilli(end).atZone(ZoneOffset.UTC).toLocalDate(),
+                    )
+                }
+                showRangePicker = false
+            },
+            onDismiss = { showRangePicker = false },
+        )
+    }
+    attachment?.let { ImagePreviewDialog(model = resolveAssetUrl(it), onDismiss = { attachment = null }) }
 }
 
 /** Tab "Jadwal": month label, one cell per day of that month, and the cards of the chosen day. */

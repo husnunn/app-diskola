@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -15,6 +16,8 @@ import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DatePickerState
+import androidx.compose.material3.DateRangePicker
+import androidx.compose.material3.DateRangePickerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -77,6 +80,58 @@ fun AppDatePickerDialog(
     ) {
         DatePicker(
             state = state,
+            colors = DatePickerDefaults.colors(containerColor = container),
+            title = {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(start = Spacing.xxl, end = Spacing.xxl, top = Spacing.xxl).semantics { heading() },
+                )
+            },
+        )
+    }
+}
+
+/**
+ * The date-range picker in the same dialog dress as [AppDatePickerDialog]. The confirm button waits for both ends, so a half-chosen range
+ * cannot be applied. The calendar needs a fixed height inside a dialog (Material's range picker has none of its own there).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AppDateRangePickerDialog(
+    state: DateRangePickerState,
+    title: String,
+    confirmText: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    dismissText: String = "Batal",
+) {
+    val container = MaterialTheme.extendedColors.dialogSurface
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        shape = DiskolaExtraShapes.dialog,
+        colors = DatePickerDefaults.colors(containerColor = container),
+        confirmButton = {
+            AppButton(
+                text = confirmText,
+                onClick = onConfirm,
+                enabled = state.selectedStartDateMillis != null && state.selectedEndDateMillis != null,
+                modifier = Modifier.padding(end = Spacing.sm, bottom = Spacing.sm),
+            )
+        },
+        dismissButton = {
+            AppButton(
+                text = dismissText,
+                onClick = onDismiss,
+                variant = ButtonVariant.Tonal,
+                modifier = Modifier.padding(end = Spacing.sm, bottom = Spacing.sm),
+            )
+        },
+    ) {
+        DateRangePicker(
+            state = state,
+            modifier = Modifier.height(520.dp),
             colors = DatePickerDefaults.colors(containerColor = container),
             title = {
                 Text(
