@@ -11,12 +11,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.Business
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -25,11 +23,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import id.diskola.app.dataclass.ResponData.MagangScheduleItem
-import id.diskola.app.ui.components.AppBottomSheet
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppCard
 import id.diskola.app.ui.components.BadgeTone
@@ -125,41 +121,6 @@ internal fun ScheduleCard(
                         AppButton(text = "Masuk", onClick = onMasuk, modifier = Modifier.fillMaxWidth())
                 }
             }
-        }
-    }
-}
-
-/** The four steps legacy walked through with an overlay, as a static sheet (same as Presensi's "Panduan"). */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun MagangGuideSheet(onDismiss: () -> Unit) {
-    val scheme = MaterialTheme.colorScheme
-    AppBottomSheet(title = "Panduan", onDismiss = onDismiss) {
-        Column(
-            modifier = Modifier.padding(horizontal = ScreenHorizontalPadding).padding(bottom = Spacing.xl),
-            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-        ) {
-            listOf(
-                "Pilih Jadwal" to "Ketuk Jadwal untuk melihat daftar jadwal magang yang tersedia.",
-                "Pilih Tanggal" to "Ketuk tanggal untuk melihat jadwal magang pada hari yang ingin Anda lihat.",
-                "Ganti Bulan" to "Ketuk label bulan untuk memilih bulan dan tahun yang lain.",
-                "Tambah Izin" to "Ketuk tombol ini untuk mengajukan atau melihat riwayat izin/sakit magang.",
-            ).forEachIndexed { index, (title, text) ->
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                    Text(
-                        "${index + 1}",
-                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
-                        color = scheme.onPrimary,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.size(28.dp).background(scheme.primary, CircleShape).padding(top = 3.dp),
-                    )
-                    Column {
-                        Text(title, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Black), color = scheme.onSurface)
-                        Text(text, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
-                    }
-                }
-            }
-            AppButton(text = "Mengerti", onClick = onDismiss, modifier = Modifier.fillMaxWidth())
         }
     }
 }

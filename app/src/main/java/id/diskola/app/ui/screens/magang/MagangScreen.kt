@@ -1,6 +1,7 @@
 package id.diskola.app.ui.screens.magang
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,6 +37,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.diskola.app.dataclass.ResponData.MagangScheduleItem
 import id.diskola.app.ui.components.AppDateRangePickerDialog
 import id.diskola.app.ui.components.AutoTimeGate
+import id.diskola.app.ui.components.CoachMarkOverlay
+import id.diskola.app.ui.components.CoachStep
 import id.diskola.app.ui.components.BannerError
 import id.diskola.app.ui.components.DateStrip
 import id.diskola.app.ui.components.DetailScaffold
@@ -45,6 +48,8 @@ import id.diskola.app.ui.components.LoadingState
 import id.diskola.app.ui.components.MonthYearPickerDialog
 import id.diskola.app.ui.components.SkeletonVariant
 import id.diskola.app.ui.components.UnderlineTabRow
+import id.diskola.app.ui.components.coachTarget
+import id.diskola.app.ui.components.rememberCoachMarkState
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
 import id.diskola.app.utils.MagangRules
@@ -56,6 +61,19 @@ import java.time.YearMonth
 import java.time.ZoneOffset
 
 private val TAB_LABELS = listOf("Jadwal", "Laporan")
+
+private const val GUIDE_JADWAL = "jadwal"
+private const val GUIDE_TANGGAL = "tanggal"
+private const val GUIDE_BULAN = "bulan"
+private const val GUIDE_IZIN = "izin"
+
+/** The four stops of legacy's tour, in its order (the first sentence had stray punctuation, which is tidied). */
+private val GUIDE_STEPS = listOf(
+    CoachStep(GUIDE_JADWAL, "Pilih Jadwal", "Ketuk Jadwal untuk melihat daftar jadwal magang yang tersedia."),
+    CoachStep(GUIDE_TANGGAL, "Pilih Tanggal Mulai", "Ketuk tanggal untuk menentukan jadwal magang pada hari yang ingin Anda lihat."),
+    CoachStep(GUIDE_BULAN, "Ganti Bulan", "Ketuk label bulan untuk memilih bulan dan tahun yang lain."),
+    CoachStep(GUIDE_IZIN, "Tambah Izin", "Ketuk ikon ini untuk mengajukan atau melihat riwayat izin/sakit magang."),
+)
 
 /**
  * "Magang" shell (doc `07` §11): the student's internship schedule (a date strip and one card per day) and, in the second tab, the reports
@@ -87,6 +105,7 @@ fun MagangScreen(
     var showGuide by remember { mutableStateOf(false) }
     var showRangePicker by remember { mutableStateOf(false) }
     var attachment by remember { mutableStateOf<String?>(null) }
+    val coach = rememberCoachMarkState()
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -103,64 +122,73 @@ fun MagangScreen(
         onCancel = onBack,
     )
 
-    DetailScaffold(
-        title = "Magang",
-        onBack = onBack,
-        modifier = modifier,
-        actions = {
-            TextButton(onClick = onOpenIzin, modifier = Modifier.heightIn(min = 48.dp)) { Text("Tambah Izin") }
-            if (tab == 0) {
-                IconButton(onClick = { showGuide = true }) {
-                    Icon(Icons.AutoMirrored.Rounded.HelpOutline, contentDescription = "Panduan")
+    // The tour is drawn over the whole screen, app bar included, because "Tambah Izin" is one of its targets.
+    Box(modifier = modifier.fillMaxSize()) {
+        DetailScaffold(
+            title = "Magang",
+            onBack = onBack,
+            actions = {
+                TextButton(
+                    onClick = onOpenIzin,
+                    modifier = Modifier.heightIn(min = 48.dp).coachTarget(coach, GUIDE_IZIN),
+                ) { Text("Tambah Izin") }
+                if (tab == 0) {
+                    IconButton(onClick = { showGuide = true }) {
+                        Icon(Icons.AutoMirrored.Rounded.HelpOutline, contentDescription = "Panduan")
+                    }
+                }
+            },
+        ) { padding ->
+            Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+                UnderlineTabRow(
+                    options = TAB_LABELS,
+                    selectedIndex = tab,
+                    onSelect = { tab = it },
+                    modifier = Modifier.padding(horizontal = ScreenHorizontalPadding),
+                    tabModifier = { if (it == 0) Modifier.coachTarget(coach, GUIDE_JADWAL) else Modifier },
+                )
+                if (tab == 0) {
+                    JadwalTab(
+                        selected = selected,
+                        schedules = schedules,
+                        loaded = loaded,
+                        loading = loading,
+                        errorMessage = errorMessage,
+                        onSelectDate = viewModel::selectDate,
+                        onPickMonth = { showMonthPicker = true },
+                        onRefresh = viewModel::refresh,
+                        onRetry = {
+                            viewModel.clearError()
+                            viewModel.refresh()
+                        },
+                        onDismissError = viewModel::clearError,
+                        onMasuk = { onOpenMasuk(it.id) },
+                        onLaporan = { onOpenLaporan(it.id) },
+                        monthModifier = Modifier.coachTarget(coach, GUIDE_BULAN),
+                        stripModifier = Modifier.coachTarget(coach, GUIDE_TANGGAL),
+                    )
+                } else {
+                    LaporanTab(
+                        reports = attendance,
+                        range = reportRange,
+                        loaded = attendanceLoaded,
+                        loading = loading,
+                        errorMessage = attendanceError,
+                        onPickRange = { showRangePicker = true },
+                        onClearRange = viewModel::clearReportRange,
+                        onRefresh = viewModel::refresh,
+                        onRetry = {
+                            viewModel.clearAttendanceError()
+                            viewModel.refresh()
+                        },
+                        onDismissError = viewModel::clearAttendanceError,
+                        onOpenReport = { onOpenReport(it.id) },
+                        onOpenAttachment = { attachment = it },
+                    )
                 }
             }
-        },
-    ) { padding ->
-        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-            UnderlineTabRow(
-                options = TAB_LABELS,
-                selectedIndex = tab,
-                onSelect = { tab = it },
-                modifier = Modifier.padding(horizontal = ScreenHorizontalPadding),
-            )
-            if (tab == 0) {
-                JadwalTab(
-                    selected = selected,
-                    schedules = schedules,
-                    loaded = loaded,
-                    loading = loading,
-                    errorMessage = errorMessage,
-                    onSelectDate = viewModel::selectDate,
-                    onPickMonth = { showMonthPicker = true },
-                    onRefresh = viewModel::refresh,
-                    onRetry = {
-                        viewModel.clearError()
-                        viewModel.refresh()
-                    },
-                    onDismissError = viewModel::clearError,
-                    onMasuk = { onOpenMasuk(it.id) },
-                    onLaporan = { onOpenLaporan(it.id) },
-                )
-            } else {
-                LaporanTab(
-                    reports = attendance,
-                    range = reportRange,
-                    loaded = attendanceLoaded,
-                    loading = loading,
-                    errorMessage = attendanceError,
-                    onPickRange = { showRangePicker = true },
-                    onClearRange = viewModel::clearReportRange,
-                    onRefresh = viewModel::refresh,
-                    onRetry = {
-                        viewModel.clearAttendanceError()
-                        viewModel.refresh()
-                    },
-                    onDismissError = viewModel::clearAttendanceError,
-                    onOpenReport = { onOpenReport(it.id) },
-                    onOpenAttachment = { attachment = it },
-                )
-            }
         }
+        if (showGuide) CoachMarkOverlay(steps = GUIDE_STEPS, state = coach, onFinish = { showGuide = false })
     }
 
     if (showMonthPicker) {
@@ -173,7 +201,6 @@ fun MagangScreen(
             onDismiss = { showMonthPicker = false },
         )
     }
-    if (showGuide) MagangGuideSheet(onDismiss = { showGuide = false })
     if (showRangePicker) {
         val state = rememberDateRangePickerState(
             initialSelectedStartDateMillis = reportRange?.first?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli(),
@@ -217,12 +244,15 @@ internal fun JadwalTab(
     onMasuk: (MagangScheduleItem) -> Unit,
     onLaporan: (MagangScheduleItem) -> Unit,
     modifier: Modifier = Modifier,
+    /** Extra modifiers for the month label and the date strip, so the tour can point at them. */
+    monthModifier: Modifier = Modifier,
+    stripModifier: Modifier = Modifier,
 ) {
     val month = YearMonth.from(selected)
     val contentPadding = PaddingValues(horizontal = ScreenHorizontalPadding, vertical = Spacing.md)
     Column(modifier = modifier.fillMaxSize()) {
-        MonthLabel(month = month, onClick = onPickMonth)
-        DateStrip(dates = MagangRules.daysOf(month), selected = selected, onSelect = onSelectDate)
+        MonthLabel(month = month, onClick = onPickMonth, modifier = monthModifier)
+        DateStrip(dates = MagangRules.daysOf(month), selected = selected, onSelect = onSelectDate, modifier = stripModifier)
         if (errorMessage.isNotBlank() && loaded) {
             BannerError(
                 message = errorMessage,

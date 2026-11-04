@@ -60,6 +60,8 @@ fun UnderlineTabRow(
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    /** Extra modifier for one tab, e.g. to mark it as a tour target. */
+    tabModifier: (index: Int) -> Modifier = { Modifier },
 ) {
     val scheme = MaterialTheme.colorScheme
     androidx.compose.foundation.layout.Column(modifier = modifier) {
@@ -69,6 +71,7 @@ fun UnderlineTabRow(
                 androidx.compose.foundation.layout.Column(
                     modifier = Modifier
                         .weight(1f)
+                        .then(tabModifier(index))
                         .clickable { onSelect(index) }
                         .padding(vertical = Spacing.md),
                     horizontalAlignment = Alignment.CenterHorizontally,
