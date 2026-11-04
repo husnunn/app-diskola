@@ -136,6 +136,17 @@ sealed interface Route {
     @Serializable
     data class MagangReport(val scheduleId: Long = 0) : Route
 
+    /** Magang izin: this month's list, filed izin of both types. */
+    @Serializable
+    data object MagangIzinList : Route
+
+    @Serializable
+    data object MagangIzinAdd : Route
+
+    /** One izin; [leaveId] is the id the list (merged from `attendance` and `schedule`) shows it under. */
+    @Serializable
+    data class MagangIzinDetail(val leaveId: Long = 0) : Route
+
     /** A report sent earlier, read-only; [reportId] is the `attendance` row id. */
     @Serializable
     data class MagangReportDetail(val reportId: Long = 0) : Route

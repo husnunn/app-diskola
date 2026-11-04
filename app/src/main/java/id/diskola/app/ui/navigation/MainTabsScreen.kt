@@ -46,6 +46,9 @@ import id.diskola.app.ui.screens.jurnal.JurnalFormScreen
 import id.diskola.app.ui.screens.jurnal.JurnalScreen
 import id.diskola.app.ui.screens.jurnal.VerifikasiJurnalScreen
 import id.diskola.app.ui.screens.magang.MagangAttendScreen
+import id.diskola.app.ui.screens.magang.MagangIzinAddScreen
+import id.diskola.app.ui.screens.magang.MagangIzinDetailScreen
+import id.diskola.app.ui.screens.magang.MagangIzinListScreen
 import id.diskola.app.ui.screens.magang.MagangReportDetailScreen
 import id.diskola.app.ui.screens.magang.MagangReportScreen
 import id.diskola.app.ui.screens.magang.MagangScreen
@@ -448,6 +451,33 @@ fun MainTabsScreen(
                         onOpenMasuk = { navController.navigate(Route.MagangAttend(it)) },
                         onOpenLaporan = { navController.navigate(Route.MagangReport(it)) },
                         onOpenReport = { navController.navigate(Route.MagangReportDetail(it)) },
+                        onOpenIzin = { navController.navigate(Route.MagangIzinList) },
+                    )
+                }
+                composable<Route.MagangIzinList> { backStackEntry ->
+                    val shellEntry = remember(backStackEntry) { navController.getBackStackEntry(Route.Magang) }
+                    MagangIzinListScreen(
+                        shared = hiltViewModel(shellEntry),
+                        onBack = { navController.popBackStack() },
+                        onAdd = { navController.navigate(Route.MagangIzinAdd) },
+                        onOpenDetail = { navController.navigate(Route.MagangIzinDetail(it)) },
+                    )
+                }
+                composable<Route.MagangIzinAdd> { backStackEntry ->
+                    val shellEntry = remember(backStackEntry) { navController.getBackStackEntry(Route.Magang) }
+                    MagangIzinAddScreen(
+                        shared = hiltViewModel(shellEntry),
+                        onBack = { navController.popBackStack() },
+                        onDone = { navController.popBackStack() },
+                    )
+                }
+                composable<Route.MagangIzinDetail> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.MagangIzinDetail>()
+                    val shellEntry = remember(backStackEntry) { navController.getBackStackEntry(Route.Magang) }
+                    MagangIzinDetailScreen(
+                        leaveId = route.leaveId,
+                        shared = hiltViewModel(shellEntry),
+                        onBack = { navController.popBackStack() },
                     )
                 }
                 composable<Route.MagangAttend> { backStackEntry ->

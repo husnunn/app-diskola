@@ -53,13 +53,13 @@ Legenda: ✅ selesai & teruji (JVM/compile) · ✅* kode selesai, **belum diuji 
 | Tab Laporan: "Semua"/"Pilih Tanggal" (rentang), kartu laporan, "Lihat Selengkapnya" bila > 121 karakter | ✅ | Diuji di Samsung: 2 laporan nyata terurut terbaru dulu; filter rentang 1–7 Nov menyisakan satu laporan; "Semua" mengembalikan. Waktu ditampilkan "04 Nov 2026, 10:13" (legacy: string mentah). |
 | Bentuk respons `attendance` | ✅ | `id` angka, tanpa `record_type`, `check_in_status`/`check_out_status` "ontime", `file` URL penuh, `daily_report` bisa `null`, `company` tanpa `id`, `location` `{latitude, longitude}`. |
 
-## 5. Izin magang (doc §11.6)
+## 5. Izin magang (doc §11.6) — tahap S5
 
 | Item | Status | Keterangan |
 |---|---|---|
-| Daftar (jenis Semua/Sakit/Izin, navigasi bulan, "Ajukan Izin") | ⏳ | Digabung dari `attendance` (record `leave_request`) dan `schedule`; item `attendance` menang. |
-| Ajukan: banner, pemilih jadwal bila > 1, jenis, bukti gambar ≤ 2 MB, keterangan 10–5000, `POST leave-request` | ⏳ | Gambar > 2 MB dikompres. |
-| Detail Pengajuan; "Hapus Pengajuan" tetap tersembunyi | ⏳ | Seperti legacy. |
+| Menu "Tambah Izin" di shell → daftar (jenis Semua/Sakit/Izin, navigasi bulan, "Ajukan Izin") | ✅ | Diuji di Samsung: daftar kosong "Belum ada Pengajuan Izin" (akun BUDI belum punya izin), tombol "Ajukan Izin". Digabung dari `attendance` (record `leave_request`) dan `schedule` (`leave_request` pada hari itu); item `attendance` menang. Tidak ada izin di data uji, jadi tampilan baris izin hanya diuji lewat preview. |
+| Ajukan: banner, pemilih jadwal bila > 1, jenis, bukti gambar ≤ 2 MB, keterangan 10–5000, `POST leave-request` multipart | ✅* | Banner dan kunci form teramati di device: setelah presensi masuk server menurunkan `can_submit_leave_request` → "Tidak ada jadwal magang yang dapat diajukan izin hari ini." dan "Kirim" nonaktif. Pengiriman nyata belum dijalankan (lihat §7). Gambar > 2 MB dikompres; bukan gambar → "File harus berupa gambar". |
+| Detail Pengajuan; "Hapus Pengajuan" tetap tersembunyi | ✅* | Seperti legacy; belum ada izin di data uji untuk dibuka. Bukti ditampilkan sebagai gambar (ketuk → pratinjau penuh) alih-alih membuka aplikasi lain. |
 
 ## 6. Dihapus / tidak dibangun
 - Geofence, `GeofenceBroadcastReceiver`, notifikasi "GeofenceChannel2" (kanalnya tak pernah dibuat, tujuan notifikasinya bukan Activity), izin `ACCESS_BACKGROUND_LOCATION`.
@@ -70,4 +70,4 @@ Legenda: ✅ selesai & teruji (JVM/compile) · ✅* kode selesai, **belum diuji 
 1. Bentuk asli respons `attendance` (laporan dan izin: `null` vs `""`, format `check_in_at`, `location`). Respons `schedule` sudah terbukti dari akun BUDI (lihat FLOW_QUESTIONS 2026-11-04); `company.id` melewati `Int`.
 2. Apa yang membuat `can_leave` bernilai true: sesudah presensi masuk status jadi "Belum waktunya presensi pulang" dengan `can_leave=false`; kapan jendela pulang terbuka (menurut jam `end_time`?) belum teramati.
 3. Apakah server menegakkan jarak/jam/ukuran file, dan isi pesan 4xx-nya (presensi masuk dari luar radius tidak dicoba: app sengaja menyembunyikan tombolnya).
-4. Jalur tulis laporan harian dan izin di device (S4/S5). Presensi masuk (`POST attend`) sudah dijalankan sekali di device.
+4. Jalur tulis laporan harian dan pengajuan izin di device (S4/S5). Presensi masuk (`POST attend`) sudah dijalankan sekali di device. Izin hanya bisa diajukan untuk jadwal **hari ini** yang `can_submit_leave_request`-nya true; untuk BUDI itu hilang begitu presensi masuk dicatat.

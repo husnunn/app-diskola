@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Place
@@ -27,6 +28,7 @@ import id.diskola.app.ui.screens.presensi.DistancePill
 import id.diskola.app.ui.screens.presensi.MapFrame
 import id.diskola.app.ui.screens.presensi.mapCardShadow
 import id.diskola.app.ui.theme.DiskolaTheme
+import id.diskola.app.utils.MagangRules
 import id.diskola.app.utils.PresensiRules.MasukStatus
 import id.diskola.app.viewmodel.MagangAttendView
 import java.time.LocalDate
@@ -247,3 +249,34 @@ private fun LaporanLoadingPreview() = LaporanPreview(emptyList(), loaded = false
 @Preview(name = "Laporan, failed", showBackground = true, widthDp = 360, heightDp = 640)
 @Composable
 private fun LaporanErrorPreview() = LaporanPreview(emptyList(), loaded = false, errorMessage = "Tidak dapat terhubung ke server.")
+
+// ---- Izin ----
+// One row of the izin list in both types, with a long company and note (cut at two lines) and with neither.
+
+@Composable
+private fun LeavePreview() {
+    DiskolaTheme(darkTheme = isSystemInDarkTheme()) {
+        Surface {
+            androidx.compose.foundation.layout.Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp),
+            ) {
+                LeaveCard(
+                    MagangRules.Leave(
+                        1, "2026-06-04", "sakit",
+                        "Demam tinggi sejak semalam dan dokter menyarankan istirahat penuh selama dua hari, surat keterangan terlampir.",
+                        "", "PT. Teknologi Pendidikan Nusantara Berkembang Bersama", "",
+                    ),
+                    onClick = {},
+                )
+                LeaveCard(MagangRules.Leave(2, "2026-06-05", "izin", "", "", "", ""), onClick = {})
+            }
+        }
+    }
+}
+
+@Preview(name = "Izin, list rows", showBackground = true, widthDp = 360, heightDp = 480)
+@Preview(name = "Izin, list rows, dark", showBackground = true, widthDp = 360, heightDp = 480, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Preview(name = "Izin, list rows, large font", showBackground = true, widthDp = 360, heightDp = 800, fontScale = 1.5f)
+@Composable
+private fun LeaveRowsPreview() = LeavePreview()
