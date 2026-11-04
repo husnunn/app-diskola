@@ -217,7 +217,10 @@ fun PresensiMasukScreen(
     }
 }
 
-/** Shared by Masuk and Dinas Luar; the radius circle and the markers take their colours from the theme. */
+/**
+ * Shared by Masuk, Dinas Luar, Verifikasi Jurnal and Magang; the radius circle and the markers take their colours from the theme.
+ * [placeTitle] is the destination marker's title ("Sekolah", "Lokasi Magang"); the coordinates keep their `school` names from the first caller.
+ */
 @Composable
 internal fun AttendanceMap(
     schoolLat: Double,
@@ -227,6 +230,7 @@ internal fun AttendanceMap(
     userLat: Double?,
     userLng: Double?,
     modifier: Modifier = Modifier,
+    placeTitle: String = "Sekolah",
     overlay: @Composable BoxScope.() -> Unit = {},
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -264,7 +268,7 @@ internal fun AttendanceMap(
             modifier = Modifier.fillMaxSize(),
         ) {
             if (hasSchool) {
-                Marker(state = schoolMarker, title = "Sekolah")
+                Marker(state = schoolMarker, title = placeTitle)
                 if (showRadius && radiusMeters > 0f) {
                     Circle(center = school, radius = radiusMeters.toDouble(), fillColor = scheme.primary.copy(alpha = 0.12f), strokeColor = scheme.primary, strokeWidth = 4f)
                 }

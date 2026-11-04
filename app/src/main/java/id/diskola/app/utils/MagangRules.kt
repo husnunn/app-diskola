@@ -3,6 +3,10 @@ package id.diskola.app.utils
 import id.diskola.app.dataclass.ResponData.MagangAttendanceItem
 import id.diskola.app.dataclass.ResponData.MagangAttendanceState
 import id.diskola.app.dataclass.ResponData.MagangScheduleItem
+import id.diskola.app.utils.PresensiRules.CardTone
+import id.diskola.app.utils.PresensiRules.MasukCard
+import id.diskola.app.utils.PresensiRules.MasukStatus
+import id.diskola.app.utils.PresensiRules.Proximity
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -205,6 +209,67 @@ object MagangRules {
 
     /** At pick time: only pictures are accepted as proof. */
     fun leaveFileError(mimeType: String?): String? = if (mimeType?.startsWith("image/") == true) null else "File harus berupa gambar"
+
+    // ---- Check-in (presensi masuk) ----
+
+    const val ATTEND_BUTTON = "Konfirmasi"
+
+    /** `restricted` is "the radius is enforced"; legacy defaulted to true when the server said nothing. */
+    fun radiusEnforced(state: MagangAttendanceState?): Boolean = state?.radius_enabled != false
+
+    const val NO_COORDINATES_MESSAGE = "Titik lokasi tempat magang belum diatur. Silakan hubungi pembimbing atau admin sekolah Anda."
+
+    /**
+     * What the check-in screen offers. The server decides first: without `can_attend` its own `status` text is shown and there is no button.
+     * Then the location: the button waits for a fix (legacy showed it with the radius off and failed with "Gagal mendapatkan lokasi Anda"
+     * when tapped), a mock fix is refused, and with the radius on the student must be inside it. A company without coordinates cannot be
+     * "inside" for anyone (legacy measured against 0,0), so it says so instead of "outside".
+     */
+    fun attendStatus(
+        state: MagangAttendanceState?,
+        companyHasCoordinates: Boolean,
+        hasLocation: Boolean,
+        isMock: Boolean,
+        radius: Float,
+        distanceMeters: Float?,
+    ): MasukStatus {
+        val enforced = radiusEnforced(state)
+        val serverText = when {
+            state?.can_attend != true -> state?.status?.trim().orEmpty().ifEmpty { "Presensi masuk belum dapat dilakukan" }
+            enforced && !companyHasCoordinates -> NO_COORDINATES_MESSAGE
+            else -> ""
+        }
+        return PresensiRules.masukStatus(
+            loading = false,
+            checkFailed = false,
+            allowAttendance = true,
+            buttonLabel = ATTEND_BUTTON,
+            serverText = serverText,
+            hasLocation = hasLocation,
+            isMock = isMock,
+            restricted = enforced,
+            radius = radius,
+            distanceMeters = distanceMeters,
+        )
+    }
+
+    /** The status card of the check-in screen: the school screen's wording, with the company named and legacy's "area yang diizinkan". */
+    fun attendCard(status: MasukStatus, locationOff: Boolean, proximity: Proximity): MasukCard? = when (status) {
+        MasukStatus.OutsideRadius -> MasukCard(
+            CardTone.Error,
+            "Anda berada di luar area yang diizinkan",
+            (proximity as? Proximity.Outside)?.let { distanceLine(it.meters, it.radius) },
+        )
+        is MasukStatus.Ready -> when (proximity) {
+            is Proximity.Inside -> MasukCard(CardTone.Success, "Anda berada di area yang diizinkan", distanceLine(proximity.meters, proximity.radius))
+            Proximity.Unrestricted -> MasukCard(CardTone.Neutral, "Absensi bisa dilakukan dimanapun")
+            else -> MasukCard(CardTone.Neutral, "Lokasi Anda sudah ditemukan")
+        }
+        else -> PresensiRules.masukCard(status, locationOff, proximity)
+    }
+
+    private fun distanceLine(meters: Float, radius: Float) =
+        "${PresensiRules.formatDistance(meters)} dari lokasi magang · radius ${PresensiRules.formatDistance(radius)}"
 
     // ---- Locations and errors ----
 

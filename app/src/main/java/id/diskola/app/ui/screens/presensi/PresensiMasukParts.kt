@@ -182,7 +182,7 @@ internal fun MasukContent(
  * negative offset, so the map keeps its touches and the page has no dead strip at the bottom).
  */
 @Composable
-private fun MasukHero(
+internal fun MasukHero(
     name: String,
     avatar: String,
     lastLabel: String,
@@ -320,9 +320,9 @@ internal fun MapFrame(
 /** The shadow the map card casts on the hero; given by the screen, so the Dinas Luar map stays flat. */
 internal fun Modifier.mapCardShadow(): Modifier = shadow(3.dp, DiskolaExtraShapes.card, clip = false)
 
-/** "45 m dari sekolah", floating over the top-left of the map. */
+/** "45 m dari sekolah", floating over the top-left of the map. [place] is what the distance is measured to ("sekolah", "lokasi magang"). */
 @Composable
-internal fun BoxScope.DistancePill(meters: Float) {
+internal fun BoxScope.DistancePill(meters: Float, place: String = "sekolah") {
     val scheme = MaterialTheme.colorScheme
     Row(
         modifier = Modifier
@@ -335,7 +335,7 @@ internal fun BoxScope.DistancePill(meters: Float) {
     ) {
         Icon(Icons.Rounded.Place, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(16.dp))
         Spacer(modifier = Modifier.size(Spacing.xs))
-        Text("${PresensiRules.formatDistance(meters)} dari sekolah", style = MaterialTheme.typography.labelLarge, color = scheme.onSurface)
+        Text("${PresensiRules.formatDistance(meters)} dari $place", style = MaterialTheme.typography.labelLarge, color = scheme.onSurface)
     }
 }
 
@@ -460,7 +460,7 @@ internal fun MasukScheduleCard(schedule: PresensiSchedule, modifier: Modifier = 
 }
 
 @Composable
-private fun ScheduleTile(label: String, value: String, icon: ImageVector, modifier: Modifier = Modifier) {
+internal fun ScheduleTile(label: String, value: String, icon: ImageVector, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
     Row(
         modifier = modifier

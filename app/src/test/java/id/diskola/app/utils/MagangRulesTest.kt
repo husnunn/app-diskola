@@ -9,6 +9,9 @@ import id.diskola.app.dataclass.ResponData.MagangScheduleItem
 import id.diskola.app.dataclass.ResponData.MagangScheduleTime
 import id.diskola.app.utils.MagangRules.CardAction
 import id.diskola.app.utils.MagangRules.LeaveField
+import id.diskola.app.utils.PresensiRules.CardTone
+import id.diskola.app.utils.PresensiRules.MasukStatus
+import id.diskola.app.utils.PresensiRules.Proximity
 import java.time.LocalDate
 import java.time.YearMonth
 import org.junit.Assert.assertEquals
@@ -252,6 +255,93 @@ class MagangRulesTest {
         assertNull(MagangRules.leaveFileError("image/png"))
         assertEquals("File harus berupa gambar", MagangRules.leaveFileError("application/pdf"))
         assertEquals("File harus berupa gambar", MagangRules.leaveFileError(null))
+    }
+
+    // ---- check-in ----
+
+    private val canAttend = MagangAttendanceState(status = "Presensi Masuk", can_attend = true, radius_enabled = true)
+
+    private fun attend(
+        state: MagangAttendanceState? = canAttend,
+        coordinates: Boolean = true,
+        fix: Boolean = true,
+        mock: Boolean = false,
+        radius: Float = 100f,
+        distance: Float? = 45f,
+    ) = MagangRules.attendStatus(state, coordinates, fix, mock, radius, distance)
+
+    @Test
+    fun attendStatus_insideTheRadiusOffersTheButtonAndTheCardSaysHowFar() {
+        val status = attend()
+        assertEquals(MasukStatus.Ready("Konfirmasi"), status)
+        val card = MagangRules.attendCard(status, locationOff = false, Proximity.Inside(45f, 100f))!!
+        assertEquals(CardTone.Success, card.tone)
+        assertEquals("Anda berada di area yang diizinkan", card.title)
+        assertEquals("45 m dari lokasi magang · radius 100 m", card.detail)
+    }
+
+    @Test
+    fun attendStatus_outsideTheRadiusHidesTheButtonWithLegacyWording() {
+        val status = attend(distance = 250f)
+        assertEquals(MasukStatus.OutsideRadius, status)
+        val card = MagangRules.attendCard(status, locationOff = false, Proximity.Outside(250f, 100f))!!
+        assertEquals(CardTone.Error, card.tone)
+        assertEquals("Anda berada di luar area yang diizinkan", card.title)
+        assertEquals("250 m dari lokasi magang · radius 100 m", card.detail)
+    }
+
+    @Test
+    fun attendStatus_exactlyOnTheRadiusIsStillInside() {
+        assertEquals(MasukStatus.Ready("Konfirmasi"), attend(radius = 5f, distance = 5f))
+        assertEquals(MasukStatus.OutsideRadius, attend(radius = 5f, distance = 5.1f))
+    }
+
+    @Test
+    fun attendStatus_radiusOffWorksAnywhereOnceThereIsAFix() {
+        val off = canAttend.copy(radius_enabled = false)
+        assertEquals(MasukStatus.Ready("Konfirmasi"), attend(state = off, distance = 9_000f))
+        val card = MagangRules.attendCard(MasukStatus.Ready("Konfirmasi"), false, Proximity.Unrestricted)!!
+        assertEquals("Absensi bisa dilakukan dimanapun", card.title)
+        // Legacy showed the button before any fix and failed on tap; here it waits for the position the request needs.
+        assertEquals(MasukStatus.WaitingLocation, attend(state = off, fix = false, distance = null))
+    }
+
+    @Test
+    fun attendStatus_aMissingRadiusFlagMeansTheRadiusIsEnforced() {
+        assertTrue(MagangRules.radiusEnforced(null))
+        assertTrue(MagangRules.radiusEnforced(MagangAttendanceState(can_attend = true)))
+        assertFalse(MagangRules.radiusEnforced(MagangAttendanceState(radius_enabled = false)))
+        assertEquals(MasukStatus.OutsideRadius, attend(state = MagangAttendanceState(can_attend = true), distance = 500f))
+    }
+
+    @Test
+    fun attendStatus_withoutCanAttendTheServersOwnTextIsShownAndThereIsNoButton() {
+        val late = MagangAttendanceState(status = " Waktu presensi masuk sudah lewat ", can_attend = false, radius_enabled = true)
+        assertEquals(MasukStatus.ServerMessage("Waktu presensi masuk sudah lewat"), attend(state = late))
+        assertEquals(MasukStatus.ServerMessage("Presensi masuk belum dapat dilakukan"), attend(state = null))
+        assertEquals(
+            MasukStatus.ServerMessage("Presensi masuk belum dapat dilakukan"),
+            attend(state = MagangAttendanceState(status = "  ", can_attend = null)),
+        )
+        // Even a perfect position cannot override the server.
+        assertEquals(MasukStatus.ServerMessage("Waktu presensi masuk sudah lewat"), attend(state = late, distance = 0f))
+    }
+
+    @Test
+    fun attendStatus_waitsForAFixAndRefusesAMockOne() {
+        assertEquals(MasukStatus.WaitingLocation, attend(fix = false, distance = null))
+        assertEquals(MasukStatus.Mock, attend(mock = true))
+        assertEquals(MasukStatus.Mock, attend(state = canAttend.copy(radius_enabled = false), mock = true))
+        assertEquals("Mengambil lokasi…", MagangRules.attendCard(MasukStatus.WaitingLocation, false, Proximity.Unknown)!!.title)
+        val off = MagangRules.attendCard(MasukStatus.WaitingLocation, locationOff = true, Proximity.Unknown)!!
+        assertTrue(off.offersEnableLocation)
+    }
+
+    @Test
+    fun attendStatus_aCompanyWithoutCoordinatesCannotBeJudgedWhenTheRadiusIsOn() {
+        assertEquals(MasukStatus.ServerMessage(MagangRules.NO_COORDINATES_MESSAGE), attend(coordinates = false, distance = null))
+        // With the radius off the position is only recorded, so missing coordinates do not matter.
+        assertEquals(MasukStatus.Ready("Konfirmasi"), attend(state = canAttend.copy(radius_enabled = false), coordinates = false, distance = null))
     }
 
     // ---- coordinates and errors ----

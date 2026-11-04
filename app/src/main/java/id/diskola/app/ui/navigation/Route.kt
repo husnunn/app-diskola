@@ -128,6 +128,10 @@ sealed interface Route {
     @Serializable
     data object Magang : Route
 
+    /** Magang check-in for one schedule day; [scheduleId] is the server's schedule id. */
+    @Serializable
+    data class MagangAttend(val scheduleId: Long = 0) : Route
+
     /** Materi entry point for students — the subject picker. */
     @Serializable
     data object Mapel : Route

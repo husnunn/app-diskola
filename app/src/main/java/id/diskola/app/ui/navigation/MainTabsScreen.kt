@@ -45,6 +45,7 @@ import id.diskola.app.ui.screens.jurnal.JurnalDetailScreen
 import id.diskola.app.ui.screens.jurnal.JurnalFormScreen
 import id.diskola.app.ui.screens.jurnal.JurnalScreen
 import id.diskola.app.ui.screens.jurnal.VerifikasiJurnalScreen
+import id.diskola.app.ui.screens.magang.MagangAttendScreen
 import id.diskola.app.ui.screens.magang.MagangScreen
 import id.diskola.app.ui.screens.presensi.IzinAddScreen
 import id.diskola.app.ui.screens.presensi.IzinDetailScreen
@@ -442,8 +443,18 @@ fun MainTabsScreen(
                 composable<Route.Magang> {
                     MagangScreen(
                         onBack = { navController.popBackStack() },
-                        onOpenMasuk = { },
+                        onOpenMasuk = { navController.navigate(Route.MagangAttend(it)) },
                         onOpenLaporan = { },
+                    )
+                }
+                composable<Route.MagangAttend> { backStackEntry ->
+                    val route = backStackEntry.toRoute<Route.MagangAttend>()
+                    val shellEntry = remember(backStackEntry) { navController.getBackStackEntry(Route.Magang) }
+                    MagangAttendScreen(
+                        scheduleId = route.scheduleId,
+                        shared = hiltViewModel(shellEntry),
+                        onBack = { navController.popBackStack() },
+                        onDone = { navController.popBackStack() },
                     )
                 }
                 composable<Route.IzinDetail> { backStackEntry ->

@@ -28,15 +28,19 @@ Legenda: ✅ selesai & teruji (JVM/compile) · ✅* kode selesai, **belum diuji 
 | Menu "Panduan" (4 langkah) dan "Tambah Izin" | ✅* | Panduan = bottom sheet statis (legacy: overlay bertahap; pref `onboarding_magang_filter_done` hanya ditulis, tidak pernah dibaca) — teramati di device. "Tambah Izin" ⏳ S5. |
 | `company.id` > `Int.MAX_VALUE` (2149267629) pada data dev | ✅ | DTO `Long?`; tes regresi `schedule_companyIdPastIntRangeAndRadiusAsNumber…`. |
 
-## 3. Presensi masuk (doc §11.3)
+## 3. Presensi masuk (doc §11.3) — tahap S3, diuji di Samsung (siswa BUDI) 2026-11-04
 
 | Item | Status | Keterangan |
 |---|---|---|
-| Peta perusahaan + lingkaran radius bila `radius_enabled`; kartu status; "Konfirmasi" → `POST attend` → "Absensi Berhasil!" | ⏳ | |
-| Izin lokasi presisi (FINE) saja, ditolak → alert + keluar | ⏳ | **Tanpa geofence dan tanpa izin lokasi latar** (keputusan 2026-10-07 menggantikan Q1); legacy memintanya selalu. |
-| Lokasi palsu ditolak | ⏳ | Fitur baru (Q5). |
-| Setelah sukses: tutup dan segarkan shell | ⏳ | Legacy membuka ulang `MagangPage` dengan `CLEAR_TOP`. |
-| Tanpa unduh avatar untuk marker | ⏳ | Legacy mengunduh tanpa try/catch (bisa crash). |
+| Peta perusahaan + lingkaran radius bila `radius_enabled`; kartu status; "Konfirmasi" → dialog konfirmasi → `POST attend` → "Absensi Berhasil!" | ✅ | Diuji penuh di device: 2 m dari PT AMEERA MEKKAH (radius 5 m) → kartu hijau, "Konfirmasi", dialog "Lakukan Absensi", `POST attend` `{id, lat, lng}` (Double) → **201**, dialog "Absensi Berhasil!". Dialog konfirmasi tambahan tidak ada di legacy (lihat FLOW_QUESTIONS). |
+| Izin lokasi presisi (FINE) saja, ditolak → alert + keluar | ✅* | Kode mengikuti layar Masuk Sekolah; jalur ditolak belum dijalankan di device. |
+| Lokasi palsu ditolak | ✅ | Aturan diuji JVM (`attendStatus_waitsForAFixAndRefusesAMockOne`); tidak dicoba di device. |
+| Tombol menunggu posisi (radius mati pun) | ✅ | Legacy menampilkan tombol sebelum ada posisi lalu gagal dengan "Gagal mendapatkan lokasi Anda". |
+| Perusahaan tanpa koordinat + radius aktif → pesan, bukan "di luar area" | ✅ | Legacy mengukur ke 0,0. Diuji JVM. |
+| Server yang menentukan: tanpa `can_attend` tampil teks `status`-nya, tanpa tombol | ✅ | Diuji JVM. |
+| Setelah sukses: tutup dan segarkan shell | ✅ | Teramati: kartu hari ini berubah menjadi "Belum waktunya presensi pulang" tanpa tombol. Legacy membuka ulang `MagangPage` (`CLEAR_TOP`). |
+| Tanpa unduh avatar untuk marker | ✅ | Marker pengguna biru seperti layar Masuk Sekolah. |
+| Tanpa geofence, tanpa `ACCESS_BACKGROUND_LOCATION` | ✅ | Keputusan 2026-10-07 menggantikan Q1. |
 
 ## 4. Laporan harian + riwayat (doc §11.4–11.5)
 
@@ -62,6 +66,6 @@ Legenda: ✅ selesai & teruji (JVM/compile) · ✅* kode selesai, **belum diuji 
 
 ## 7. Belum diverifikasi (jangan diasumsikan selesai)
 1. Bentuk asli respons `attendance` (laporan dan izin: `null` vs `""`, format `check_in_at`, `location`). Respons `schedule` sudah terbukti dari akun BUDI (lihat FLOW_QUESTIONS 2026-11-04); `company.id` melewati `Int`.
-2. Apa yang membuat `can_leave` bernilai true (hanya `can_attend` yang teramati; status "Presensi Masuk" muncul bersamanya) dan nilai `status` selain tiga kalimat yang teramati.
-3. Apakah server menegakkan jarak/jam/ukuran file, dan isi pesan 4xx-nya.
-4. Jalur tulis (presensi masuk, laporan harian, izin) di device. Akun BUDI punya jadwal hari ini (radius 5 m): jarak 5 m ke PT AMEERA MEKKAH tidak dapat dicapai tanpa lokasi palsu, yang sengaja ditolak app.
+2. Apa yang membuat `can_leave` bernilai true: sesudah presensi masuk status jadi "Belum waktunya presensi pulang" dengan `can_leave=false`; kapan jendela pulang terbuka (menurut jam `end_time`?) belum teramati.
+3. Apakah server menegakkan jarak/jam/ukuran file, dan isi pesan 4xx-nya (presensi masuk dari luar radius tidak dicoba: app sengaja menyembunyikan tombolnya).
+4. Jalur tulis laporan harian dan izin di device (S4/S5). Presensi masuk (`POST attend`) sudah dijalankan sekali di device.

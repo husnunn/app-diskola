@@ -7,6 +7,7 @@ import id.diskola.app.dataclass.ResponData.MagangAttendanceItem
 import id.diskola.app.dataclass.ResponData.MagangScheduleItem
 import id.diskola.app.utils.JurnalRules
 import id.diskola.app.utils.MagangRules
+import id.diskola.app.utils.session.SessionStore
 import java.io.File
 import javax.inject.Inject
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -22,7 +23,11 @@ import okhttp3.RequestBody.Companion.toRequestBody
  */
 class MagangRepository @Inject constructor(
     private val api: MagangApiService,
+    private val sessionStore: SessionStore,
 ) {
+
+    /** Whose name and photo the check-in screen shows. */
+    val user get() = sessionStore.user
 
     suspend fun schedules(): List<MagangScheduleItem> = api.schedule().data.orEmpty()
 
