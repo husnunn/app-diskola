@@ -124,6 +124,10 @@ sealed interface Route {
     @Serializable
     data class IzinDetail(val uuid: String = "") : Route
 
+    /** Magang (internship) shell: Jadwal + Laporan. Owns the [id.diskola.app.viewmodel.MagangViewModel] its screens share. */
+    @Serializable
+    data object Magang : Route
+
     /** Materi entry point for students — the subject picker. */
     @Serializable
     data object Mapel : Route

@@ -45,6 +45,7 @@ import id.diskola.app.ui.screens.jurnal.JurnalDetailScreen
 import id.diskola.app.ui.screens.jurnal.JurnalFormScreen
 import id.diskola.app.ui.screens.jurnal.JurnalScreen
 import id.diskola.app.ui.screens.jurnal.VerifikasiJurnalScreen
+import id.diskola.app.ui.screens.magang.MagangScreen
 import id.diskola.app.ui.screens.presensi.IzinAddScreen
 import id.diskola.app.ui.screens.presensi.IzinDetailScreen
 import id.diskola.app.ui.screens.presensi.IzinListScreen
@@ -253,6 +254,7 @@ fun MainTabsScreen(
                         onNavigateToPoin = {
                             navController.navigate(if (isTeacher) Route.PoinGuru else Route.PoinSiswa)
                         },
+                        onNavigateToMagang = { navController.navigate(Route.Magang) },
                         onNavigateToAsesmen = { navController.navigate(Route.Akm.List) },
                         onNavigateToNotifikasi = { navController.navigate(Route.Notifikasi) },
                         onOpenKlaspayActivation = activationGate.start,
@@ -435,6 +437,13 @@ fun MainTabsScreen(
                             navController.previousBackStackEntry?.savedStateHandle?.set("izinChanged", true)
                             navController.popBackStack()
                         },
+                    )
+                }
+                composable<Route.Magang> {
+                    MagangScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenMasuk = { },
+                        onOpenLaporan = { },
                     )
                 }
                 composable<Route.IzinDetail> { backStackEntry ->

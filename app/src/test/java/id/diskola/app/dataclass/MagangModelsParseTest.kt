@@ -41,6 +41,26 @@ class MagangModelsParseTest {
     }
 
     @Test
+    fun schedule_companyIdPastIntRangeAndRadiusAsNumberReadLikeTheDevServerSendsThem() {
+        // Real row from dev (4 Nov 2026): the company id is above Int.MAX_VALUE and the radius is a JSON number.
+        val item = schedule(
+            """
+            { "data": [
+              { "id": 2026110425,
+                "company": { "id": 2149267629, "name": "PT AMEERA MEKKAH", "address": "Jl. Raya Bratang Binangun No.85 B",
+                             "latitude": "-7.2942595", "longitude": "112.7597888", "radius": 5 },
+                "schedule": { "date": "2026-11-04", "start_time": "08:00:00", "end_time": "16:00:00" },
+                "attendance": { "status": "Presensi Masuk", "can_attend": true, "can_leave": false,
+                                "can_submit_leave_request": true, "leave_request": null, "radius_enabled": true } }
+            ] }
+            """,
+        ).data!!.single()
+        assertEquals(2149267629L, item.company?.id)
+        assertEquals("5", item.company?.radius)
+        assertEquals(true, item.attendance?.can_attend)
+    }
+
+    @Test
     fun schedule_numbersWhereStringsAreExpectedAndNullsDoNotFailTheList() {
         val items = schedule(
             """

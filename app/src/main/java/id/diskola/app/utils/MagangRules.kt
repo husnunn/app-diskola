@@ -54,6 +54,9 @@ object MagangRules {
     fun schedulesOn(items: List<MagangScheduleItem>, day: LocalDate): List<MagangScheduleItem> =
         items.filter { dateOf(it.schedule?.date) == day }
 
+    /** The company named on the card; a schedule the server sent without one still gets a title. */
+    fun companyName(item: MagangScheduleItem): String = item.company?.name?.trim().orEmpty().ifEmpty { "Tempat Magang" }
+
     enum class CardAction { Masuk, LaporanHarian }
 
     /**

@@ -24,7 +24,8 @@ data class MagangScheduleItem(
 
 @JsonClass(generateAdapter = true)
 data class MagangCompany(
-    val id: Int? = null,
+    /** Dev rows carry ids past `Int.MAX_VALUE` (2149267629): an `Int` here failed the whole schedule list. */
+    val id: Long? = null,
     @NullToEmptyString val name: String = "",
     @NullToEmptyString val address: String = "",
     @NullToEmptyString val latitude: String = "",

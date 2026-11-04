@@ -58,6 +58,7 @@ fun HomeScreen(
     onNavigateToTugas: () -> Unit,
     onNavigateToPresensi: () -> Unit,
     onNavigateToPoin: () -> Unit,
+    onNavigateToMagang: () -> Unit,
     onNavigateToAgenda: () -> Unit,
     onOpenJurnal: () -> Unit,
     onOpenVerifikasiJurnal: (attendanceId: Int, title: String) -> Unit,
@@ -123,6 +124,7 @@ fun HomeScreen(
             tile.key == MenuKey.PRESENSI -> viewModel.openFeature(FeatureGateRepository.PRESENSI, onNavigateToPresensi)
             tile.key == MenuKey.ASESMEN -> onNavigateToAsesmen()
             tile.key == MenuKey.POIN -> onNavigateToPoin()
+            tile.key == MenuKey.MAGANG -> onNavigateToMagang()
             tile.key == MenuKey.JURNAL -> viewModel.openFeature(FeatureGateRepository.JURNAL_KBM, onOpenJurnal)
             tile.key == MenuKey.AGENDA_MINGGUAN -> onNavigateToAgenda()
             else -> comingSoonDialog = true

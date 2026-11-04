@@ -53,7 +53,7 @@ fun menuTilesFor(profile: HomeProfile): List<MenuTileData> {
             tile(MenuKey.JURNAL, "edit_note", "Jurnal", true),
             tile(MenuKey.ASESMEN, "quiz", "Asesmen", true),
             tile(MenuKey.POIN, "workspace_premium", "Poin", true),
-            tile(MenuKey.MAGANG, "business_center", "Magang", false),
+            tile(MenuKey.MAGANG, "business_center", "Magang", true),
             tile(MenuKey.E_RAPORT, "grading", "E-Raport", false),
         )
         profile.isTeacher -> listOf(

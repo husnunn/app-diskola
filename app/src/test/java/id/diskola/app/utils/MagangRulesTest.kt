@@ -102,6 +102,13 @@ class MagangRulesTest {
         assertNull(MagangRules.statusText(null))
     }
 
+    @Test
+    fun companyName_isTrimmedAndFallsBackWhenTheServerSentNone() {
+        assertEquals("PT. Uji", MagangRules.companyName(schedule(1, "2026-06-04", company = "  PT. Uji ")))
+        assertEquals("Tempat Magang", MagangRules.companyName(schedule(1, "2026-06-04", company = "   ")))
+        assertEquals("Tempat Magang", MagangRules.companyName(MagangScheduleItem(id = 1)))
+    }
+
     // ---- reports ----
 
     @Test
