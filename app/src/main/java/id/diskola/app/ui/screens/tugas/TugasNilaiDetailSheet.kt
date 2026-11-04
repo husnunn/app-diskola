@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import id.diskola.app.ui.components.InfoToastEffect
 import id.diskola.app.ui.components.AppBottomSheet
 import id.diskola.app.ui.components.FileViewerHost
 import id.diskola.app.ui.components.AppButton
@@ -52,6 +53,10 @@ fun TugasNilaiDetailSheet(
     val pdfPath by viewModel.pdfPath.collectAsStateWithLifecycle()
     val openFileIntent by viewModel.openFileIntent.collectAsStateWithLifecycle()
     val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
+    val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
+    // Both were invisible or red before: the info notice is a toast (legacy), and "Gagal membuka file" was set but this sheet never showed it.
+    InfoToastEffect(infoMessage, onShown = viewModel::consumeInfoMessage)
+    InfoToastEffect(errorMessage.ifBlank { null }, onShown = viewModel::clearError)
 
     var permissionDialogFor by remember { mutableStateOf<Pair<String, String>?>(null) }
 
@@ -77,7 +82,6 @@ fun TugasNilaiDetailSheet(
                 if (current.teacher_name.isNotBlank()) {
                     Text("Guru · ${current.teacher_name}", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
                 }
-                infoMessage?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = scheme.error) }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier.size(56.dp).background(scheme.primaryContainer, CircleShape),

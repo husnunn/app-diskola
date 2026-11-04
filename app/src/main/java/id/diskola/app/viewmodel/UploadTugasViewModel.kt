@@ -67,6 +67,15 @@ class UploadTugasViewModel @Inject constructor(
     private val sessionStore: SessionStore,
 ) : BaseViewModel() {
 
+    /** "Hapus Tugas" of the read-only detail; [onDeleted] runs only after the server accepted. */
+    fun deleteTugas(id: Int, onDeleted: () -> Unit) {
+        if (id <= 0) return
+        launchWithHandling {
+            repository.deleteTugas(id)
+            onDeleted()
+        }
+    }
+
     /** `null` until the scope is known; the form waits for it ([initialLoading]). */
     private val _restricted = MutableStateFlow<Boolean?>(null)
     val restricted: StateFlow<Boolean?> = _restricted.asStateFlow()

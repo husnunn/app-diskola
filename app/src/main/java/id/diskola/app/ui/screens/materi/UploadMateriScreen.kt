@@ -59,22 +59,12 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
+import id.diskola.app.utils.UploadFileTypes
 import java.io.FileOutputStream
 
 private enum class UploadTarget { JENJANG, JURUSAN, KELAS }
 
-private val ALLOWED_MIME_TYPES = arrayOf(
-    "application/pdf",
-    "image/jpeg",
-    "image/png",
-    "image/*",
-    "application/msword",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "application/vnd.ms-excel",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "application/vnd.ms-powerpoint",
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-)
+private val ALLOWED_MIME_TYPES = UploadFileTypes.DOCUMENT_MIME_TYPES
 
 private const val MAX_FILE_BYTES = 12 * 1024 * 1024L
 

@@ -100,6 +100,10 @@ fun TugasGuruListItem(item: HomeworkTable, onClick: () -> Unit, onMoreClick: () 
             if (item.subject_name.isNotBlank()) {
                 Text(item.subject_name, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
             }
+            // The server's own deadline line ("Terlewati : 26 Oct 2026"), which legacy's teacher card showed in place of the upload date.
+            if (item.information_label.isNotBlank()) {
+                Text(item.information_label, style = MaterialTheme.typography.labelMedium, color = scheme.onSurface)
+            }
             if (item.upload_at_label.isNotBlank()) {
                 Text("Upload: ${item.upload_at_label}", style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
             }

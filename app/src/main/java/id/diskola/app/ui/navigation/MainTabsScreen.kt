@@ -41,6 +41,8 @@ import androidx.navigation.toRoute
 import id.diskola.app.dataclass.mock.NotificationItem
 import java.time.LocalDate
 import id.diskola.app.dataclass.mock.formatRupiah
+import id.diskola.app.repository.FeatureGateRepository
+import id.diskola.app.ui.components.FeatureGateDialogs
 import id.diskola.app.ui.screens.jurnal.JurnalDetailScreen
 import id.diskola.app.ui.screens.jurnal.JurnalFormScreen
 import id.diskola.app.ui.screens.jurnal.JurnalScreen
@@ -95,6 +97,7 @@ import id.diskola.app.ui.screens.poin.PoinCariScreen
 import id.diskola.app.ui.screens.poin.PoinFormScreen
 import id.diskola.app.ui.screens.poin.PoinHasilScreen
 import id.diskola.app.ui.screens.poin.PoinSiswaScreen
+import id.diskola.app.viewmodel.FeatureOpenViewModel
 import id.diskola.app.viewmodel.PoinGuruViewModel
 import id.diskola.app.ui.screens.notifikasi.NotifikasiDetailScreen
 import id.diskola.app.ui.screens.notifikasi.NotifikasiScreen
@@ -544,15 +547,19 @@ fun MainTabsScreen(
                 }
 
                 composable<Route.AgendaMingguan> {
+                    // Legacy opens Presensi from here through the same server feature switch as the Home tile.
+                    val gate: FeatureOpenViewModel = hiltViewModel()
                     AgendaMingguanScreen(
                         onBack = { navController.popBackStack() },
                         onOpenDetail = { date, id -> navController.navigate(Route.AgendaDetail(date, id)) },
                         onOpenCheck = { date, id, mode -> navController.navigate(Route.AgendaCheck(date, id, mode)) },
-                        onOpenPresensi = { navController.navigate(Route.Presensi) },
+                        onOpenPresensi = { gate.open(FeatureGateRepository.PRESENSI) { navController.navigate(Route.Presensi) } },
                     )
+                    FeatureGateDialogs(gate, isTeacher = rememberIsTeacher())
                 }
                 composable<Route.AgendaCheck> { backStackEntry ->
                     val route = backStackEntry.toRoute<Route.AgendaCheck>()
+                    val gate: FeatureOpenViewModel = hiltViewModel()
                     AgendaCheckScreen(
                         date = route.date,
                         agendaId = route.agendaId,
@@ -562,10 +569,13 @@ fun MainTabsScreen(
                         // Presensi replaces this check page; coming back lands on the agenda list, which
                         // refreshes today's gate on resume.
                         onOpenPresensi = {
-                            navController.popBackStack()
-                            navController.navigate(Route.Presensi)
+                            gate.open(FeatureGateRepository.PRESENSI) {
+                                navController.popBackStack()
+                                navController.navigate(Route.Presensi)
+                            }
                         },
                     )
+                    FeatureGateDialogs(gate, isTeacher = rememberIsTeacher())
                 }
                 composable<Route.AgendaDetail> { backStackEntry ->
                     val route = backStackEntry.toRoute<Route.AgendaDetail>()
@@ -603,7 +613,8 @@ fun MainTabsScreen(
                         mode = route.mode,
                         guruViewModel = vm,
                         onBack = { navController.popBackStack() },
-                        onDone = { navController.popBackStack() },
+                        // Legacy finishes the whole Poin activity after a posted entry, landing on the hub, not back on the student's result.
+                        onDone = { navController.popBackStack(Route.PoinGuru, inclusive = true) },
                     )
                 }
 
@@ -634,7 +645,7 @@ fun MainTabsScreen(
                     }
                     TugasGuruScreen(
                         onBack = { navController.popBackStack() },
-                        onOpenTugas = { navController.navigate(Route.TugasDetail(it.id.toInt(), it.type, isTeacher = true)) },
+                        onOpenTugas = { navController.navigate(Route.UploadTugas(isEdit = true, tugasId = it.id.toInt(), editable = false)) },
                         onUpload = { navController.navigate(Route.UploadTugas()) },
                         onEdit = { navController.navigate(Route.UploadTugas(isEdit = true, tugasId = it.id.toInt())) },
                         onOpenScoredGroup = { navController.navigate(Route.TugasTerkumpul(it.id.toInt())) },
@@ -649,6 +660,7 @@ fun MainTabsScreen(
                             navController.previousBackStackEntry?.savedStateHandle?.set("tugasChanged", true)
                             navController.popBackStack()
                         },
+                        onBack = { navController.popBackStack() },
                     )
                 }
                 composable<Route.TugasTerkumpul> { backStackEntry ->

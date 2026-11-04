@@ -92,7 +92,8 @@ class UploadMateriViewModel @Inject constructor(
     }
 
     fun submit(isEdit: Boolean, materiId: Int, data: Map<String, RequestBody>, filePart: MultipartBody.Part?) {
-        launchWithHandling(customMessage = "Gagal membuat materi") {
+        // The reason from the server (422, offline…) as legacy showed it, not a fixed "Gagal membuat materi" that hid it.
+        launchWithHandling {
             if (isEdit) repository.updateMateri(materiId, data, filePart) else repository.createMateri(data, filePart)
             _uploadSuccess.value = true
         }

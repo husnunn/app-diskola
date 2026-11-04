@@ -242,12 +242,17 @@ class TugasDetailViewModel @Inject constructor(
         }
     }
 
-    fun downloadFile(url: String, fileName: String) {
+    /**
+     * [markRead]: this is the question file; saving it counts as reading the question, as in legacy ("Download" satisfied the requirement
+     * just like "Baca tugas"). Only a download that was really queued counts.
+     */
+    fun downloadFile(url: String, fileName: String, markRead: Boolean = false) {
         if (url.isBlank()) {
             _infoMessage.value = "Berkas tidak tersedia, mohon ulangi beberapa saat lagi"
             return
         }
         if (fileOpenRepository.enqueueDownload(url, fileName)) {
+            if (markRead) _readDone.value = true
             _infoMessage.value = "Proses download $fileName akan dimulai sesaat lagi"
         } else {
             _infoMessage.value = "Berkas tidak tersedia, mohon ulangi beberapa saat lagi"

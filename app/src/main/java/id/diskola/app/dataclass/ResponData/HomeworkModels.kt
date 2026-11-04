@@ -2,6 +2,7 @@ package id.diskola.app.dataclass.ResponData
 
 import id.diskola.app.di.module.NullToEmptyString
 import id.diskola.app.di.module.NullToZeroInt
+import id.diskola.app.utils.AnswerFileRules
 
 import androidx.annotation.Keep
 import androidx.room.*
@@ -188,7 +189,7 @@ data class HomeworkAnswerFileTable(
         fun from(homeworkId: Int, it: AssignmentFileItem): HomeworkAnswerFileTable = HomeworkAnswerFileTable(
             homework_id = homeworkId,
             file_name = it.file_name,
-            file_path = it.file_path,
+            file_path = AnswerFileRules.resolvePath(it.file_path),
             file_format = it.file_format,
             file_type = it.file_type,
             file_size = it.file_size,

@@ -40,8 +40,11 @@ object AnswerFileRules {
         file.file_format.ifEmpty { file.student_assignment_files_format }.ifEmpty { name(file).substringAfterLast('.', "") }.lowercase()
 
     /** Where to fetch the file: backslashes dropped, a path without a host put under the assets host; blank when the file has no path. */
-    fun url(file: AssignmentAnswerFile): String {
-        val raw = file.file_path.ifEmpty { file.student_assignment_files_path }.replace("\\", "")
+    fun url(file: AssignmentAnswerFile): String = resolvePath(file.file_path.ifEmpty { file.student_assignment_files_path })
+
+    /** [url] for a bare path, e.g. the student's own answer file the server lists on the Tugas detail. */
+    fun resolvePath(path: String): String {
+        val raw = path.replace("\\", "")
         return if (raw.isBlank()) "" else resolveAssetUrl(raw)
     }
 }

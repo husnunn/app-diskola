@@ -111,6 +111,17 @@ fun MateriGuruListItem(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
+            // The subject tag legacy's own-materi card had (`tag_mapel_primary`): a teacher with several subjects tells the cards apart by it.
+            if (item.subject_name.isNotBlank()) {
+                Text(
+                    item.subject_name,
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    color = scheme.onPrimary,
+                    modifier = Modifier
+                        .background(scheme.primary, DiskolaExtraShapes.chipBadge)
+                        .padding(horizontal = Spacing.sm, vertical = 3.dp),
+                )
+            }
             Text(
                 item.name.ifBlank { "Tanpa judul" },
                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black),

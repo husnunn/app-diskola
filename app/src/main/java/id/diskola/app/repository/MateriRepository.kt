@@ -6,6 +6,7 @@ import id.diskola.app.apiservice.MateriApiService
 import id.diskola.app.dataclass.ResponData.ClassRoomTable
 import id.diskola.app.dataclass.ResponData.GradeTable
 import id.diskola.app.dataclass.ResponData.MajorItem
+import id.diskola.app.dataclass.ResponData.MapelItem
 import id.diskola.app.dataclass.ResponData.MapelTable
 import id.diskola.app.dataclass.ResponData.MateriTable
 import id.diskola.app.dataclass.localDb.MapelDao
@@ -18,6 +19,7 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody
 
 private const val PAGE_SIZE = 20
+private const val MAX_SUBJECT_PAGES = 25
 
 /**
  * Materi's local-only search + 20/page infinite scroll (doc `05-pembelajaran-materi-tugas.md`
@@ -61,19 +63,35 @@ class MateriRepository @Inject constructor(
         return response.data.size >= PAGE_SIZE
     }
 
+    /**
+     * The teacher's subjects feed a form dropdown and a filter, which need every subject, not a window of them: legacy asked once without
+     * `take`/`skip` (so for all). Here every page is fetched up front (the first load, and "refresh"), so a teacher with more than 20 subjects
+     * does not find some of them missing from "Mata Pelajaran" in the upload form.
+     */
     suspend fun ensureTeacherSubjectsFirstPage() {
-        if (mapelDao.count() == 0) fetchTeacherSubjectsPage(0)
+        if (mapelDao.count() == 0) mapelDao.insertAll(requestAllTeacherSubjects().map { MapelTable.fromMapelItem(it) })
     }
 
     suspend fun loadMoreTeacherSubjects(currentCount: Int): Boolean = fetchTeacherSubjectsPage(currentCount)
 
     suspend fun refreshTeacherSubjects(): Boolean {
-        val response = materiApiService.teacherSubject(take = PAGE_SIZE, skip = 0)
+        val rows = requestAllTeacherSubjects()
         db.withTransaction {
             mapelDao.clear()
-            mapelDao.insertAll(response.data.map { MapelTable.fromMapelItem(it) })
+            mapelDao.insertAll(rows.map { MapelTable.fromMapelItem(it) })
         }
-        return response.data.size >= PAGE_SIZE
+        return false
+    }
+
+    /** Pages until one comes back short; the page cap stops a server that ignores `skip` from looping forever. */
+    private suspend fun requestAllTeacherSubjects(): List<MapelItem> {
+        val all = mutableListOf<MapelItem>()
+        repeat(MAX_SUBJECT_PAGES) {
+            val page = materiApiService.teacherSubject(take = PAGE_SIZE, skip = all.size).data
+            all += page
+            if (page.size < PAGE_SIZE) return all
+        }
+        return all
     }
 
     private suspend fun fetchTeacherSubjectsPage(skip: Int): Boolean {

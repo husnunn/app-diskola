@@ -854,8 +854,8 @@ Dua agen pembaca (hanya baca kode legacy dan baru, tanpa menjalankan app) memban
 | D1 | Dokumen: 05e/FLOW 2026-10-06 menulis alert gate Agenda "hanya Tutup" padahal kode (dan legacy) punya "Presensi" + "Tutup"; 05a mengklaim paging Materi Saya teruji padahal tidak tersambung | Dokumen dikoreksi |
 
 **Belum dikerjakan — perlu keputusan atau akun uji:**
-- **H2 (High)** Guru tidak bisa membuka file jawaban siswa di layar Beri/Ubah Nilai (legacy: daftar file jawaban dengan Baca/Download + pratinjau tautan; baru: hanya satu nama file, model `Assignment` membuang `files`). Bentuk JSON-nya belum terverifikasi dan butuh sesi guru untuk diuji.
-- **Medium:** Tugas: Download pada soal tidak dihitung "sudah baca soal" (legacy menghitung); guru mengetuk kartu List Tugas membuka detail gaya siswa tanpa Edit/Hapus (legacy: form baca-saja dengan ⋮ Edit/Hapus); galat kirim Upload Materi selalu "Gagal membuat materi" (legacy menampilkan pesan server); daftar mapel guru hanya 20 (legacy tanpa paging); tile Hub tidak mengunci peran staf non-Guru (`StaffMenuAccess` legacy, dan FLOW 2026-11-02 #4 merujuk seolah ada); routing tile memakai `rememberIsTeacher()` vs `is_student` legacy; pemberitahuan download memakai banner merah (legacy toast); sheet Nilai siswa mengabaikan `emitError("Gagal membuka file")`; jawaban siswa dengan path relatif/kunci alternatif; picker soal Tugas hanya PDF (legacy daftar tipe); kartu guru tanpa tag mapel/`information_label`; Agenda → Presensi tanpa pemeriksaan ketersediaan fitur; Poin guru: setelah sukses kembali ke layar Hasil (legacy menutup alur ke Hub); Verifikasi Jurnal menampilkan dialog sukses (legacy tidak, terdokumentasi).
+- ~~**H2 (High)** Guru tidak bisa membuka file jawaban siswa di layar Beri/Ubah Nilai~~ — dibangun, lihat "Tindak lanjut audit" di bawah (entri `files` nyata belum ada di data dev).
+- **Medium:** semua sudah ditangani pada "Tahap Medium" di bawah, kecuali dua yang sengaja dibiarkan (tile Hub untuk staf non-Guru dan routing `is_student` vs `rememberIsTeacher()`).
 - **Low:** teks/label (mis. "Unggah Materi" vs "Upload Materi", "Lihat/Unduh" vs "baca materi/Download"), status line Detail Tugas jadi lencana, format tanggal/waktu form pemanggilan, pratinjau tautan jawaban, ukuran/ikon file di Upload Materi, dialog progres hapus/kirim nilai, kartu Agenda dengan tombol eksplisit (tambahan), banner galat vs toast (presentasi).
 
 **Tindak lanjut audit — file jawaban siswa untuk guru (H2), 2026-11-04, Infinix sesi guru "Guru DEV":**
@@ -864,3 +864,23 @@ Dua agen pembaca (hanya baca kode legacy dan baru, tanpa menjalankan app) memban
 - **Temuan sampingan yang diperbaiki:** header "JAWABAN TERKUMPUL" tampil kosong untuk jawaban tanpa file dan tanpa tautan (karena `link: [null]` dibaca "ada tautan"); kini disembunyikan. Teruji di device.
 - **Belum diverifikasi:** bentuk entri `files` bila terisi (nama field, ukuran, path relatif), "Baca" PDF dan "Download" dengan berkas sungguhan — perlu satu siswa kelas DEVELOPER MOBILE mengumpulkan jawaban berupa file untuk salah satu tugas.
 - **Paging daftar guru (H1) teruji di device:** List Tugas meminta `backlog?take=10&skip=0` lalu otomatis `skip=10` (halaman kedua), dan berhenti karena data habis.
+
+**Tahap Medium (2026-11-04) — "kerjakan selisih sedang yang tersisa":**
+| # | Temuan | Hasil |
+|---|---|---|
+| M1 | Download pada soal Tugas tidak dihitung "sudah baca soal" | `downloadFile(markRead = true)` pada kartu soal: hanya download yang benar-benar masuk antrean yang menghitung (seperti legacy `downloded`) |
+| M2 | Pemberitahuan download memakai banner merah; legacy toast | `InfoToastEffect` (`ui/components/InfoToast.kt`) dipakai di Materi/Tugas/Penilaian: pesan info jadi Toast, banner merah hanya untuk galat |
+| M3 | Sheet Nilai siswa mengabaikan galat "Gagal membuka file" | Galat ikut ditampilkan (Toast) |
+| M4 | Galat kirim Upload Materi selalu "Gagal membuat materi" | Alasan server/jaringan ditampilkan (`launchWithHandling` tanpa `customMessage`) |
+| M5 | Picker soal Tugas hanya PDF; legacy daftar tipe | `UploadFileTypes.DOCUMENT_MIME_TYPES` (PDF, gambar, Word, Excel, PowerPoint) dipakai Upload Tugas dan Upload Materi; petunjuk "PDF, gambar, Word, Excel, atau PowerPoint · maksimal 12 MB" (teruji di device) |
+| M6 | Kartu guru tanpa tag mapel dan `information_label` | Tag mapel di kartu Materi Saya, baris `information_label` ("Terlewati : 26 Oct 2026") di kartu List Tugas (keduanya teruji di device) |
+| M7 | Daftar mapel guru hanya 20 | Semua halaman diambil (`requestAllTeacherSubjects`, batas 25 halaman) |
+| M8 | Guru mengetuk kartu List Tugas → detail gaya siswa tanpa Edit/Hapus | Ketuk kartu membuka form baca-saja ("Detail Tugas") dengan ⋮ **Edit Tugas** (mengubah layar yang sama jadi "Edit Tugas" + "Posting Tugas") dan **Hapus Tugas** (dialog konfirmasi, lalu `deleteTugas`). Teruji di device sampai menu dan mode edit; **Hapus dan Posting tidak ditekan** (menulis ke server dev) |
+| M9 | Jawaban siswa dengan path relatif/berbackslash | `AnswerFileRules.resolvePath` dipakai juga oleh `HomeworkAnswerFileTable.from`; 2 tes baru (total 570) |
+| M10 | Agenda → Presensi tanpa pemeriksaan ketersediaan fitur | `FeatureOpenViewModel` + `FeatureGateDialogs` (dipakai kedua layar Agenda, dialog "Presensi" di daftar dan di halaman check-in). Teruji di device: ketuk "Presensi" memanggil `GET check-feature-availability?name=presensi` (200) lalu membuka Presensi. Cabang "fitur mati" (lembar Fitur Belum Tersedia) belum teruji karena server dev menyalakan fitur |
+| M11 | Poin guru: sesudah sukses kembali ke layar Hasil; legacy menutup seluruh alur ke Hub | `popBackStack(Route.PoinGuru, inclusive = true)`. **Belum teruji di device**: butuh posting poin sungguhan ke siswa dev |
+
+**Sengaja dibiarkan (butuh keputusan/akun uji):**
+- Tile Hub untuk staf non-Guru (`StaffMenuAccess` legacy) dan routing tile memakai `rememberIsTeacher()` vs `is_student` legacy: dokumen saling bertentangan dan butuh akun staf atau peran ganda untuk membuktikan perilaku sebenarnya. Tidak diubah.
+- Verifikasi Jurnal menampilkan dialog sukses (legacy tidak): keputusan terdokumentasi di 07c/FLOW 2026-10-07.
+- Temuan Low di atas (label, ikon, dialog progres) tidak dikerjakan.

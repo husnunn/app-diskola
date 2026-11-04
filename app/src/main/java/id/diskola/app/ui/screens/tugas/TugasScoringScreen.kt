@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import id.diskola.app.ui.components.InfoToastEffect
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppTextField
 import id.diskola.app.ui.components.BannerError
@@ -58,6 +59,7 @@ fun TugasScoringScreen(
     val pdfPath by viewModel.pdfPath.collectAsStateWithLifecycle()
     val openFileIntent by viewModel.openFileIntent.collectAsStateWithLifecycle()
     val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
+    InfoToastEffect(infoMessage, onShown = viewModel::consumeInfoMessage)
 
     FileViewerHost(intent = openFileIntent, fileName = null, onConsumed = viewModel::consumeOpenFileIntent)
     LaunchedEffect(pdfPath) {
@@ -86,7 +88,6 @@ fun TugasScoringScreen(
                 if (errorMessage.isNotBlank()) {
                     BannerError(message = errorMessage, onDismiss = { viewModel.clearError() })
                 }
-                infoMessage?.let { BannerError(message = it, onDismiss = viewModel::consumeInfoMessage) }
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     SectionLabel("SKOR")
                     AppTextField(

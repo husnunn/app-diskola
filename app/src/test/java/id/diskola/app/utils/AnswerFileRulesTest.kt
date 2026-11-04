@@ -3,6 +3,8 @@ package id.diskola.app.utils
 import id.diskola.app.BuildConfig
 import id.diskola.app.dataclass.ResponData.Assignment
 import id.diskola.app.dataclass.ResponData.AssignmentAnswerFile
+import id.diskola.app.dataclass.ResponData.AssignmentFileItem
+import id.diskola.app.dataclass.ResponData.HomeworkAnswerFileTable
 import id.diskola.app.dataclass.ResponData.MateriLink
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -72,5 +74,19 @@ class AnswerFileRulesTest {
         val relative = AnswerFileRules.url(AssignmentAnswerFile(file_path = "assignment/x/jawaban.pdf"))
         assertEquals(BuildConfig.ASSETS_URL.trimEnd('/') + "/assignment/x/jawaban.pdf", relative)
         assertEquals("", AnswerFileRules.url(AssignmentAnswerFile()))
+    }
+
+    @Test
+    fun resolvePath_givesTheStudentsOwnAnswerFileTheSameUrlTheTeacherViewUses() {
+        assertEquals(BuildConfig.ASSETS_URL.trimEnd('/') + "/assignment/x/jawaban.pdf", AnswerFileRules.resolvePath("assignment\\/x\\/jawaban.pdf"))
+        assertEquals("https://cdn.example/a/b.pdf", AnswerFileRules.resolvePath("https://cdn.example/a/b.pdf"))
+        assertEquals("", AnswerFileRules.resolvePath(""))
+    }
+
+    @Test
+    fun homeworkAnswerFileTable_keepsAResolvedPathSoOpenAndDownloadNeedNoHostGuessing() {
+        val row = HomeworkAnswerFileTable.from(7, AssignmentFileItem(file_name = "j.pdf", file_path = "assignment/x/j.pdf"))
+        assertEquals(BuildConfig.ASSETS_URL.trimEnd('/') + "/assignment/x/j.pdf", row.file_path)
+        assertEquals(7, row.homework_id)
     }
 }

@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import id.diskola.app.ui.components.InfoToastEffect
 import id.diskola.app.ui.components.AppDialog
 import id.diskola.app.ui.components.BannerError
 import id.diskola.app.ui.components.DetailScaffold
@@ -78,6 +79,7 @@ fun MateriDetailScreen(
     val linkPreview by viewModel.linkPreview.collectAsStateWithLifecycle()
     val linkPreviewLoading by viewModel.linkPreviewLoading.collectAsStateWithLifecycle()
     val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
+    InfoToastEffect(infoMessage, onShown = viewModel::consumeInfoMessage)
     val openFileIntent by viewModel.openFileIntent.collectAsStateWithLifecycle()
     val pdfPath by viewModel.pdfPath.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
@@ -108,9 +110,6 @@ fun MateriDetailScreen(
             ) {
                 if (errorMessage.isNotBlank()) {
                     BannerError(message = errorMessage, onDismiss = { viewModel.clearError() })
-                }
-                infoMessage?.let {
-                    BannerError(message = it, onDismiss = { viewModel.consumeInfoMessage() })
                 }
 
                 MateriHeaderCard(item)

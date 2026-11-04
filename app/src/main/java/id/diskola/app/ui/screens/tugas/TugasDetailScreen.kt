@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.diskola.app.dataclass.ResponData.HomeworkTable
+import id.diskola.app.ui.components.InfoToastEffect
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppDialog
 import id.diskola.app.ui.components.BannerError
@@ -119,6 +120,7 @@ fun TugasDetailScreen(
     val pdfPath by viewModel.pdfPath.collectAsStateWithLifecycle()
     val openFileIntent by viewModel.openFileIntent.collectAsStateWithLifecycle()
     val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
+    InfoToastEffect(infoMessage, onShown = viewModel::consumeInfoMessage)
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
     val submitSuccess by viewModel.submitSuccess.collectAsStateWithLifecycle()
     val submitting by viewModel.submitting.collectAsStateWithLifecycle()
@@ -212,7 +214,6 @@ fun TugasDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(Spacing.xl),
             ) {
                 if (errorMessage.isNotBlank()) BannerError(message = errorMessage, onDismiss = { viewModel.clearError() })
-                infoMessage?.let { BannerError(message = it, onDismiss = { viewModel.consumeInfoMessage() }) }
                 fileSizeError?.let {
                     BannerError(message = it, onDismiss = { fileSizeError = null })
                 }
@@ -239,7 +240,7 @@ fun TugasDetailScreen(
                             loading = fileLoading,
                             readLabel = if (readDone) "Sudah dibaca ✓" else "Baca tugas",
                             onOpen = { permissionDialogFor = Triple(current.file_path, current.file_name, true) },
-                            onDownload = { viewModel.downloadFile(current.file_path, current.file_name) },
+                            onDownload = { viewModel.downloadFile(current.file_path, current.file_name, markRead = true) },
                         )
                     } else {
                         EmptyNote(NO_QUESTION_FILE, Icons.Rounded.AttachFile)

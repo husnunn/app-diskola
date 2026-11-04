@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.UploadFile
@@ -29,6 +30,8 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.SelectableDates
@@ -66,6 +69,7 @@ import id.diskola.app.ui.navigation.Route
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
+import id.diskola.app.utils.UploadFileTypes
 import id.diskola.app.utils.AssignmentInput
 import id.diskola.app.utils.AssignmentPayload
 import id.diskola.app.viewmodel.TugasFormDialog
@@ -97,11 +101,17 @@ fun UploadTugasScreen(
     route: Route.UploadTugas,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Leaving the read-only detail without having changed anything: no refresh of the list behind it. */
+    onBack: () -> Unit = onDone,
     viewModel: UploadTugasViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val zone = ZoneId.systemDefault()
 
+    // The read-only "Detail Tugas" turns into the edit form in place through its ⋮ menu (legacy `CreateHomeworkPage`), so this is state, not the route flag.
+    var editing by remember { mutableStateOf(route.editable) }
+    var menuOpen by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var dueAtMillis by remember { mutableStateOf<Long?>(null) }
@@ -196,12 +206,35 @@ fun UploadTugasScreen(
     val canSubmit = AssignmentPayload.validate(input).isEmpty() && !submitting && !scheduleLoading && !initialLoading
 
     DetailScaffold(
-        title = if (!route.editable) "Detail Tugas" else if (route.isEdit) "Edit Tugas" else "Buat Tugas",
-        onBack = onDone,
+        title = if (!editing) "Detail Tugas" else if (route.isEdit) "Edit Tugas" else "Buat Tugas",
+        onBack = if (editing) onDone else onBack,
         useCloseIcon = true,
         modifier = modifier,
+        actions = {
+            if (!editing && route.isEdit) {
+                Box {
+                    IconButton(onClick = { menuOpen = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "Opsi tugas") }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Edit Tugas") },
+                            onClick = {
+                                menuOpen = false
+                                editing = true
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Hapus Tugas") },
+                            onClick = {
+                                menuOpen = false
+                                confirmDelete = true
+                            },
+                        )
+                    }
+                }
+            }
+        },
         bottomBar = {
-            if (route.editable) {
+            if (editing) {
                 Box(modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerLowest).padding(horizontal = ScreenHorizontalPadding, vertical = Spacing.md)) {
                     AppButton(
                         text = "Posting Tugas",
@@ -240,7 +273,7 @@ fun UploadTugasScreen(
                     options = classes.map { it.id to (if (it.grade > 0) "${it.grade} - ${it.name}" else it.name) },
                     selected = selection.classId.takeIf { it > 0 },
                     placeholder = "Pilih Kelas",
-                    enabled = route.editable,
+                    enabled = editing,
                     onSelected = {
                         touchedClass = true
                         viewModel.selectClass(it)
@@ -254,7 +287,7 @@ fun UploadTugasScreen(
                         options = days.mapIndexed { index, d -> index to d.lable.ifBlank { d.key } },
                         selected = days.indexOfFirst { it.key == selection.day }.takeIf { it >= 0 },
                         placeholder = "Pilih Hari Mata Pelajaran",
-                        enabled = route.editable && selection.classId > 0,
+                        enabled = editing && selection.classId > 0,
                         onSelected = { index ->
                             touchedDay = true
                             viewModel.selectDay(days.getOrNull(index)?.key.orEmpty())
@@ -267,7 +300,7 @@ fun UploadTugasScreen(
                         options = schedules.map { it.id to "[${it.time_plot.start_at} - ${it.time_plot.end_at}] ${it.subject.name}" },
                         selected = selection.scheduleId.takeIf { it > 0 },
                         placeholder = "Pilih Mata Pelajaran",
-                        enabled = route.editable && selection.classId > 0 && selection.day.isNotBlank(),
+                        enabled = editing && selection.classId > 0 && selection.day.isNotBlank(),
                         onSelected = {
                             touchedSubject = true
                             viewModel.selectSchedule(it)
@@ -283,7 +316,7 @@ fun UploadTugasScreen(
                         options = subjects.map { it.id to it.name },
                         selected = selection.subjectId.takeIf { it > 0 },
                         placeholder = "Pilih Mata Pelajaran",
-                        enabled = route.editable,
+                        enabled = editing,
                         onSelected = {
                             touchedSubject = true
                             viewModel.selectSubject(it)
@@ -300,7 +333,7 @@ fun UploadTugasScreen(
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.surfaceContainerLowest, DiskolaExtraShapes.card)
                         .border(1.5.dp, MaterialTheme.colorScheme.outlineVariant, DiskolaExtraShapes.card)
-                        .clickable(enabled = route.editable) { showDatePicker = true }
+                        .clickable(enabled = editing) { showDatePicker = true }
                         .padding(Spacing.lg),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -326,7 +359,7 @@ fun UploadTugasScreen(
                     },
                     placeholder = "Ketik Judul tugas",
                     errorText = fieldErrors["title"],
-                    enabled = route.editable,
+                    enabled = editing,
                 )
 
                 FieldLabel("Deskripsi", required = true)
@@ -338,23 +371,23 @@ fun UploadTugasScreen(
                     },
                     placeholder = "Ketik deskripsi tugas",
                     errorText = fieldErrors["description"],
-                    enabled = route.editable,
+                    enabled = editing,
                 )
             }
 
             FormCard {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable(enabled = route.editable) { attachSoal = !attachSoal },
+                    modifier = Modifier.clickable(enabled = editing) { attachSoal = !attachSoal },
                 ) {
-                    Checkbox(checked = attachSoal, onCheckedChange = { attachSoal = it }, enabled = route.editable)
+                    Checkbox(checked = attachSoal, onCheckedChange = { attachSoal = it }, enabled = editing)
                     Text("Upload Soal", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
                 }
                 if (attachSoal) {
-                    Text("File dalam format pdf, maksimal 12 MB", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("${UploadFileTypes.HINT} · maksimal 12 MB", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     TugasFileDropZone(
                         fileName = selectedFileName,
-                        onPick = { if (route.editable) filePickerLauncher.launch(arrayOf("application/pdf")) },
+                        onPick = { if (editing) filePickerLauncher.launch(UploadFileTypes.DOCUMENT_MIME_TYPES) },
                         onClear = {
                             selectedFileUri = null
                             selectedFileName = null
@@ -367,7 +400,7 @@ fun UploadTugasScreen(
                         onValueChange = { link = it },
                         placeholder = "Ketik url",
                         errorText = fieldErrors["link"],
-                        enabled = route.editable,
+                        enabled = editing,
                     )
                     // The preview only informs: "Posting" never waits for it.
                     if (link.isNotBlank()) {
@@ -376,18 +409,18 @@ fun UploadTugasScreen(
                     if (selectedFileName != null || link.isNotBlank()) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.clickable(enabled = route.editable) { requireRead = !requireRead },
+                            modifier = Modifier.clickable(enabled = editing) { requireRead = !requireRead },
                         ) {
-                            Checkbox(checked = requireRead, onCheckedChange = { requireRead = it }, enabled = route.editable)
+                            Checkbox(checked = requireRead, onCheckedChange = { requireRead = it }, enabled = editing)
                             Text("Siswa wajib membaca materi", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                         }
                     }
                 }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable(enabled = route.editable) { requireUpload = !requireUpload },
+                    modifier = Modifier.clickable(enabled = editing) { requireUpload = !requireUpload },
                 ) {
-                    Checkbox(checked = requireUpload, onCheckedChange = { requireUpload = it }, enabled = route.editable)
+                    Checkbox(checked = requireUpload, onCheckedChange = { requireUpload = it }, enabled = editing)
                     Text("Siswa wajib mengumpulkan jawaban", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
@@ -437,6 +470,22 @@ fun UploadTugasScreen(
     }
 
     if (initialLoading) AppLoadingDialog(message = "Mohon tunggu")
+    if (confirmDelete) {
+        AppDialog(
+            onDismiss = { confirmDelete = false },
+            title = "Hapus Tugas",
+            body = "Anda yakin akan menghapus tugas?",
+            primaryButtonText = "Hapus",
+            onPrimaryClick = {
+                confirmDelete = false
+                // A refusal such as 400 "Tugas telah dikerjakan" is shown as the server words it (banner above); success closes and refreshes the list.
+                viewModel.deleteTugas(route.tugasId, onDeleted = onDone)
+            },
+            secondaryButtonText = "Batal",
+            onSecondaryClick = { confirmDelete = false },
+        )
+    }
+
     if (submitting) AppLoadingDialog(message = if (route.isEdit) "Sedang menyimpan tugas" else "Sedang membuat tugas")
     when (val shown = dialog) {
         is TugasFormDialog.Blocked -> AppDialog(
