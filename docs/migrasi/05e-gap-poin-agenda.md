@@ -46,7 +46,9 @@ Legenda: ✅ Selesai & diverifikasi di device · ✅* Selesai (kode benar, belum
 | Detail Agenda read-only | ✅* | `AgendaDetailScreen`. |
 | Badge Agenda di Hub (`summary.missing`, "9+") | ✅* | `HomeViewModel.refresh()` → `AgendaRepository.missingToday()`; `CounterBadge(max=9)`. |
 
-**Belum diuji sama sekali di device**: seluruh sisi guru Poin dan seluruh Agenda (HP uji berisi sesi
-siswa; akun guru tersedia tapi menukar sesi di HP itu butuh persetujuan pemilik HP). Peta butuh
-`MAPS_API_KEY` valid di `local.properties` (key terpasang lewat manifest placeholder; belum dilihat
-berfungsi).
+**Pembaruan 2026-11-05 — Poin diuji dua peran (Infinix guru "Guru DEV", Samsung siswa HUSNI, server dev):**
+- **Teruji di device:** cari siswa (nama; hasil dari `konseling/score?name=`), layar Hasil (skor 0/0 lalu angka naik sesudah kirim), picker jenis (3 form), validasi form kosong ("Mohon isi keterangan terlebih dahulu", tanpa request; pesan dan urutan sama dengan legacy), ketiga kirim (`create/achievement` 200, `create/violation` 200, `create/calling-student` 201, body `score_student_id`, `school_handling_id`, `calling_at` "yyyy-MM-dd HH:mm:ss"), dialog sukses sesuai legacy, **tutup seluruh alur ke Hub** sesudah "Baik".
+- **Sisi siswa dengan data nyata:** Prestasi (cincin 2, kartu "Jumlah Poin/Dibuat oleh/keterangan", dialog "Detail Prestasi Semester"), Pelanggaran (cincin merah 12, kartu, dialog "Detail Pelanggaran Semester" dengan terjemahan label), tombol pemanggilan dan "Detail Penanganan Siswa".
+- **Belum teruji:** lampiran foto di form, gerbang "Akses Ditolak" untuk peran Cooperative-only, blokir target non-siswa, `AutoTimeGate`, "Lihat Dokumentasi" (butuh kejadian berfoto).
+- Catatan: jadwal pemanggilan tampil apa adanya ("2026-11-06 10:10:00"); kartu kejadian siswa tidak menampilkan tanggal.
+- **Agenda:** daftar dan alert gate "Presensi" sudah dibuka di Infinix sesi guru (2026-11-04, lewat pemeriksaan ketersediaan fitur); lapor masuk/pulang, detail, dan peta belum diuji. Peta butuh `MAPS_API_KEY` valid di `local.properties` (key terpasang lewat manifest placeholder; belum dilihat berfungsi).

@@ -19,8 +19,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PersonSearch
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -46,12 +50,14 @@ import id.diskola.app.ui.components.AppTextField
 import id.diskola.app.ui.components.BannerError
 import id.diskola.app.ui.components.ButtonVariant
 import id.diskola.app.ui.components.DetailScaffold
-import id.diskola.app.ui.components.ErrorText
+import id.diskola.app.ui.components.EmptyState
+import id.diskola.app.ui.components.ErrorState
 import id.diskola.app.ui.components.SectionLabel
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
 import id.diskola.app.ui.theme.extendedColors
+import id.diskola.app.utils.PoinSearchRules
 import id.diskola.app.utils.resolveAssetUrl
 import id.diskola.app.viewmodel.PoinAccess
 import id.diskola.app.viewmodel.PoinGuruViewModel
@@ -106,7 +112,9 @@ fun PoinCariScreen(
                 }
                 SearchResults(
                     state = search,
+                    query = query,
                     onPick = { student -> viewModel.pick(student, onStudentReady) },
+                    onRetry = viewModel::retrySearch,
                 )
             }
         }
@@ -134,26 +142,56 @@ fun PoinCariScreen(
     }
 }
 
+/** What the search page shows under the field: the explanation before a search, then the list or the reason there is none. */
 @Composable
-private fun SearchResults(state: PoinSearchState, onPick: (SearchPoinStudentItem) -> Unit) {
+internal fun SearchResults(
+    state: PoinSearchState,
+    query: String,
+    onPick: (SearchPoinStudentItem) -> Unit,
+    onRetry: () -> Unit,
+) {
     val scheme = MaterialTheme.colorScheme
-    when (state) {
-        PoinSearchState.Idle -> Unit
+    // Between the last keystroke and the debounced request the state is still Idle; "short query" would be wrong for a long one.
+    val shown = if (state == PoinSearchState.Idle && PoinSearchRules.isSearchable(query)) PoinSearchState.Loading else state
+    when (shown) {
+        PoinSearchState.Idle -> EmptyState(
+            title = "Cari siswa",
+            description = PoinSearchRules.idleHint(query),
+            icon = Icons.Rounded.PersonSearch,
+            modifier = Modifier.padding(top = Spacing.xl),
+        )
         PoinSearchState.Loading -> Text("mencari siswa ...", style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
-        is PoinSearchState.Error -> ErrorText(state.message)
+        is PoinSearchState.Error ->
+            if (shown.forbidden) {
+                EmptyState(
+                    title = "Tidak Ada Akses",
+                    description = "Akun Anda tidak memiliki akses untuk mencari data siswa di fitur Poin. Hubungi pihak sekolah bila ini keliru.",
+                    icon = Icons.Rounded.Lock,
+                    modifier = Modifier.padding(top = Spacing.xl),
+                )
+            } else {
+                ErrorState(
+                    title = "Pencarian Gagal",
+                    description = shown.message,
+                    icon = Icons.Rounded.ErrorOutline,
+                    onRetry = onRetry,
+                    modifier = Modifier.padding(top = Spacing.xl),
+                )
+            }
         is PoinSearchState.Result ->
-            if (state.items.isEmpty()) {
-                Text(
-                    "Data siswa tidak ditemukan\nPastikan nama atau NISN/NIS/NIK sudah benar",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = scheme.onSurfaceVariant,
+            if (shown.items.isEmpty()) {
+                EmptyState(
+                    title = "Data siswa tidak ditemukan",
+                    description = "Pastikan nama atau NISN/NIS/NIK sudah benar.",
+                    icon = Icons.Rounded.SearchOff,
+                    modifier = Modifier.padding(top = Spacing.xl),
                 )
             } else {
                 LazyColumn(
                     contentPadding = PaddingValues(bottom = Spacing.xxxl),
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
-                    items(state.items, key = { "${it.id}|${it.nisn}|${it.name}" }) { student ->
+                    items(shown.items, key = { "${it.id}|${it.nisn}|${it.name}" }) { student ->
                         StudentRow(student = student, onClick = { onPick(student) })
                     }
                 }

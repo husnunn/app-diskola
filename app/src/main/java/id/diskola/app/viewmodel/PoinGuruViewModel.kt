@@ -4,8 +4,10 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import id.diskola.app.dataclass.ResponData.SearchPoinStudentItem
 import id.diskola.app.repository.PoinRepository
+import id.diskola.app.apiservice.ApiException
 import id.diskola.app.repository.PoinTarget
 import id.diskola.app.utils.AppErrorHandler
+import id.diskola.app.utils.PoinSearchRules
 import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -14,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
@@ -33,7 +36,8 @@ sealed interface PoinSearchState {
     data object Idle : PoinSearchState
     data object Loading : PoinSearchState
     data class Result(val items: List<SearchPoinStudentItem>) : PoinSearchState
-    data class Error(val message: String) : PoinSearchState
+    /** [forbidden]: the server refused this account's role (403): searching again cannot help, so the page offers no retry. */
+    data class Error(val message: String, val forbidden: Boolean = false) : PoinSearchState
 }
 
 /** The student the teacher is currently acting on. [userId] ≠ [student].id — see [PoinTarget.Ready]. */
@@ -61,14 +65,16 @@ class PoinGuruViewModel @Inject constructor(
     private val _blockedMessage = MutableStateFlow("")
     val blockedMessage: StateFlow<String> = _blockedMessage.asStateFlow()
 
+    private val _retry = MutableStateFlow(0)
+
     @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
-    val search: StateFlow<PoinSearchState> = _query
-        .map { it.trim() }
-        .debounce(300)
-        .distinctUntilChanged()
+    val search: StateFlow<PoinSearchState> = combine(
+        _query.map { it.trim() }.debounce(300).distinctUntilChanged(),
+        _retry,
+    ) { q, _ -> q }
         .flatMapLatest { q ->
             flow {
-                if (q.length < MIN_QUERY) {
+                if (!PoinSearchRules.isSearchable(q)) {
                     emit(PoinSearchState.Idle)
                     return@flow
                 }
@@ -79,7 +85,7 @@ class PoinGuruViewModel @Inject constructor(
                     throw e
                 } catch (e: Exception) {
                     Timber.e(e)
-                    emit(PoinSearchState.Error(AppErrorHandler.getMessage(e)))
+                    emit(PoinSearchState.Error(AppErrorHandler.getMessage(e), forbidden = (e as? ApiException)?.responseCode == 403))
                 }
             }
         }
@@ -93,6 +99,11 @@ class PoinGuruViewModel @Inject constructor(
 
     fun onQueryChange(value: String) {
         _query.value = value
+    }
+
+    /** Runs the last query again, e.g. after the connection came back. */
+    fun retrySearch() {
+        _retry.value += 1
     }
 
     /** Resolves [student] to a `user_id`; [onReady] runs only when it is safe to continue. */
@@ -126,9 +137,5 @@ class PoinGuruViewModel @Inject constructor(
                 Timber.e(e)
             }
         }
-    }
-
-    private companion object {
-        const val MIN_QUERY = 3
     }
 }

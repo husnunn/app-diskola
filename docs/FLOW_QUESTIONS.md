@@ -884,3 +884,28 @@ Dua agen pembaca (hanya baca kode legacy dan baru, tanpa menjalankan app) memban
 - Tile Hub untuk staf non-Guru (`StaffMenuAccess` legacy) dan routing tile memakai `rememberIsTeacher()` vs `is_student` legacy: dokumen saling bertentangan dan butuh akun staf atau peran ganda untuk membuktikan perilaku sebenarnya. Tidak diubah.
 - Verifikasi Jurnal menampilkan dialog sukses (legacy tidak): keputusan terdokumentasi di 07c/FLOW 2026-10-07.
 - Temuan Low di atas (label, ikon, dialog progres) tidak dikerjakan.
+
+## 2026-11-05 — Poin diuji dua peran + pesan galat dan halaman awal guru
+
+**Permintaan:** tes Poin (Infinix guru, Samsung siswa); lalu "ganti pesan errornya jadi bahasa Indonesia" dan "halaman awal guru jangan kosong".
+
+**Temuan:** pencarian siswa guru pertama kali dijawab `403 "User does not have the right roles."` (`GET mobile/konseling/score`) untuk akun Infinix dengan role tunggal **Janitor**. Server memakai pustaka izin (Spatie) dan mewajibkan role konseling; app lama memanggil endpoint yang sama dan hanya memblokir peran Cooperative-only di sisi klien, jadi hasilnya sama di legacy. Beberapa menit kemudian akun yang sama sudah ber-role **Teacher + Janitor** (diubah di server) dan pencarian berhasil.
+
+**Diubah (JVM 576 tes, teruji di device sampai halaman awal; cabang 403 hanya lewat tes dan preview karena akun sudah punya akses):**
+| # | Perubahan |
+|---|---|
+| 1 | `AppErrorHandler`: kalimat Inggris pustaka izin pada 403 ("…does not have the right roles/permissions", "…any of the necessary access rights") diganti "Akun Anda tidak memiliki akses ke fitur ini."; pesan server lain tetap dipakai apa adanya. Berlaku untuk semua layar. Tes baru `AppErrorHandlerTest` (3). |
+| 2 | Halaman awal "Poin Siswa" guru tidak lagi kosong: `EmptyState` "Cari siswa" + penjelasan (nama atau NISN/NIS/NIK, lalu pilih siswa untuk melihat poin dan menambah pelanggaran, prestasi, pemanggilan). Baru 1-2 huruf: "Ketik minimal 3 karakter…". Tidak ditemukan: `EmptyState` "Data siswa tidak ditemukan". Galat 403: `EmptyState` "Tidak Ada Akses" (tanpa tombol coba lagi, tidak ada gunanya); galat lain: `ErrorState` "Pencarian Gagal" + "Coba Lagi". Logika di `PoinSearchRules` (3 tes) + `PoinCariPreviews.kt`. |
+
+**Penulisan ke server dev (diizinkan lewat permintaan uji; tidak bisa dihapus dari app), semuanya berketerangan "UJI-POIN … 2026-11-05":**
+| Siswa | Tombol "Kirim" | Endpoint | Hasil |
+|---|---|---|---|
+| BUDI (NISN 20202602) | Prestasi "Tambah Prestasi" (+2) | `create/achievement` | 200 |
+| BUDI | Pelanggaran "pelanggaran 2" (12) | `create/violation` | 200 |
+| BUDI | Pemanggilan "Panggilan 1", 06 Nov 2026 10:04 | `create/calling-student` | 201 |
+| HUSNI (NISN 20202604, akun Samsung) | Prestasi "Tambah Prestasi" (+2) | `create/achievement` | 200 |
+| HUSNI | Pelanggaran "pelanggaran 2" (12) | `create/violation` | 200 |
+| HUSNI | Pemanggilan "Panggilan 1", 06 Nov 2026 10:10 | `create/calling-student` | 201 |
+
+Dari tiga baris pertama, BUDI bukan akun di perangkat mana pun: sesi Samsung hari ini adalah **HUSNI** (catatan lama yang menyebut BUDI di Samsung sudah tidak berlaku). Hasil uji per layar: lihat `docs/migrasi/05e-gap-poin-agenda.md` (Pembaruan 2026-11-05).
+
