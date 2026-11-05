@@ -911,3 +911,19 @@ Dari tiga baris pertama, BUDI bukan akun di perangkat mana pun: sesi Samsung har
 
 **Tindak lanjut (2026-11-05):** tanggal di sisi siswa dirapikan atas permintaan. Kartu kejadian mendapat baris "Tanggal" (legacy tidak menampilkan tanggal di kartu), jadwal pemanggilan dan isi dialog foto memakai label yang sama dengan kartu Magang ("05 Nov 2026, 10:10") alih-alih teks mentah server. Data tidak berubah; hanya penyajian. Teruji di Samsung dengan data nyata HUSNI.
 
+## 2026-11-05 — Sapuan uji Menu Pembelajaran (Samsung siswa HUSNI, Infinix guru "Guru DEV")
+
+**Diuji di device, hanya baca (tanpa kirim ke server kecuali yang disebut):**
+| Sisi | Fitur | Hasil |
+|---|---|---|
+| Siswa | Materi: daftar mapel dan pencarian, daftar materi, Detail Materi, "Unduh" | Benar. "Unduh" menampilkan toast "Proses download Coba.xlsx akan dimulai sesaat lagi" dan berkas (12.447 byte) masuk ke folder unduhan milik app (`Android/data/.../files/Download`); berkas uji itu saya hapus lagi. |
+| Siswa | Tugas: tiga tab, detail (syarat pengumpulan, soal, tautan, aturan unggah, pembahasan) | Benar. Membuka tautan soal membuka Chrome (seperti legacy); kembali ke app, "Baca soal" berubah "Selesai" dan pesan bawah ikut berubah. |
+| Siswa | Presensi (Data/Rekap Absensi), Jurnal (daftar jam, form, validasi form kosong tanpa request; pesan sama dengan legacy), Asesmen terkunci, E-Raport "Fitur dalam pengembangan", Magang (jadwal hari ini "Belum waktunya presensi pulang") | Sesuai. |
+| Guru | Jurnal (daftar jam dengan lencana "Kosong"), Tugas > Penilaian (daftar status; satu pengumpulan RIZKY belum dinilai), layar "Nilai Tugas", "Mata Pelajaran" (10 mapel, semua tampil) | Sesuai. |
+
+**Temuan dan perbaikan:** kartu materi siswa dengan chip lebar ("Kelas DEVELOPER MOBILE") menyisakan lebar sempit untuk tanggal sehingga "30 Jun 2026 15:00" pecah menjadi empat baris. `MateriMetaRow` kini `FlowRow`: tanggal turun ke baris sendiri; kartu lain tetap satu baris. Teruji di Samsung.
+
+**Bukan bug (sama dengan legacy):** "Kelas 2026" di layar Nilai Tugas (server mengirim `student.class` = "2026" dan `grade_class` kosong; legacy memakai kolom yang sama); pesan "Mohon isi keterangan terlebih dahulu" pada form jurnal siswa.
+
+**Belum teruji (butuh menulis ke server, berkas, atau data):** kirim jawaban Tugas siswa (pemilih berkas Samsung tidak bisa diketuk lewat adb), simpan nilai guru, kirim Jurnal (server menolak kombinasi tanpa jadwal guru), lapor Agenda masuk/pulang, Presensi masuk/keluar, presensi pulang Magang (`can_leave` baru bisa dilihat mendekati jam pulang 16:00), berkas jawaban siswa nyata (pengumpulan RIZKY tidak berberkas), "Lihat" berkas xlsx lewat pemilih aplikasi.
+

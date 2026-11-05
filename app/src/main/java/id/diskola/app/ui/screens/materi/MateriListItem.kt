@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -135,12 +137,18 @@ fun MateriGuruListItem(
     }
 }
 
+/**
+ * Target chip, file type and date. A [FlowRow], not a Row: on a phone the wide "Kelas DEVELOPER MOBILE" chip left the date a few
+ * characters of width and it broke over four lines; now the date drops to the next line instead.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MateriMetaRow(item: MateriTable) {
     val scheme = MaterialTheme.colorScheme
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    FlowRow(
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        itemVerticalAlignment = Alignment.CenterVertically,
     ) {
         item.targetLabel()?.let { target ->
             Text(
@@ -153,12 +161,15 @@ private fun MateriMetaRow(item: MateriTable) {
             )
         }
         if (item.file_name.isNotBlank()) {
-            Icon(Icons.Rounded.AttachFile, contentDescription = null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
-            Text(
-                item.file_format.ifBlank { "Berkas" }.uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                color = scheme.onSurfaceVariant,
-            )
+            // Icon and type stay together; they must not split over two lines.
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                Icon(Icons.Rounded.AttachFile, contentDescription = null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
+                Text(
+                    item.file_format.ifBlank { "Berkas" }.uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = scheme.onSurfaceVariant,
+                )
+            }
         }
         if (item.created_at_label.isNotBlank()) {
             Text(item.created_at_label, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
