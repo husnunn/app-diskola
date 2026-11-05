@@ -59,6 +59,7 @@ import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
 import id.diskola.app.ui.theme.extendedColors
+import id.diskola.app.utils.PoinDateRules
 import id.diskola.app.utils.resolveAssetUrl
 import id.diskola.app.viewmodel.PoinSiswaViewModel
 import java.text.SimpleDateFormat
@@ -182,7 +183,7 @@ fun PoinSiswaScreen(
         AppDialog(
             onDismiss = { imageDialog = null },
             title = event.name,
-            body = "${event.date} || ${event.time}",
+            body = PoinDateRules.eventStamp(event.date, event.time),
             primaryButtonText = "Tutup",
             onPrimaryClick = { imageDialog = null },
         ) {
@@ -249,7 +250,7 @@ private fun ScoreRing(score: Int, isViolation: Boolean, size: Int) {
 }
 
 @Composable
-private fun PoinEventCard(event: PoinEvent, onOpenImage: () -> Unit) {
+internal fun PoinEventCard(event: PoinEvent, onOpenImage: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     Column(
         modifier = Modifier
@@ -260,6 +261,13 @@ private fun PoinEventCard(event: PoinEvent, onOpenImage: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(Spacing.xs),
     ) {
         Text(event.name, style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black), color = scheme.onSurface)
+        val stamp = PoinDateRules.eventStamp(event.date, event.time)
+        if (stamp.isNotEmpty()) {
+            Row {
+                Text("Tanggal", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                Text(stamp, style = MaterialTheme.typography.labelLarge, color = scheme.onSurface)
+            }
+        }
         Row {
             Text("Jumlah Poin", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant, modifier = Modifier.weight(1f))
             Text(event.score.toString(), style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black), color = scheme.onSurface)
@@ -285,12 +293,12 @@ private fun PoinEventCard(event: PoinEvent, onOpenImage: () -> Unit) {
 }
 
 @Composable
-private fun CallRow(call: PoinCall) {
+internal fun CallRow(call: PoinCall) {
     val scheme = MaterialTheme.colorScheme
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
         Text(call.name, style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Black), color = scheme.onSurface)
         Text("Jadwal", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
-        Text(call.at, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurface)
+        Text(PoinDateRules.callSchedule(call.at), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurface)
         if (call.message.isNotBlank()) Text(call.message, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
         HorizontalDivider(color = scheme.outlineVariant)
     }

@@ -909,3 +909,5 @@ Dua agen pembaca (hanya baca kode legacy dan baru, tanpa menjalankan app) memban
 
 Dari tiga baris pertama, BUDI bukan akun di perangkat mana pun: sesi Samsung hari ini adalah **HUSNI** (catatan lama yang menyebut BUDI di Samsung sudah tidak berlaku). Hasil uji per layar: lihat `docs/migrasi/05e-gap-poin-agenda.md` (Pembaruan 2026-11-05).
 
+**Tindak lanjut (2026-11-05):** tanggal di sisi siswa dirapikan atas permintaan. Kartu kejadian mendapat baris "Tanggal" (legacy tidak menampilkan tanggal di kartu), jadwal pemanggilan dan isi dialog foto memakai label yang sama dengan kartu Magang ("05 Nov 2026, 10:10") alih-alih teks mentah server. Data tidak berubah; hanya penyajian. Teruji di Samsung dengan data nyata HUSNI.
+
