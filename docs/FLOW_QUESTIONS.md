@@ -950,3 +950,27 @@ Butir bertanda ✅* / ⛔ di dokumen gap `05a`, `05c`, `05e`, `05g`, `07a`, `07c
 
 **Catatan lain:** `can_leave` terlihat **true** untuk jadwal Magang 5 Nov (tombol "Laporan Harian"), jadi jendela presensi pulang bukan hanya klien; izin kamera dan lokasi app di Infinix kini diberikan (diminta penguji kamera). Belum teruji: semua yang butuh menulis ke server, memilih berkas, atau sesi kelas/jadwal berjalan (Check In, Mulai Kelas, lapor Agenda, dinas luar, Jawaban Terkumpul nyata, banner presensi selain NO_AGENDA, mode assigned).
 
+
+## 2026-11-06 — Uji tulis rantai Tugas (guru posting → siswa kirim → guru nilai → siswa lihat nilai)
+
+Semua tugas siswa HUSNI sudah lewat batas waktu, jadi rantai ini diuji dengan satu tugas uji baru. **Penulisan ke server dev (dicatat):**
+| # | Siapa menekan | Tombol | Request | Hasil |
+|---|---|---|---|---|
+| 1 | Pengguna (penekanan pertama diblokir pemeriksa keamanan, tidak ada request keluar) | Infinix, guru Guru DEV: "Posting Tugas" | `POST teachers/create` (multipart: kelas 10 - DEVELOPER MOBILE, Bahasa Indonesia, batas 13 Nov 2026 10:41, `checked=1`, `uploaded=1`, tanpa file soal) | 200, tugas **id 89 "UJI-GAP-TUGAS"** |
+| 2 | Saya | Samsung, siswa HUSNI: "Kirim Tugas" | `POST students/89/collect` (`checked=1`, `uploaded=1`, `link=https://example.com`) | 200, id jawaban siswa **2834** |
+| 3 | Saya | Infinix, guru: "simpan" (skor 88) | `POST teachers/scored/89/student-assignment/2834` | 200 |
+
+Tertinggal di server dev: tugas 89, jawaban HUSNI, nilai 88. Tidak bisa dihapus dari app (`Hapus Tugas` ⇒ 400 "Tugas telah dikerjakan").
+
+**Terverifikasi:** daftar guru dan siswa menerima tugas baru (lencana "Baru"); detail siswa "Kumpulkan Jawaban · Wajib"; tombol "Kirim Tugas" aktif hanya setelah pratinjau tautan berhasil; baris hilang dari Belum sesudah kirim; tab Penilaian guru "1 tugas belum di nilai" → Tugas Terkumpul → "Beri Nilai" memperlihatkan tautan siswa → simpan → baris "88" + "Ubah Nilai"; tab Nilai siswa menampilkan 88 dan sheet nilai. Respons collect membawa `data.id` 2834 dan `subject_assignment.id` 89.
+
+**Bug dan perbaikan (teruji di device kecuali dicatat):**
+| # | Temuan | Perbaikan |
+|---|---|---|
+| 1 | **Baris baru tersembunyi di atas layar**: sesudah posting (guru) atau tarik-segarkan (siswa) tugas baru ada di respons dan di Room, tetapi `LazyColumn` ber-key mempertahankan baris yang sedang terlihat, jadi baris baru berada tepat di atas tepi dan daftar tampak tidak berubah sampai digeser ke atas | `KeepNewestVisibleEffect(listState, firstKey)`: bila kunci baris pertama berubah dan daftar tadinya di puncak, kembali ke puncak (keputusan murni `shouldJumpToTop`, tes 4). Dipasang di List Tugas dan Penilaian guru, tiga tab Tugas siswa, Materi siswa, Izin Presensi, Izin Magang. Teruji di Samsung: baris teratas dihapus dari cache lokal, tarik-segarkan, baris kembali tampil di puncak (sebelumnya tersembunyi dengan gestur yang sama) |
+| 2 | Isi sheet Nilai (mapel, guru, lingkaran skor) menempel ke tepi kiri layar | Padding horizontal `Spacing.xl` seperti judulnya |
+| 3 | Lencana kartu Sudah Dikerjakan menampilkan `<p>&#10004;</p>` (server mengirim HTML; legacy juga menampilkannya mentah) | `ServerText.plain` (tag dibuang, entitas diurai; tes 3) ⇒ ✔. Teruji hanya lewat tes: tugas sudah dinilai sehingga tidak ada baris Sudah Dikerjakan untuk dilihat |
+
+**Bukan bug app, data server (pertanyaan untuk backend):** `GET students/done` mengirim `id` = id jawaban siswa (2834), **tanpa** `uri_student`, `files` kosong, dan tanpa id tugas (89) maupun `student_assignment_id`. Akibatnya detail tugas yang sudah dikerjakan menampilkan "Tidak ada tautan jawaban" padahal tautan terkirim (guru melihatnya). Legacy memakai `file_student_*` dan cache lokal `hw_sa_*`, jadi tampil kosong juga untuk tautan. Kalau backend menambahkan `subject_assignment_id` dan `uri_student` ke `done`, `ensureAnswerFiles` dan `link_student` sudah siap memakainya.
+
+**Pengamatan (sama dengan legacy, tidak diubah):** (a) tautan jawaban yang pratinjaunya gagal (URL 404) membuat "Kirim Tugas" tetap nonaktif dengan petunjuk "Lengkapi upload jawaban" tanpa alasan yang terlihat; (b) tab Penilaian guru dibuka dari cache, pengumpulan baru baru tampil setelah tarik-segarkan; (c) tombol back di layar siswa saat keyboard sudah tertutup menutup layar (normal). Tidak terlihat dialog atau toast "berhasil" sesudah kirim jawaban: layar kembali ke daftar dan baris hilang.

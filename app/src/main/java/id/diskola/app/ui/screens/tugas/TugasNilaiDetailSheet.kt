@@ -73,7 +73,7 @@ fun TugasNilaiDetailSheet(
         val current = item
         if (current != null) {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.xl),
+                modifier = Modifier.fillMaxWidth().padding(start = Spacing.xl, end = Spacing.xl, bottom = Spacing.xl),
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
                 if (current.subject_name.isNotBlank()) {

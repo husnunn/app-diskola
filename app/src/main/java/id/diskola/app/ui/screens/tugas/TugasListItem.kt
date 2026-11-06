@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import id.diskola.app.dataclass.ResponData.HomeworkTable
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.Spacing
+import id.diskola.app.utils.ServerText
 
 /** One row in the "Belum Dikerjakan" tab — grey end-date label, or red "Terlambat dari" when
  * overdue (doc §5.4). */
@@ -141,9 +142,11 @@ private fun TugasCardHeader(item: HomeworkTable) {
                 Text("Guru · ${item.teacher_name}", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
             }
         }
-        if (item.message_label.isNotBlank()) {
+        // The server sends a finished task's badge as HTML (`<p>&#10004;</p>`); show what it means, not its markup.
+        val badge = ServerText.plain(item.message_label)
+        if (badge.isNotBlank()) {
             Text(
-                item.message_label,
+                badge,
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
                 color = scheme.onSurfaceVariant,
                 modifier = Modifier

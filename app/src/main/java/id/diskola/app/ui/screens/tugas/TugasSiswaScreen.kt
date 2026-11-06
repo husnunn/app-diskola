@@ -28,6 +28,7 @@ import id.diskola.app.dataclass.ResponData.HomeworkTable
 import id.diskola.app.ui.components.BannerError
 import id.diskola.app.ui.components.DetailScaffold
 import id.diskola.app.ui.components.EmptyState
+import id.diskola.app.ui.components.KeepNewestVisibleEffect
 import id.diskola.app.ui.components.LoadingState
 import id.diskola.app.ui.components.SkeletonVariant
 import id.diskola.app.ui.components.UnderlineTabRow
@@ -100,6 +101,7 @@ private fun BacklogTab(viewModel: TugasSiswaViewModel, onOpenTugas: (HomeworkTab
         }
     }
     LaunchedEffect(reachedEnd) { if (reachedEnd) viewModel.loadMoreBacklog() }
+    KeepNewestVisibleEffect(listState, items.firstOrNull()?.id)
 
     if (items.isEmpty() && !loading) {
         EmptyState(title = "Belum terdapat tugas", description = "", icon = Icons.Rounded.Assignment)
@@ -132,6 +134,7 @@ private fun DoneTab(viewModel: TugasSiswaViewModel, onOpenTugas: (HomeworkTable)
         }
     }
     LaunchedEffect(reachedEnd) { if (reachedEnd) viewModel.loadMoreDone() }
+    KeepNewestVisibleEffect(listState, items.firstOrNull()?.id)
 
     if (items.isEmpty() && !loading) {
         EmptyState(title = "Belum terdapat rekap tugas", description = "", icon = Icons.Rounded.Assignment)
@@ -164,6 +167,7 @@ private fun ScoredTab(viewModel: TugasSiswaViewModel, onOpenScoreDetail: (Homewo
         }
     }
     LaunchedEffect(reachedEnd) { if (reachedEnd) viewModel.loadMoreScored() }
+    KeepNewestVisibleEffect(listState, items.firstOrNull()?.id)
 
     if (items.isEmpty() && !loading) {
         EmptyState(title = "Belum terdapat rekap tugas", description = "", icon = Icons.Rounded.Assignment)

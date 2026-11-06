@@ -45,6 +45,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.diskola.app.dataclass.ResponData.HomeworkCollected
 import id.diskola.app.dataclass.ResponData.HomeworkTable
+import id.diskola.app.ui.components.KeepNewestVisibleEffect
 import id.diskola.app.ui.components.LoadMoreEffect
 import id.diskola.app.ui.components.AppBottomSheet
 import id.diskola.app.ui.components.AppDialog
@@ -61,6 +62,7 @@ import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
 import id.diskola.app.ui.theme.extendedColors
 import id.diskola.app.utils.AssignmentAccess
+import id.diskola.app.utils.ServerText
 import id.diskola.app.viewmodel.TugasGuruViewModel
 import id.diskola.app.viewmodel.TugasPenilaianViewModel
 
@@ -168,6 +170,7 @@ private fun ListTugasTab(
             } else {
                 val listState = rememberLazyListState()
                 LoadMoreEffect(listState, itemCount = items.size, onLoadMore = viewModel::loadMore)
+                KeepNewestVisibleEffect(listState, items.firstOrNull()?.id)
                 PullToRefreshBox(isRefreshing = loading, onRefresh = { viewModel.refresh() }, modifier = Modifier.fillMaxSize()) {
                     LazyColumn(
                         state = listState,
@@ -271,6 +274,7 @@ private fun PenilaianTab(viewModel: TugasPenilaianViewModel, onOpenScoredGroup: 
     } else {
         val listState = rememberLazyListState()
         LoadMoreEffect(listState, itemCount = items.size, onLoadMore = viewModel::loadMore)
+        KeepNewestVisibleEffect(listState, items.firstOrNull()?.id)
         PullToRefreshBox(isRefreshing = loading, onRefresh = { viewModel.refresh() }, modifier = Modifier.fillMaxSize()) {
             LazyColumn(
                 state = listState,
@@ -301,9 +305,10 @@ private fun TugasPenilaianListItem(item: HomeworkCollected, onClick: () -> Unit)
             if (item.upload_at_label.isNotBlank()) {
                 Text("Diupload ${item.upload_at_label}", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
             }
-            if (item.message_label.isNotBlank()) {
+            val message = ServerText.plain(item.message_label)
+            if (message.isNotBlank()) {
                 Text(
-                    item.message_label,
+                    message,
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                     color = if (allScored) MaterialTheme.extendedColors.success else scheme.error,
                 )

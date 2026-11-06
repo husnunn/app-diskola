@@ -22,6 +22,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.diskola.app.dataclass.ResponData.MateriTable
 import id.diskola.app.ui.components.DetailScaffold
 import id.diskola.app.ui.components.EmptyState
+import id.diskola.app.ui.components.KeepNewestVisibleEffect
 import id.diskola.app.ui.components.LoadingState
 import id.diskola.app.ui.components.SkeletonVariant
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
@@ -54,6 +55,7 @@ fun MateriListScreen(
         }
     }
     LaunchedEffect(reachedEnd) { if (reachedEnd) viewModel.loadMoreMateri() }
+    KeepNewestVisibleEffect(listState, materials.firstOrNull()?.id)
 
     DetailScaffold(title = subjectName.ifBlank { "Materi" }, onBack = onBack, modifier = modifier) { padding ->
         if (materials.isEmpty() && !loading) {

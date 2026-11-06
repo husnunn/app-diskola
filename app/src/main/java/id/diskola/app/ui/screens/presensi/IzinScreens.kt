@@ -57,6 +57,7 @@ import id.diskola.app.ui.components.BannerError
 import id.diskola.app.ui.components.ButtonVariant
 import id.diskola.app.ui.components.DetailScaffold
 import id.diskola.app.ui.components.EmptyState
+import id.diskola.app.ui.components.KeepNewestVisibleEffect
 import id.diskola.app.ui.components.ErrorText
 import id.diskola.app.ui.components.FieldLabel
 import id.diskola.app.ui.components.FormCard
@@ -138,6 +139,7 @@ fun IzinListScreen(
         }
     }
     LaunchedEffect(reachedEnd) { if (reachedEnd) viewModel.loadMore() }
+    KeepNewestVisibleEffect(listState, items.firstOrNull()?.uuid)
 
     DetailScaffold(
         title = "Pengajuan Izin",

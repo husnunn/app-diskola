@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -69,6 +70,7 @@ import id.diskola.app.ui.components.ErrorState
 import id.diskola.app.ui.components.ErrorText
 import id.diskola.app.ui.components.FieldLabel
 import id.diskola.app.ui.components.FormCard
+import id.diskola.app.ui.components.KeepNewestVisibleEffect
 import id.diskola.app.ui.components.LeaveDetailContent
 import id.diskola.app.ui.components.LeaveDetailUi
 import id.diskola.app.ui.components.LeaveFact
@@ -186,8 +188,11 @@ fun MagangIzinListScreen(
                 )
                 else -> {
                     val shown = MagangRules.leavesIn(leaves, monthOf(month), type)
+                    val listState = rememberLazyListState()
+                    KeepNewestVisibleEffect(listState, shown.firstOrNull()?.id)
                     PullToRefreshBox(isRefreshing = loading, onRefresh = shared::refresh, modifier = Modifier.fillMaxSize()) {
                         LazyColumn(
+                            state = listState,
                             contentPadding = contentPadding,
                             verticalArrangement = Arrangement.spacedBy(Spacing.md),
                             modifier = Modifier.fillMaxSize(),
