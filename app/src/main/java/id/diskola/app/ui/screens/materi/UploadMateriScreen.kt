@@ -73,6 +73,8 @@ private const val MAX_FILE_BYTES = 12 * 1024 * 1024L
 fun UploadMateriScreen(
     route: Route.UploadMateri,
     onDone: () -> Unit,
+    /** The close (X) button: leaves without saving, so the list behind has nothing to reload. */
+    onBack: () -> Unit = onDone,
     modifier: Modifier = Modifier,
     viewModel: UploadMateriViewModel = hiltViewModel(),
 ) {
@@ -154,7 +156,7 @@ fun UploadMateriScreen(
 
     DetailScaffold(
         title = if (route.isEdit) "Edit Materi" else "Unggah Materi",
-        onBack = onDone,
+        onBack = onBack,
         useCloseIcon = true,
         modifier = modifier,
         bottomBar = {

@@ -302,4 +302,13 @@ class PresensiRulesTest {
         assertEquals("Ukuran file maksimal 2 MB", PresensiRules.validateLeave(true, "sakit", "demam tinggi sejak semalam", 3L * 1024 * 1024))
         assertNull(PresensiRules.validateLeave(true, "sakit", "demam tinggi sejak semalam", 1024))
     }
+
+    @Test
+    fun typeVerb_namesTheTypeOnlyWhenTheServerSaidWhich() {
+        assertEquals("Masuk", PresensiRules.typeVerb("checkin"))
+        assertEquals("Masuk", PresensiRules.typeVerb(" CheckIn "))
+        assertEquals("Pulang", PresensiRules.typeVerb("checkout"))
+        assertEquals(null, PresensiRules.typeVerb(""))
+        assertEquals(null, PresensiRules.typeVerb("lainnya"))
+    }
 }

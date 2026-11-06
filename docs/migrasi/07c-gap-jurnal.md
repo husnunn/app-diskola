@@ -11,14 +11,14 @@ fase ini selesai; akun uji juga tidak punya data yang membuat jalur ini aktif) �
 
 | Item | Status | Keterangan |
 |---|---|---|
-| `GET mobile/attendance/schedule?date=` → baris per jam + sesi kelas; **tanpa cache Room** | ✅* | Cache legacy dikunci `plot_start_at` dan kosong saat offline. Daftar hanya "hari ini": load 1× di `init`, refresh 1× saat kembali dari layar anak (ON_RESUME pertama diabaikan), pull-to-refresh. |
+| `GET mobile/attendance/schedule?date=` → baris per jam + sesi kelas; **tanpa cache Room** | ✅* | Cache legacy dikunci `plot_start_at` dan kosong saat offline. Daftar hanya "hari ini": load 1× di `init`, refresh 1× saat kembali dari layar anak (ON_RESUME pertama diabaikan), pull-to-refresh. **uji device 2026-11-06: 7 baris per jam; sesi kelas nyata belum ada.** |
 | Baris sintetis "Jam Pelajaran - n" / "Kosong"; "Kelas belum dimulai" bila jam belum mulai | ✅ | `JurnalRules.buildRows`, teruji unit. |
 | Kunci jam siswa (doc §19#13) | ✅ | **Aturan dipertahankan, indeks diperbaiki**: dihitung per jam pelajaran. Legacy menjalankan aturan di atas daftar yang sudah di-flatten sehingga bergeser begitu satu jam punya >1 kelas. |
 | Tombol siswa: "Hadiri kelas" / "Isi Jurnal" / label "Anda Hadir Dikelas Ini" | ✅ | Teruji unit (`studentUi`). |
 | Tombol guru: "Isi Jurnal" / "Detail" / "Mulai kelas" | ✅ | "Mulai kelas" **disembunyikan sebelum jamnya mulai** (legacy menampilkannya; server menolak). Status sesi non-kosong ikut tampil sebagai badge (legacy hanya "Kosong"). |
 | Dialog "Pilih Metode Presensi" | ✅* | Dibuat sebagai bottom sheet. Aturan = `JurnalPage` (manual bila belum ada status; QR hanya bila belum hadir **dan** `mulai <= sekarang < selesai`), bukan aturan Hub yang berbeda. |
 | Empty state "Belum ada jurnal hari ini" + "Muat ulang", error state + "Coba Lagi" | ✅* | |
-| Tile "Jurnal" Hub (3 peran) → feature gate `jurnal-kbm` → `Route.Jurnal` | ✅* | Tombol "Hadiri"/"Isi Jurnal" kartu "Kelas Berlangsung" **hanya untuk siswa** (legacy; app baru sebelumnya menampilkannya ke semua peran) dan membuka alur baris itu setelah daftar termuat. |
+| Tile "Jurnal" Hub (3 peran) → feature gate `jurnal-kbm` → `Route.Jurnal` | ✅ | Tombol "Hadiri"/"Isi Jurnal" kartu "Kelas Berlangsung" **hanya untuk siswa** (legacy; app baru sebelumnya menampilkannya ke semua peran) dan membuka alur baris itu setelah daftar termuat. **uji device 2026-11-06: `check-feature-availability?name=jurnal-kbm` 200.** |
 | `AutoTimeGate` ("Atur tanggal & waktu Otomatis") | ✅* | Komponen bersama. |
 
 ## 2. Hadir kelas siswa (doc §7.2–7.3)
@@ -35,9 +35,9 @@ fase ini selesai; akun uji juga tidak punya data yang membuat jalur ini aktif) �
 | Item | Status | Keterangan |
 |---|---|---|
 | Chip jam guru dari `list-plot`; pilih berurutan; "pilih secara urut" | ✅ | `toggleChip` teruji unit. **Deviasi:** pilihan ditolak tidak lagi menghapus semua chip (legacy menghapus). Gagal memuat daftar jam tidak crash (legacy crash): form tetap terbuka dengan pesan. |
-| Chip jam siswa: satu jam terkunci | ✅* | Hanya jam dari baris yang dibuka (label dikirim lewat route). |
-| Picker Kelas/Mapel/Guru: cari (debounce 500 ms), paging 20, server-side | ✅* | `PagedPickerSheet` + `PagedPicker` (state di memori, generasi untuk membatalkan respons basi, dedup per id). **Tidak** memakai tabel Room `class_journal_item`/`classroom`/`mapel` legacy. Label kelas `"<grade> - <name>"`. |
-| Hint scope `assigned` | ✅* | "Hanya menampilkan kelas/mapel/jam dari jadwal Anda"; scope dibaca setiap form dibuka (fallback ke nilai tersimpan). |
+| Chip jam siswa: satu jam terkunci | ✅ | Hanya jam dari baris yang dibuka (label dikirim lewat route). **uji device 2026-11-06.** |
+| Picker Kelas/Mapel/Guru: cari (debounce 500 ms), paging 20, server-side | ✅* | `PagedPickerSheet` + `PagedPicker` (state di memori, generasi untuk membatalkan respons basi, dedup per id). **Tidak** memakai tabel Room `class_journal_item`/`classroom`/`mapel` legacy. Label kelas `"<grade> - <name>"`. **uji device 2026-11-06: debounce 500 ms terbukti; paging 20 belum terpicu (data kurang dari 20); server dev mengabaikan `name`, filter klien yang menyaring.** |
+| Hint scope `assigned` | ✅* | "Hanya menampilkan kelas/mapel/jam dari jadwal Anda"; scope dibaca setiap form dibuka (fallback ke nilai tersimpan). **uji device 2026-11-06: siswa melihat hint statis; guru tak tercapai (`restricted:false`).** |
 | Validasi & pesan persis: foto wajib → "Foto suasana KBM wajib diambil"; guru "Data isian tidak lengkap"; siswa "Mohon isi keterangan terlebih dahulu" | ✅ | Tombol "Proses" tetap aktif; validasi saat kirim (spek). Teruji unit. |
 | Kirim guru `POST mobile/attendance/journal` (multipart, `school_time_plot_id[]` distinct) | ✅* | Belum dikirim ke server (membuat data nyata). |
 | Kirim siswa `POST student/journal-student`: `teacher_id` = **UUID** guru, `school_class_id` dari `SessionStore.student.classRoomId` (bukan pref login yang basi) | ✅* | lat/lng best-effort (timeout 4 s); lokasi palsu → koordinat **tidak dikirim**. |
@@ -48,8 +48,8 @@ fase ini selesai; akun uji juga tidak punya data yang membuat jalur ini aktif) �
 
 | Item | Status | Keterangan |
 |---|---|---|
-| Scope `journal-capture-scope` dibaca tiap form dibuka; tanda "*" bila wajib | ✅* | Fallback ke nilai tersimpan saat gagal. |
-| Kamera CameraX belakang + tombol ganti kamera, watermark live (alamat/koordinat opsional + waktu), hanya kamera (tanpa galeri) | ✅* | `CaptureCameraScreen` dipakai bersama Dinas Luar (`CaptureCameraConfig.OffsiteSelfie` / `JurnalScene`). |
+| Scope `journal-capture-scope` dibaca tiap form dibuka; tanda "*" bila wajib | ✅ | Fallback ke nilai tersimpan saat gagal. **uji device 2026-11-06: dibaca tiap form dibuka; kasus wajib (tanda *) belum, `required:false`.** |
+| Kamera CameraX belakang + tombol ganti kamera, watermark live (alamat/koordinat opsional + waktu), hanya kamera (tanpa galeri) | ✅ | `CaptureCameraScreen` dipakai bersama Dinas Luar (`CaptureCameraConfig.OffsiteSelfie` / `JurnalScene`). **uji device 2026-11-06: ganti kamera, watermark live, pratinjau, layar penuh, Hapus; preview kartu kini menampilkan seluruh foto.** |
 | ≤ 1600 px, JPEG q90 → turun 10 per langkah sampai ≤ 2 MB (minimum q40) | ✅* | `OffsiteWatermark.process(maxSide, maxBytes)`. |
 | Lokasi + geocode best-effort (4 s + 4 s) tidak memblokir kamera | ✅* | Izin: CAMERA wajib ("Izin kamera diperlukan untuk mengambil foto"), lokasi opsional. |
 | Preview, ketuk untuk melihat penuh, "Hapus"/"Ambil Ulang Foto" | ✅* | |

@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Inbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +44,10 @@ import id.diskola.app.ui.components.AppBottomSheet
 import id.diskola.app.ui.components.BannerError
 import id.diskola.app.ui.components.ButtonVariant
 import id.diskola.app.ui.components.DetailScaffold
+import id.diskola.app.ui.components.EmptyState
+import id.diskola.app.ui.components.ErrorState
+import id.diskola.app.ui.components.LoadingState
+import id.diskola.app.ui.components.SkeletonVariant
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
 import id.diskola.app.ui.theme.Spacing
@@ -54,6 +59,18 @@ private val FILTER_LABELS = mapOf(
     ScoringFilter.BELUM_DINILAI to "Belum Dinilai",
     ScoringFilter.SUDAH_DINILAI to "Sudah Dinilai",
 )
+
+private fun emptyTitle(filter: ScoringFilter): String = when (filter) {
+    ScoringFilter.SEMUA -> "Belum ada yang mengumpulkan"
+    ScoringFilter.BELUM_DINILAI -> "Semua sudah dinilai"
+    ScoringFilter.SUDAH_DINILAI -> "Belum ada yang dinilai"
+}
+
+private fun emptyDescription(filter: ScoringFilter): String = when (filter) {
+    ScoringFilter.SEMUA -> "Tugas ini belum dikumpulkan oleh siswa mana pun."
+    ScoringFilter.BELUM_DINILAI -> "Tidak ada pengumpulan yang menunggu nilai."
+    ScoringFilter.SUDAH_DINILAI -> "Belum ada pengumpulan yang sudah diberi nilai."
+}
 
 /** `HomeworkSubmittedPage` (doc §6.4) — collapsible "Detail" panel + per-student score rows, local
  * Semua/Belum/Sudah Dinilai filter. */
@@ -74,7 +91,13 @@ fun TugasTerkumpulScreen(
     var detailExpanded by remember { mutableStateOf(false) }
     var filterSheetOpen by remember { mutableStateOf(false) }
 
-    LaunchedEffect(collectedId) { viewModel.load(collectedId) }
+    val loading by viewModel.loading.collectAsStateWithLifecycle()
+    // False until load() has started, so the first frame is the skeleton and not a flash of the error state.
+    var requested by remember { mutableStateOf(false) }
+    LaunchedEffect(collectedId) {
+        viewModel.load(collectedId)
+        requested = true
+    }
 
     DetailScaffold(title = "Tugas Terkumpul", onBack = onBack, modifier = modifier) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
@@ -116,17 +139,35 @@ fun TugasTerkumpulScreen(
                     }
                 }
             }
-            LazyColumn(
-                contentPadding = PaddingValues(start = ScreenHorizontalPadding, end = ScreenHorizontalPadding, bottom = Spacing.xxxl),
-                verticalArrangement = Arrangement.spacedBy(Spacing.md),
-            ) {
-                // A submission whose id the server left out reads as 0 (@NullToZeroInt): two of them must not share a key (that crashes the list).
-                itemsIndexed(assignments, key = { index, assignment -> if (assignment.id > 0) assignment.id else "baris-$index" }) { _, assignment ->
-                    AssignmentScoreRow(
-                        assignment = assignment,
-                        onOpenReadonly = { detail?.let { onOpenTugasReadonly(it.id) } },
-                        onScore = { onScoreStudent(assignment) },
+            when {
+                detail == null && (!requested || loading) ->
+                    LoadingState(
+                        variant = SkeletonVariant.ListRow,
+                        padding = PaddingValues(horizontal = ScreenHorizontalPadding, vertical = Spacing.md),
                     )
+                detail == null -> ErrorState(
+                    title = "Daftar tidak dapat dimuat",
+                    description = "Periksa koneksi internet Anda dan coba lagi.",
+                    onRetry = { viewModel.load(collectedId) },
+                )
+                assignments.isEmpty() -> EmptyState(
+                    title = emptyTitle(filter),
+                    description = emptyDescription(filter),
+                    icon = Icons.Rounded.Inbox,
+                    modifier = Modifier.padding(top = Spacing.xl),
+                )
+                else -> LazyColumn(
+                    contentPadding = PaddingValues(start = ScreenHorizontalPadding, end = ScreenHorizontalPadding, bottom = Spacing.xxxl),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                ) {
+                    // A submission whose id the server left out reads as 0 (@NullToZeroInt): two of them must not share a key (that crashes the list).
+                    itemsIndexed(assignments, key = { index, assignment -> if (assignment.id > 0) assignment.id else "baris-$index" }) { _, assignment ->
+                        AssignmentScoreRow(
+                            assignment = assignment,
+                            onOpenReadonly = { detail?.let { onOpenTugasReadonly(it.id) } },
+                            onScore = { onScoreStudent(assignment) },
+                        )
+                    }
                 }
             }
         }

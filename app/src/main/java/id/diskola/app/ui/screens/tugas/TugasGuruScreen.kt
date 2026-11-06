@@ -34,10 +34,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -78,7 +80,7 @@ fun TugasGuruScreen(
     viewModel: TugasGuruViewModel = hiltViewModel(),
     penilaianViewModel: TugasPenilaianViewModel = hiltViewModel(),
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
 
     DetailScaffold(title = "Tugas", onBack = onBack, modifier = modifier) { padding ->
         // An account without teacher data cannot use the teacher endpoints (spec §2/§6): say so instead of showing a list and a form that fail.
@@ -328,7 +330,7 @@ private fun FilterField(label: String, value: String, onClick: () -> Unit, modif
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(label, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
-            Text(value, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurface, maxLines = 1)
+            Text(value, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Icon(Icons.Rounded.ExpandMore, contentDescription = null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
     }

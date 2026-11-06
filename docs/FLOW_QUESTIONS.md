@@ -927,3 +927,26 @@ Dari tiga baris pertama, BUDI bukan akun di perangkat mana pun: sesi Samsung har
 
 **Belum teruji (butuh menulis ke server, berkas, atau data):** kirim jawaban Tugas siswa (pemilih berkas Samsung tidak bisa diketuk lewat adb), simpan nilai guru, kirim Jurnal (server menolak kombinasi tanpa jadwal guru), lapor Agenda masuk/pulang, Presensi masuk/keluar, presensi pulang Magang (`can_leave` baru bisa dilihat mendekati jam pulang 16:00), berkas jawaban siswa nyata (pengumpulan RIZKY tidak berberkas), "Lihat" berkas xlsx lewat pemilih aplikasi.
 
+## 2026-11-06 — Uji gap Menu Pembelajaran (dua penguji hanya-baca: Samsung siswa HUSNI, Infinix guru "Guru DEV")
+
+Butir bertanda ✅* / ⛔ di dokumen gap `05a`, `05c`, `05e`, `05g`, `07a`, `07c`, `07e` diuji di device lewat dua sesi paralel yang dilarang menulis ke server (satu-satunya POST: `check-account` otomatis dan `payment/check` milik layar PIN Wallet). Hasil per butir sudah dicatat di baris dokumennya (awalan "uji device 2026-11-06"); butir yang tidak bisa dicapai tetap ✅*.
+
+**Hasil:** guru 34 butir: 21 terverifikasi, 3 sebagian, 10 tidak bisa diuji; siswa 34 butir: 14 terverifikasi, 8 sebagian, 11 tidak bisa diuji, 1 bug (crash). Satu-satunya bug fungsional adalah crash itu, sisanya tampilan.
+
+**Bug dan perbaikan (teruji di device sesudahnya):**
+| # | Temuan | Perbaikan |
+|---|---|---|
+| 1 | **Crash** Home → lonceng → Notifikasi → Kembali (2/2): `IllegalArgumentException: No destination with route Notifikasi is on the NavController's back stack` karena `hiltViewModel(navController.getBackStackEntry(Route.Notifikasi))` dievaluasi ulang saat rute di-pop | Memakai `backStackEntry` milik rute itu sendiri. Teruji: PID tetap, tanpa exception, lewat tombol sistem dan panah layar |
+| 2 | Layar Tugas Terkumpul kosong tanpa keterangan (tugas tanpa pengumpulan, filter Sudah Dinilai), tanpa skeleton saat memuat | Skeleton, `ErrorState` + "Coba Lagi", `EmptyState` per filter |
+| 3 | Kembali dari Tugas Terkumpul mendarat di tab "List Tugas" (tab guru dan siswa memakai `remember`) | `rememberSaveable` di `TugasGuruScreen` dan `TugasSiswaScreen` |
+| 4 | Menutup form Unggah Materi / Edit Tugas dengan X memuat ulang daftar seolah ada perubahan | `onBack` terpisah dari `onDone` |
+| 5 | Alert presensi "School Calendar Event is not available for today" berbahasa Inggris | `ServerText.localize` di titik tampil (tes 2) → "Agenda kalender sekolah tidak tersedia untuk hari ini" |
+| 6 | Chip "Presensi Pulang" tampil di Masuk Sekolah walau jadwal belum diatur (`type_attendance` kosong) | `PresensiRules.typeVerb`: chip hanya bila server menyebut checkin/checkout (tes 1) |
+| 7 | Pratinjau tautan mengunduh gambar 2 MB sebagai teks; tautan gambar tampil "Tidak ada gambar pratinjau" | Tautan gambar jadi pratinjaunya sendiri tanpa unduh; bacaan HTML dibatasi 256 KB (`@Streaming`) |
+| 8 | Pratinjau foto Jurnal memotong bagian bawah (watermark tak terlihat) | `ContentScale.Fit` |
+| 9 | Label filter mapel panjang terpotong tanpa elipsis; Detail Tugas read-only masih memberi tanda * wajib | Elipsis; tanda * hanya saat bisa diedit |
+
+**Tidak diubah (alasan):** "ID Agenda" dan teks "Tap Lapor masuk" di Detail Agenda (sama dengan legacy); tautan materi hanya yang pertama (legacy memakai `link.first()`); skor 101 dijepit 100 (legacy menolak ketikan); tarik-muat-ulang List Tugas menembak dua request (paging halaman kedua); tombol Tonal tampak pucat (varian desain sistem di seluruh app); label "Kelas belum dimulai" pada jam yang lewat (aturan legacy: kunci jam siswa); hari mendatang di Data Absensi sama merahnya dengan hari kosong (spesifikasi); Notifikasi masih data contoh (fase notifikasi); `payment/wallet` dev 502 dan `name` diabaikan `list-subject` (server dev).
+
+**Catatan lain:** `can_leave` terlihat **true** untuk jadwal Magang 5 Nov (tombol "Laporan Harian"), jadi jendela presensi pulang bukan hanya klien; izin kamera dan lokasi app di Infinix kini diberikan (diminta penguji kamera). Belum teruji: semua yang butuh menulis ke server, memilih berkas, atau sesi kelas/jadwal berjalan (Check In, Mulai Kelas, lapor Agenda, dinas luar, Jawaban Terkumpul nyata, banner presensi selain NO_AGENDA, mode assigned).
+

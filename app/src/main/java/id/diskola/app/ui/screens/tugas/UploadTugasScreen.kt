@@ -207,7 +207,7 @@ fun UploadTugasScreen(
 
     DetailScaffold(
         title = if (!editing) "Detail Tugas" else if (route.isEdit) "Edit Tugas" else "Buat Tugas",
-        onBack = if (editing) onDone else onBack,
+        onBack = onBack,
         useCloseIcon = true,
         modifier = modifier,
         actions = {
@@ -268,7 +268,7 @@ fun UploadTugasScreen(
             if (errorMessage.isNotBlank()) BannerError(message = errorMessage, onDismiss = { viewModel.clearError() })
 
             FormCard {
-                FieldLabel("Kelas", required = true)
+                FieldLabel("Kelas", required = editing)
                 SimpleDropdown(
                     options = classes.map { it.id to (if (it.grade > 0) "${it.grade} - ${it.name}" else it.name) },
                     selected = selection.classId.takeIf { it > 0 },
@@ -282,7 +282,7 @@ fun UploadTugasScreen(
                 (fieldErrors["school_class_id"] ?: "Kelas wajib dipilih".takeIf { touchedClass && selection.classId <= 0 })?.let { ErrorText(it) }
 
                 if (assigned) {
-                    FieldLabel("Hari Mata Pelajaran", required = true)
+                    FieldLabel("Hari Mata Pelajaran", required = editing)
                     SimpleDropdown(
                         options = days.mapIndexed { index, d -> index to d.lable.ifBlank { d.key } },
                         selected = days.indexOfFirst { it.key == selection.day }.takeIf { it >= 0 },
@@ -295,7 +295,7 @@ fun UploadTugasScreen(
                     )
                     (fieldErrors["day"] ?: "Hari Mata Pelajaran wajib dipilih".takeIf { touchedDay && selection.day.isBlank() })?.let { ErrorText(it) }
 
-                    FieldLabel("Mata Pelajaran", required = true)
+                    FieldLabel("Mata Pelajaran", required = editing)
                     SimpleDropdown(
                         options = schedules.map { it.id to "[${it.time_plot.start_at} - ${it.time_plot.end_at}] ${it.subject.name}" },
                         selected = selection.scheduleId.takeIf { it > 0 },
@@ -311,7 +311,7 @@ fun UploadTugasScreen(
                     }
                     (fieldErrors["school_subject_id"] ?: "Mata Pelajaran wajib dipilih".takeIf { touchedSubject && selection.scheduleId <= 0 })?.let { ErrorText(it) }
                 } else {
-                    FieldLabel("Mata Pelajaran", required = true)
+                    FieldLabel("Mata Pelajaran", required = editing)
                     SimpleDropdown(
                         options = subjects.map { it.id to it.name },
                         selected = selection.subjectId.takeIf { it > 0 },
@@ -327,7 +327,7 @@ fun UploadTugasScreen(
             }
 
             FormCard {
-                FieldLabel("Waktu berakhir", required = true)
+                FieldLabel("Waktu berakhir", required = editing)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -350,7 +350,7 @@ fun UploadTugasScreen(
             }
 
             FormCard {
-                FieldLabel("Judul Tugas", required = true, counter = "${title.length}/500")
+                FieldLabel("Judul Tugas", required = editing, counter = "${title.length}/500")
                 AppTextField(
                     value = title,
                     onValueChange = {
@@ -362,7 +362,7 @@ fun UploadTugasScreen(
                     enabled = editing,
                 )
 
-                FieldLabel("Deskripsi", required = true)
+                FieldLabel("Deskripsi", required = editing)
                 AppTextField(
                     value = description,
                     onValueChange = {

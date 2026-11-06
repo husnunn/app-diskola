@@ -539,6 +539,7 @@ fun MainTabsScreen(
                             navController.previousBackStackEntry?.savedStateHandle?.set("materiChanged", true)
                             navController.popBackStack()
                         },
+                        onBack = { navController.popBackStack() },
                     )
                 }
                 composable<Route.PdfViewer> { backStackEntry ->
@@ -780,8 +781,9 @@ fun MainTabsScreen(
                     )
                 }
 
-                composable<Route.Notifikasi> {
-                    val viewModel: NotifikasiViewModel = hiltViewModel(navController.getBackStackEntry(Route.Notifikasi))
+                composable<Route.Notifikasi> { backStackEntry ->
+                    // This route's own entry: looking it up with getBackStackEntry while it is being popped throws (crash on Back).
+                    val viewModel: NotifikasiViewModel = hiltViewModel(backStackEntry)
                     NotifikasiScreen(
                         viewModel = viewModel,
                         onBack = { navController.popBackStack() },

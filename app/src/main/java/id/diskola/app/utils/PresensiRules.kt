@@ -12,6 +12,16 @@ import java.util.Locale
  */
 object PresensiRules {
 
+    /**
+     * "Masuk" / "Pulang" for the header chip, only when the server said which one (`checkin` / `checkout`). With no type (the school's schedule is
+     * not set) the legacy rule still means Pulang for the button, but a chip saying "Presensi Pulang" next to "Jadwal presensi belum diatur" misleads.
+     */
+    fun typeVerb(typeAttendance: String): String? = when (typeAttendance.trim().lowercase()) {
+        "checkin" -> "Masuk"
+        "checkout" -> "Pulang"
+        else -> null
+    }
+
     private val SERVER_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
     private val CLOCK = DateTimeFormatter.ofPattern("HH:mm")
 
@@ -122,7 +132,7 @@ object PresensiRules {
     fun masukCard(status: MasukStatus, locationOff: Boolean, proximity: Proximity): MasukCard? = when (status) {
         MasukStatus.Loading -> null
         MasukStatus.CheckFailed -> MasukCard(CardTone.Error, "Gagal memuat data presensi")
-        is MasukStatus.ServerMessage -> MasukCard(CardTone.Info, status.text)
+        is MasukStatus.ServerMessage -> MasukCard(CardTone.Info, ServerText.localize(status.text))
         MasukStatus.ScheduleNotSet -> MasukCard(CardTone.Error, "Jadwal presensi belum diatur")
         MasukStatus.WaitingLocation ->
             if (locationOff) MasukCard(CardTone.Warning, "Lokasi perangkat nonaktif", offersEnableLocation = true)

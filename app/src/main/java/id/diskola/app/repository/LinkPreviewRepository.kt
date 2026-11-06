@@ -1,6 +1,7 @@
 package id.diskola.app.repository
 
 import id.diskola.app.apiservice.CommonApiService
+import id.diskola.app.utils.isImageFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -18,6 +19,8 @@ data class LinkPreviewData(
  * tags, `<title>` fallback), done with regex over the raw HTML instead of pulling in a new HTML
  * parser dependency for what's a handful of meta tags.
  */
+private const val MAX_HTML_BYTES = 256L * 1024
+
 class LinkPreviewRepository @Inject constructor(
     private val commonApiService: CommonApiService,
 ) {
@@ -29,8 +32,15 @@ class LinkPreviewRepository @Inject constructor(
         if (!url.startsWith("http://", ignoreCase = true) && !url.startsWith("https://", ignoreCase = true)) {
             return@withContext null
         }
+        // A link that is itself a picture is its own preview: nothing to scrape, and downloading it as text (seen: 2 MB) is wasted.
+        if (isImageFile(url)) return@withContext LinkPreviewData(url = url, title = null, description = null, imageUrl = url)
         try {
-            val html = commonApiService.downloadAsString(url).string()
+            val html = commonApiService.downloadAsString(url).use { body ->
+                // Meta tags sit at the top of a page; never read more than this much of whatever the link serves.
+                val source = body.source()
+                source.request(MAX_HTML_BYTES)
+                source.buffer.snapshot().utf8()
+            }
             LinkPreviewData(
                 url = url,
                 title = metaContent(html, "og:title") ?: tagContent(html, "title"),

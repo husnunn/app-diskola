@@ -234,10 +234,11 @@ fun JurnalFormScreen(
                         AsyncImage(
                             model = file,
                             contentDescription = "Foto suasana KBM",
-                            contentScale = ContentScale.Crop,
+                            // Fit, not Crop: the watermark (address, time) is at the bottom of the photo and a crop hid it in the preview.
+                            contentScale = ContentScale.Fit,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 220.dp)
+                                .heightIn(max = 280.dp)
                                 .clip(DiskolaExtraShapes.card)
                                 .border(1.dp, MaterialTheme.colorScheme.outlineVariant, DiskolaExtraShapes.card)
                                 .clickable { showFullPhoto = true },

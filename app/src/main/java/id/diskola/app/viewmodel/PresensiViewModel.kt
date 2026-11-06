@@ -9,6 +9,7 @@ import id.diskola.app.repository.OffsiteAvailability
 import id.diskola.app.repository.PresensiRepository
 import id.diskola.app.utils.AppErrorHandler
 import id.diskola.app.utils.PresensiRules
+import id.diskola.app.utils.ServerText
 import java.time.LocalDate
 import java.time.YearMonth
 import javax.inject.Inject
@@ -151,8 +152,8 @@ class PresensiViewModel @Inject constructor(
 
     private fun offsiteBlockMessage(offsite: OffsiteAvailability): String = when {
         offsite.message.contains("Workgroup", ignoreCase = true) -> "Maaf anda belum memiliki pengaturan jam"
-        offsite.responseText.isNotBlank() -> offsite.responseText
-        offsite.message.isNotBlank() -> offsite.message
+        offsite.responseText.isNotBlank() -> ServerText.localize(offsite.responseText)
+        offsite.message.isNotBlank() -> ServerText.localize(offsite.message)
         else -> "Presensi dinas luar tidak dapat dilakukan saat ini"
     }
 

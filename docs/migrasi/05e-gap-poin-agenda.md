@@ -36,15 +36,15 @@ Legenda: ✅ Selesai & diverifikasi di device · ✅* Selesai (kode benar, belum
 
 | Item | Status | Keterangan |
 |---|---|---|
-| Strip tanggal sebulan, label bulan + picker bulan/tahun, ringkasan "x / y sesi" | ✅* | `DateStrip`, `MonthYearPickerDialog`, `AgendaMingguanScreen`. |
-| Status chip & routing tap (hari ini, `gate.in`) | ✅* | `AgendaUiStatus` (INFO tak dibuat), `AgendaMingguanViewModel.resolveTap()`. |
-| Alert gate: tombol "Presensi" dan "Tutup" (seperti legacy; koreksi 2026-11-04 — catatan lama "hanya Tutup" basi sejak tombol Presensi dibuat) | ✅* | "Presensi" membuka layar Presensi langsung; legacy melewati pemeriksaan ketersediaan fitur dulu (belum ditiru, lihat FLOW_QUESTIONS 2026-11-04 audit). |
-| Cache Room per tanggal; 1× fetch saat buka | ✅* | `AgendaRepository` (tidak pernah fetch sendiri); `init` memuat sekali, ON_RESUME pertama diabaikan. Legacy: 2× saat buka. |
-| Lapor masuk/pulang: izin lokasi, GPS, peta, alamat, POST `{agenda_id,lat,lng}` | ✅* | `AgendaCheckScreen`/`LocationProvider`. Deviasi disengaja: submit disabled sampai ada fix GPS; izin fine **atau** coarse cukup; Geocoder API 33 punya `onError`; jam tampil berjalan. |
+| Strip tanggal sebulan, label bulan + picker bulan/tahun, ringkasan "x / y sesi" | ✅ | `DateStrip`, `MonthYearPickerDialog`, `AgendaMingguanScreen`. **uji device 2026-11-06: strip, label bulan, picker, ringkasan "0 / 7 sesi".** |
+| Status chip & routing tap (hari ini, `gate.in`) | ✅* | `AgendaUiStatus` (INFO tak dibuat), `AgendaMingguanViewModel.resolveTap()`. **uji device 2026-11-06: chip "Belum"; ketuk "Absen Hadir" saat `gate.in` null membuka dialog gate; status lain belum bisa dicapai.** |
+| Alert gate: tombol "Presensi" dan "Tutup" (seperti legacy; koreksi 2026-11-04 — catatan lama "hanya Tutup" basi sejak tombol Presensi dibuat) | ✅ | "Presensi" membuka layar Presensi langsung; legacy melewati pemeriksaan ketersediaan fitur dulu (belum ditiru, lihat FLOW_QUESTIONS 2026-11-04 audit). **uji device 2026-11-06: "Presensi" memanggil `check-feature-availability` lalu membuka Presensi.** |
+| Cache Room per tanggal; 1× fetch saat buka | ✅ | `AgendaRepository` (tidak pernah fetch sendiri); `init` memuat sekali, ON_RESUME pertama diabaikan. Legacy: 2× saat buka. **uji device 2026-11-06: 1 fetch saat buka, 1 per tanggal baru, 0 untuk tanggal yang sudah dibuka.** |
+| Lapor masuk/pulang: izin lokasi, GPS, peta, alamat, POST `{agenda_id,lat,lng}` | ✅* | `AgendaCheckScreen`/`LocationProvider`. Deviasi disengaja: submit disabled sampai ada fix GPS; izin fine **atau** coarse cukup; Geocoder API 33 punya `onError`; jam tampil berjalan. **uji device 2026-11-06: belum teruji, layar butuh `gate.in` terisi.** |
 | Pesan error `errors` → `message` → fallback | ✅* | `ApiException.validationMessages` (baru, diisi `ResponseInterceptor`) dipakai `AgendaRepository`. |
-| Kebijakan collapsible dengan teks persis | ✅* | `AgendaPolicySection`, hormati animator scale 0. |
-| Detail Agenda read-only | ✅* | `AgendaDetailScreen`. |
-| Badge Agenda di Hub (`summary.missing`, "9+") | ✅* | `HomeViewModel.refresh()` → `AgendaRepository.missingToday()`; `CounterBadge(max=9)`. |
+| Kebijakan collapsible dengan teks persis | ✅ | `AgendaPolicySection`, hormati animator scale 0. **uji device 2026-11-06: tiga varian teks.** |
+| Detail Agenda read-only | ✅ | `AgendaDetailScreen`. **uji device 2026-11-06.** |
+| Badge Agenda di Hub (`summary.missing`, "9+") | ✅ | `HomeViewModel.refresh()` → `AgendaRepository.missingToday()`; `CounterBadge(max=9)`. **uji device 2026-11-06: 7 = `summary.missing`; sempat tampil nilai lama selama refresh.** |
 
 **Pembaruan 2026-11-05 — Poin diuji dua peran (Infinix guru "Guru DEV", Samsung siswa HUSNI, server dev):**
 - **Teruji di device:** cari siswa (nama; hasil dari `konseling/score?name=`), layar Hasil (skor 0/0 lalu angka naik sesudah kirim), picker jenis (3 form), validasi form kosong ("Mohon isi keterangan terlebih dahulu", tanpa request; pesan dan urutan sama dengan legacy), ketiga kirim (`create/achievement` 200, `create/violation` 200, `create/calling-student` 201, body `score_student_id`, `school_handling_id`, `calling_at` "yyyy-MM-dd HH:mm:ss"), dialog sukses sesuai legacy, **tutup seluruh alur ke Hub** sesudah "Baik".

@@ -6,6 +6,7 @@ import okhttp3.ResponseBody
 import retrofit2.http.GET
 import retrofit2.http.Headers
 import retrofit2.http.Path
+import retrofit2.http.Streaming
 import retrofit2.http.Url
 
 interface CommonApiService {
@@ -23,6 +24,8 @@ interface CommonApiService {
     @GET
     suspend fun download(@Url url: String): ResponseBody
 
+    // Streaming: the caller may read only the start of a page instead of the whole body (the link preview wants a few meta tags).
+    @Streaming
     @Headers("Accept: */*")
     @GET
     suspend fun downloadAsString(@Url url: String): ResponseBody

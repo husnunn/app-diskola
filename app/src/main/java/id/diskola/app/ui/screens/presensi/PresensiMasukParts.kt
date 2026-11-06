@@ -153,7 +153,7 @@ internal fun MasukContent(
                 avatar = state.userAvatar,
                 lastLabel = state.lastLabel,
                 clock = clock,
-                verb = state.check?.let { if (isCheckIn) "Masuk" else "Pulang" },
+                verb = state.check?.let { PresensiRules.typeVerb(it.type_attendance) },
             )
             Column(
                 modifier = Modifier

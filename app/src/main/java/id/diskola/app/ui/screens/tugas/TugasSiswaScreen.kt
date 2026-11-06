@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -48,7 +49,7 @@ fun TugasSiswaScreen(
     modifier: Modifier = Modifier,
     viewModel: TugasSiswaViewModel = hiltViewModel(),
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var scoreDetailId by remember { mutableStateOf<Int?>(null) }
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
 
