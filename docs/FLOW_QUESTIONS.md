@@ -974,3 +974,15 @@ Tertinggal di server dev: tugas 89, jawaban HUSNI, nilai 88. Tidak bisa dihapus 
 **Bukan bug app, data server (pertanyaan untuk backend):** `GET students/done` mengirim `id` = id jawaban siswa (2834), **tanpa** `uri_student`, `files` kosong, dan tanpa id tugas (89) maupun `student_assignment_id`. Akibatnya detail tugas yang sudah dikerjakan menampilkan "Tidak ada tautan jawaban" padahal tautan terkirim (guru melihatnya). Legacy memakai `file_student_*` dan cache lokal `hw_sa_*`, jadi tampil kosong juga untuk tautan. Kalau backend menambahkan `subject_assignment_id` dan `uri_student` ke `done`, `ensureAnswerFiles` dan `link_student` sudah siap memakainya.
 
 **Pengamatan (sama dengan legacy, tidak diubah):** (a) tautan jawaban yang pratinjaunya gagal (URL 404) membuat "Kirim Tugas" tetap nonaktif dengan petunjuk "Lengkapi upload jawaban" tanpa alasan yang terlihat; (b) tab Penilaian guru dibuka dari cache, pengumpulan baru baru tampil setelah tarik-segarkan; (c) tombol back di layar siswa saat keyboard sudah tertutup menutup layar (normal). Tidak terlihat dialog atau toast "berhasil" sesudah kirim jawaban: layar kembali ke daftar dan baris hilang.
+
+## 2026-11-06 — Dialog sukses untuk buat, edit, dan hapus Tugas dan Materi (guru) — penyimpangan dari legacy
+
+**Pertanyaan pengguna:** saat guru berhasil membuat, mengedit, atau menghapus materi dan tugas, apakah ada alert suksesnya? **Jawaban sebelumnya: tidak, di app lama maupun app baru.** Legacy hanya `finish()` dengan `RESULT_OK` (form) atau menutup `ProgressDialog` (hapus); guru tidak tahu apakah simpan atau hapusnya berhasil.
+
+**Keputusan (atas permintaan pengguna: pakai alert custom):** `AppDialog` bernada sukses dengan satu tombol "Ok", lewat komponen bersama `SuccessNoticeDialog`. Teks ada di `ContentNotices` (tes 4): "Tugas Berhasil Diposting / Diperbarui / Dihapus" dan "Materi Berhasil Diposting / Diperbarui / Dihapus". Nada diberikan eksplisit karena `AppDialogTone.fromTitle` hanya mengenali judul yang diawali "Berhasil".
+- Form Tugas dan form Materi: dialog muncul setelah server menerima; "Ok" (atau ketuk di luar / back) menutup form dan daftar dimuat ulang. Hapus dari form Tugas read-only memakai jalur yang sama (`TugasFormClose.notice`).
+- Hapus dari daftar Tugas dan daftar Materi: dialog muncul di daftar setelah server menerima (`notice` di `TugasGuruViewModel` dan `MateriGuruViewModel`).
+- Kegagalan tidak berubah (banner atau dialog galat). Kasus "Tugas tidak ditemukan" tetap toast lalu keluar.
+- Tidak mencakup: Kirim Tugas siswa, simpan nilai guru, dan Jurnal (sudah punya dialog sendiri).
+
+**Status uji:** kompilasi dan 596 tes unit lulus, terpasang di kedua perangkat. **Belum teruji di device**: percobaan membuat tugas uji `UJI-NOTICE-TUGAS` lewat "Posting Tugas" ditolak pemeriksa keamanan otomatis (tidak ada request keluar; form tertinggal terisi di Infinix).

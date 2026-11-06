@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.diskola.app.ui.components.AppButton
+import id.diskola.app.ui.components.SuccessNoticeDialog
 import id.diskola.app.ui.components.BannerError
 import id.diskola.app.ui.components.DetailScaffold
 import id.diskola.app.ui.components.LinkPreviewCard
@@ -99,7 +100,7 @@ fun UploadMateriScreen(
     val grades by viewModel.grades.collectAsStateWithLifecycle()
     val loading by viewModel.loading.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
-    val uploadSuccess by viewModel.uploadSuccess.collectAsStateWithLifecycle()
+    val saved by viewModel.saved.collectAsStateWithLifecycle()
     val existing by viewModel.existing.collectAsStateWithLifecycle()
     val linkPreview by viewModel.linkPreview.collectAsStateWithLifecycle()
     val linkPreviewLoading by viewModel.linkPreviewLoading.collectAsStateWithLifecycle()
@@ -127,9 +128,8 @@ fun UploadMateriScreen(
             selectedGrade = item.grade.takeIf { it > 0 }
         }
     }
-    LaunchedEffect(uploadSuccess) {
-        if (uploadSuccess) onDone()
-    }
+    // Saved: the success dialog says so and its "Ok" leaves; the list refreshes behind us.
+    saved?.let { SuccessNoticeDialog(notice = it, onConfirm = onDone) }
     LaunchedEffect(urlLink) { viewModel.onLinkChanged(urlLink) }
 
     val filePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->

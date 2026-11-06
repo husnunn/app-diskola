@@ -56,6 +56,7 @@ import id.diskola.app.ui.components.LoadingState
 import id.diskola.app.ui.components.SearchableOptionSheet
 import id.diskola.app.ui.components.SelectOption
 import id.diskola.app.ui.components.SkeletonVariant
+import id.diskola.app.ui.components.SuccessNoticeDialog
 import id.diskola.app.ui.components.UnderlineTabRow
 import id.diskola.app.ui.theme.DiskolaExtraShapes
 import id.diskola.app.ui.theme.ScreenHorizontalPadding
@@ -127,6 +128,7 @@ private fun ListTugasTab(
     val classFilter by viewModel.classFilter.collectAsStateWithLifecycle()
     val loading by viewModel.listLoading.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
+    val notice by viewModel.notice.collectAsStateWithLifecycle()
 
     var openSheet by remember { mutableStateOf<GuruFilter?>(null) }
     var kebabFor by remember { mutableStateOf<HomeworkTable?>(null) }
@@ -249,6 +251,8 @@ private fun ListTugasTab(
             onSecondaryClick = { deleteFor = null },
         )
     }
+
+    notice?.let { SuccessNoticeDialog(notice = it, onConfirm = viewModel::consumeNotice) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

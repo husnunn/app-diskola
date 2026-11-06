@@ -11,6 +11,8 @@ import id.diskola.app.repository.LinkPreviewData
 import id.diskola.app.repository.LinkPreviewRepository
 import id.diskola.app.repository.TugasRepository
 import id.diskola.app.utils.AssignmentAccess
+import id.diskola.app.utils.ContentNotices
+import id.diskola.app.utils.SuccessNotice
 import id.diskola.app.utils.AssignmentDates
 import id.diskola.app.utils.AssignmentError
 import id.diskola.app.utils.AssignmentErrors
@@ -51,8 +53,8 @@ sealed interface TugasFormDialog {
     data class Failed(val text: String) : TugasFormDialog
 }
 
-/** The form is done: [toast] (if any) is shown, the screen closes and the list refreshes. */
-data class TugasFormClose(val toast: String? = null)
+/** The form is done: [toast] (if any) is shown, or the [notice] dialog when something was saved or deleted; then the screen closes and the list refreshes. */
+data class TugasFormClose(val toast: String? = null, val notice: SuccessNotice? = null)
 
 /**
  * "Buat/Edit Tugas" of the teacher (doc `05` §6.4, backend contract of 2026-10-22). Two forms, chosen by `teacher-data-scope`:
@@ -67,12 +69,12 @@ class UploadTugasViewModel @Inject constructor(
     private val sessionStore: SessionStore,
 ) : BaseViewModel() {
 
-    /** "Hapus Tugas" of the read-only detail; [onDeleted] runs only after the server accepted. */
-    fun deleteTugas(id: Int, onDeleted: () -> Unit) {
+    /** "Hapus Tugas" of the read-only detail; the form closes (after the success dialog) only once the server accepted. */
+    fun deleteTugas(id: Int) {
         if (id <= 0) return
         launchWithHandling {
             repository.deleteTugas(id)
-            onDeleted()
+            _finished.value = TugasFormClose(notice = ContentNotices.tugasDeleted())
         }
     }
 
@@ -349,7 +351,7 @@ class UploadTugasViewModel @Inject constructor(
                 val file = buildFile?.let { build -> withContext(Dispatchers.IO) { build() } }
                 val fields = AssignmentPayload.fields(input)
                 if (isEdit) repository.updateTugas(tugasId, fields, file) else repository.createTugas(fields, file)
-                _finished.value = TugasFormClose()
+                _finished.value = TugasFormClose(notice = ContentNotices.tugasSaved(isEdit))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

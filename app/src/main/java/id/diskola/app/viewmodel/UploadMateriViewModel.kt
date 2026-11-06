@@ -8,6 +8,8 @@ import id.diskola.app.dataclass.ResponData.MajorItem
 import id.diskola.app.dataclass.ResponData.MapelTable
 import id.diskola.app.dataclass.ResponData.MateriTable
 import id.diskola.app.repository.LinkPreviewData
+import id.diskola.app.utils.ContentNotices
+import id.diskola.app.utils.SuccessNotice
 import id.diskola.app.repository.LinkPreviewRepository
 import id.diskola.app.repository.MateriRepository
 import javax.inject.Inject
@@ -48,8 +50,9 @@ class UploadMateriViewModel @Inject constructor(
     private val _existing = MutableStateFlow<MateriTable?>(null)
     val existing: StateFlow<MateriTable?> = _existing.asStateFlow()
 
-    private val _uploadSuccess = MutableStateFlow(false)
-    val uploadSuccess: StateFlow<Boolean> = _uploadSuccess.asStateFlow()
+    /** Set once the server accepted the material; the screen shows it as a success dialog and leaves on its "Ok". */
+    private val _saved = MutableStateFlow<SuccessNotice?>(null)
+    val saved: StateFlow<SuccessNotice?> = _saved.asStateFlow()
 
     private val _linkPreview = MutableStateFlow<LinkPreviewData?>(null)
     val linkPreview: StateFlow<LinkPreviewData?> = _linkPreview.asStateFlow()
@@ -95,7 +98,7 @@ class UploadMateriViewModel @Inject constructor(
         // The reason from the server (422, offline…) as legacy showed it, not a fixed "Gagal membuat materi" that hid it.
         launchWithHandling {
             if (isEdit) repository.updateMateri(materiId, data, filePart) else repository.createMateri(data, filePart)
-            _uploadSuccess.value = true
+            _saved.value = ContentNotices.materiSaved(isEdit)
         }
     }
 }

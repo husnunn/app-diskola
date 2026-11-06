@@ -6,6 +6,8 @@ import id.diskola.app.dataclass.ResponData.ClassRoomTable
 import id.diskola.app.dataclass.ResponData.MapelTable
 import id.diskola.app.dataclass.ResponData.MateriTable
 import id.diskola.app.repository.MateriRepository
+import id.diskola.app.utils.ContentNotices
+import id.diskola.app.utils.SuccessNotice
 import id.diskola.app.utils.session.SessionStore
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -134,6 +136,15 @@ class MateriGuruViewModel @Inject constructor(
     fun deleteMateri(id: Int) {
         launchWithHandling(customMessage = "Gagal menghapus materi. Silakan coba lagi.") {
             repository.deleteMateri(id)
+            _notice.value = ContentNotices.materiDeleted()
         }
+    }
+
+    /** Set once the server accepted a delete; the list screen shows it as a success dialog. */
+    private val _notice = MutableStateFlow<SuccessNotice?>(null)
+    val notice: StateFlow<SuccessNotice?> = _notice.asStateFlow()
+
+    fun consumeNotice() {
+        _notice.value = null
     }
 }

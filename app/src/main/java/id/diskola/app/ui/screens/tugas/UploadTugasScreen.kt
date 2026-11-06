@@ -53,6 +53,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.diskola.app.ui.components.AppButton
 import id.diskola.app.ui.components.AppDatePickerDialog
 import id.diskola.app.ui.components.AppDialog
+import id.diskola.app.ui.components.SuccessNoticeDialog
 import id.diskola.app.ui.components.AppLoadingDialog
 import id.diskola.app.ui.components.AppTimePickerDialog
 import id.diskola.app.ui.components.AppTextField
@@ -165,12 +166,15 @@ fun UploadTugasScreen(
         attachSoal = item.file_name.isNotBlank() || item.link.isNotBlank()
         selectedFileName = item.file_name.takeIf { it.isNotBlank() }
     }
-    // Saved, or the task is gone: say so (if there is something to say), then leave; the list refreshes behind us.
+    // Saved or deleted: the success dialog says so and its "Ok" leaves. The task is gone (or no teacher data): say so (if there is something
+    // to say) and leave at once. Either way the list refreshes behind us.
     LaunchedEffect(finished) {
         val close = finished ?: return@LaunchedEffect
+        if (close.notice != null) return@LaunchedEffect
         close.toast?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
         onDone()
     }
+    finished?.notice?.let { SuccessNoticeDialog(notice = it, onConfirm = onDone) }
     LaunchedEffect(link) { viewModel.onLinkChanged(link) }
 
     val filePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -478,8 +482,8 @@ fun UploadTugasScreen(
             primaryButtonText = "Hapus",
             onPrimaryClick = {
                 confirmDelete = false
-                // A refusal such as 400 "Tugas telah dikerjakan" is shown as the server words it (banner above); success closes and refreshes the list.
-                viewModel.deleteTugas(route.tugasId, onDeleted = onDone)
+                // A refusal such as 400 "Tugas telah dikerjakan" is shown as the server words it (banner above); success shows the dialog, then closes and refreshes the list.
+                viewModel.deleteTugas(route.tugasId)
             },
             secondaryButtonText = "Batal",
             onSecondaryClick = { confirmDelete = false },

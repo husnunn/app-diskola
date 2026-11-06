@@ -43,6 +43,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import id.diskola.app.dataclass.ResponData.MateriTable
 import id.diskola.app.ui.components.LoadMoreEffect
+import id.diskola.app.ui.components.SuccessNoticeDialog
 import id.diskola.app.ui.components.AppBottomSheet
 import id.diskola.app.ui.components.AppDialog
 import id.diskola.app.ui.components.BannerError
@@ -79,6 +80,7 @@ fun MateriGuruScreen(
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
 
     var openSheet by remember { mutableStateOf<GuruFilter?>(null) }
+    val notice by viewModel.notice.collectAsStateWithLifecycle()
     var kebabFor by remember { mutableStateOf<MateriTable?>(null) }
     var deleteFor by remember { mutableStateOf<MateriTable?>(null) }
 
@@ -224,6 +226,8 @@ fun MateriGuruScreen(
             onSecondaryClick = { deleteFor = null },
         )
     }
+
+    notice?.let { SuccessNoticeDialog(notice = it, onConfirm = viewModel::consumeNotice) }
 }
 
 /** "<grade> - <name>" when grade>0, matching doc §3.4's dropdown label rule; otherwise the bare name. */

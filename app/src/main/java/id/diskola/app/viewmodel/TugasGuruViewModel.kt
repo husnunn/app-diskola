@@ -6,6 +6,8 @@ import id.diskola.app.dataclass.ResponData.ClassRoomTable
 import id.diskola.app.dataclass.ResponData.HomeworkTable
 import id.diskola.app.dataclass.ResponData.MapelTable
 import id.diskola.app.repository.MateriRepository
+import id.diskola.app.utils.ContentNotices
+import id.diskola.app.utils.SuccessNotice
 import id.diskola.app.repository.TugasRepository
 import id.diskola.app.utils.session.SessionStore
 import javax.inject.Inject
@@ -123,6 +125,15 @@ class TugasGuruViewModel @Inject constructor(
     fun deleteTugas(id: Int) {
         launchWithHandling {
             repository.deleteTugas(id)
+            _notice.value = ContentNotices.tugasDeleted()
         }
+    }
+
+    /** Set once the server accepted a delete; the list screen shows it as a success dialog. */
+    private val _notice = MutableStateFlow<SuccessNotice?>(null)
+    val notice: StateFlow<SuccessNotice?> = _notice.asStateFlow()
+
+    fun consumeNotice() {
+        _notice.value = null
     }
 }
